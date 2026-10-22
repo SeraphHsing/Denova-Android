@@ -42,8 +42,10 @@
 | [05 开发路线与任务](05-roadmap.md) | 阶段、依赖、任务包、并行分工、阶段退出条件 |
 | [06 开发、测试与交付指导](06-development-and-validation.md) | 每日实施流程、测试数据、双端对照、CI、APK 与发布 |
 | [07 证据与决策记录](07-evidence-and-decisions.md) | 固定来源、技术决策、待验证项和平台差异 |
-| [复刻矩阵](parity-matrix.csv) | 功能与验收任务台账，所有行初始为未开始 |
-| [接口登记清单](api-inventory.csv) | 从固定基线路由登记与认证代码提取的接口索引 |
+| [复刻矩阵摘要](parity-matrix.csv) | 118 条首批场景的状态与追踪摘要 | 
+| [完整复刻矩阵 CSV（gzip）](parity-matrix.full.csv.gz) | 保留原始矩阵的全部步骤、预期 UI 和服务端副作用 |
+| [API 路由登记说明](api-inventory.md) | 完整 API 清单的来源、字段和验证边界 | 
+| [完整 API 路由 CSV（gzip）](api-inventory.full.csv.gz) | 保留原始 277 条路由登记记录 |
 | [游戏事件清单](game-event-contract.csv) | 固定基线的 handled / ignored 事件分类 |
 | [基线元数据](baseline.json) | 仓库提交、来源文件 blob SHA、核对方式与验证状态 |
 
