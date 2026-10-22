@@ -51,6 +51,7 @@
 | ADR-08 | 先技术关卡，再完整写作链路，再并行页面 | 早期获得关键可行性证据 | P1→P4 |
 | ADR-09 | 客户端只回收自身终端owner | 独立客户端持有不同本地标签记录 | P1 / P4 |
 | ADR-10 | 先采用里程碑与验收关卡路线 | 用户已确认；阶段按依赖和退出条件推进 | 全过程 |
+| ADR-11 | 发送前持久化可恢复命令，编辑中持续保存草稿 | 本地提交边界按[03契约](03-api-and-state.md#6-写入与任务状态机)，不依赖进程终止回调 | P1 G2 / G3 / G4 |
 
 ## 4. 需要运行证据的事项
 
@@ -65,6 +66,7 @@
 | R07 | 系统边缘手势 | Web有24px边缘识别规则 | 真机手势 / 三键导航验证并记录差异 |
 | R08 | 日历工期 | 已确认先使用里程碑与验收关卡 | 后续需要日历排期时再补充容量与日期，当前不作为阶段启动前置条件 |
 | R09 | 设备、签名与渠道 | 本轮未获取具体值 | P0 / P6形成可执行构建与交付记录 |
+| R10 | 本地持久化与性能预算 | 已补充开发契约；数据规模、设备、数值预算与运行结果尚未获得 | P0冻结测量条件与预算，相关P1关卡按[06验证规范](06-development-and-validation.md)提供结果 |
 
 【推测，基于固定源码的交错执行推演，待实测】R06中，App终端脱离连接后，浏览器启动的全局清理可能释放该PTY。App只清理自身owner可以约束自身删除范围，不能改变浏览器的清理规则。若双端实测出现误删或内容丢失，G6保持未通过，在后端零改动边界内寻找可行处理；无法完成时登记阻塞，并在任何范围调整前取得明确决定。记录限制本身不能支持全量1:1完成，也不得用新增后台保活承诺掩盖进程回收情形。
 
@@ -78,6 +80,7 @@
 
 - [Compose UI架构](https://developer.android.com/develop/ui/compose/architecture)：状态与事件分离。
 - [Compose状态保存](https://developer.android.com/develop/ui/compose/state-saving)：轻量保存与持久存储边界。
+- [Android进程生命周期](https://developer.android.com/guide/components/activities/process-lifecycle)：系统终止进程时不能依赖最终清理回调。
 - [Compose与View互操作](https://developer.android.com/develop/ui/compose/migrate/interoperability-apis)：原生控件接入。
 - [WindowInsets](https://developer.android.com/develop/ui/compose/system/insets)：系统栏、可用内容区与键盘。
 - [网络安全配置](https://developer.android.com/privacy-and-security/security-config)：HTTP / TLS配置。

@@ -1,6 +1,6 @@
 # API 路由登记清单
 
-完整、可直接阅读的权威清单位于 [api-inventory.csv](api-inventory.csv)。压缩归档 [api-inventory.full.csv.gz](api-inventory.full.csv.gz) 保留相同的完整数据；日常开发以 CSV 为准，不需要先解压，也不维护独立摘要版。
+完整、可直接阅读的权威清单位于 [api-inventory.csv](api-inventory.csv)。该 CSV 是唯一维护版本；本文件只说明来源、字段与验证边界。
 
 - 原始记录数：277 条静态 API 注册记录。
 - 原始列：`method`、`path`、`scope`、`registered_gate`、`handler`、`source_path`、`source_line`、`verification_status`。

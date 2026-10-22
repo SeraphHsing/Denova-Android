@@ -4,7 +4,7 @@
 
 Android 对现有接口进行独立实现。方法、路径、字段名、空值、默认值、分页、revision 与权限均以固定基线为准。
 
-完整可读清单位于 [api-inventory.csv](api-inventory.csv)，压缩归档位于 [api-inventory.full.csv.gz](api-inventory.full.csv.gz)。清单登记路由方法、完整路径、作用域、注册中间件、handler、来源文件和行号。它覆盖 `routes.go` 的 API 注册与 `remote_access.go` 的认证注册；`/api/platform/manage/*path` 的内部子路由仍需沿平台调用展开。清单不推断 handler 内权限和完整 DTO。
+完整可读清单位于 [api-inventory.csv](api-inventory.csv)，该 CSV 是唯一维护版本。清单登记路由方法、完整路径、作用域、注册中间件、handler、来源文件和行号。它覆盖 `routes.go` 的 API 注册与 `remote_access.go` 的认证注册；`/api/platform/manage/*path` 的内部子路由仍需沿平台调用展开。清单不推断 handler 内权限和完整 DTO。
 
 每条被页面使用的接口在实现前补齐：Web 调用位置、请求与响应字段、可空与可省略语义、成功和错误 fixture、认证及权限、缓存键、失效范围、重试条件。新增契约文档附在对应功能目录，链接回矩阵 ID。
 
@@ -150,6 +150,16 @@ checkpoint、rehydrate、turn persisted、ask、suspended、recovery、done / ab
 
 客户端提交状态建议分为 `draft → submitting → accepted / uncertain / rejected`。这是客户端交付状态；服务端的 operation、phase、active、queue、pending_ask 和 recovery projection 保留原字段及语义。
 
+具有 `command_id` 的可恢复 Agent / Game 业务命令遵循以下本地提交顺序；这是客户端实现契约，不新增服务器字段或协议：
+
+1. 为同一逻辑命令生成稳定 `command_id`，在同一个本地事务中保存服务器与实体作用域、输入快照、适用的目标身份和 `submitting` 状态。事务成功返回后才允许发送 HTTP；落盘失败则保留输入、呈现错误并停止发送。
+2. HTTP回执到达后，持久化回执、command / operation / task绑定和已确认交付状态，再更新本地确认记录。回执落盘失败时保留原命令记录与未确认状态，重新读取服务端结果，不以新ID重复提交。
+3. 进程重建时先读取本地未确认记录，再按精确作用域查询 canonical历史与active状态。`submitting` 只证明本地命令记录存在，不能证明请求已发出或服务端未接受；核对前不自动重发。
+
+命令记录不保存登录密码、Cookie、配对token、attach token或其他认证秘密。文档草稿的本地提交独立于服务端自动保存：编辑期间持续排队写入本地存储，并记录成功提交的 `editGeneration`；恢复至少还原最近一次已确认持久化快照，尚未提交的输入窗口必须可测并在P0/G2锁定上限。后台和导航flush仅补充提交，不依赖进程被终止时执行清理回调。[Android进程生命周期](https://developer.android.com/guide/components/activities/process-lifecycle)
+
+验收分别在本地事务前 / 后、HTTP发出后但回执确认前、草稿提交前 / 后终止进程；检查已确认快照、未提交窗口、稳定命令身份与服务端副作用，不能只测试正常退出。具体测量与预算见 [06 开发与验证](06-development-and-validation.md)。
+
 | 事件 | 客户端处理 |
 |---|---|
 | 接受了明确回执 | 保存 command / operation / task 绑定，跟随服务端投影 |
@@ -193,7 +203,7 @@ sequenceDiagram
 
 DocumentSession 至少保存 `DocumentKey/baseContent/baseRevision/localContent/editGeneration`。同一文档保存串行，不同文档按 key 保留最新待保存值。发送快照与当前编辑内容分离，回执只确认当时快照；期间继续编辑仍为 dirty。
 
-基线默认自动保存延迟为 1500ms，可由现有设置覆盖。外部内容同步不启动新的用户编辑定时器。导航前 flush；不可等待的系统回收首先以本地持久化保留草稿。
+基线默认服务端自动保存延迟为 1500ms，可由现有设置覆盖。该计时不代替上述本地草稿持久化。外部内容同步不启动新的用户编辑定时器；导航前补充flush，进程回收后仅依据此前已经提交的本地快照恢复，不假定系统会留出最后落盘时间。
 
 revision 冲突时，以 base / local / remote 三方合并。无重叠则按新 revision 继续；基线最多三次保存尝试。有真实重叠时暂停自动保存，保留冲突材料，通过现有 autosave-conflicts 接口及页面动作提供“载入外部版本 / 保留合并结果 / 手动保存”。保存冲突材料失败也必须可见。
 

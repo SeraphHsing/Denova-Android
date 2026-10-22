@@ -42,15 +42,13 @@
 | [05 开发路线与任务](05-roadmap.md) | 阶段、依赖、任务包、并行分工、阶段退出条件 |
 | [06 开发、测试与交付指导](06-development-and-validation.md) | 每日实施流程、测试数据、双端对照、CI、APK 与发布 |
 | [07 证据与决策记录](07-evidence-and-decisions.md) | 固定来源、技术决策、待验证项和平台差异 |
-| [完整复刻矩阵（CSV）](parity-matrix.csv) | 完整权威矩阵，保留全部原始字段、步骤、预期 UI、服务端副作用和验收信息 |
-| [完整复刻矩阵压缩归档（gzip）](parity-matrix.full.csv.gz) | 完整矩阵的压缩归档；与可读 CSV 对应，不单独维护 |
+| [复刻矩阵（CSV，首批118场景）](parity-matrix.csv) | 唯一维护的场景矩阵；P0继续展开并冻结完整范围 |
 | [API 路由登记说明](api-inventory.md) | 完整 API 清单的来源、字段和验证边界 | 
 | [完整 API 路由清单（CSV）](api-inventory.csv) | 277 条静态路由注册记录的可读完整版本 |
-| [API 路由压缩归档（gzip）](api-inventory.full.csv.gz) | 完整 API 清单的压缩归档；与可读 CSV 对应，不单独维护 |
 | [游戏事件清单](game-event-contract.csv) | 固定基线的 handled / ignored 事件分类 |
 | [基线元数据](baseline.json) | 仓库提交、来源文件 blob SHA、核对方式与验证状态 |
 
-本包包含8份Markdown文档（含本总览）、118条首批复刻验收场景、277条静态接口注册记录、35类游戏事件及基线元数据。接口和事件数量来自固定源码提取，场景数量不代表P0已经完成逐字段盘点。
+本目录包含9份Markdown文档（含本总览与API清单说明）、118条首批复刻验收场景、277条静态接口注册记录、35类游戏事件及基线元数据。接口和事件数量来自固定源码提取，场景数量不代表P0已经完成逐字段盘点。
 
 ## 4. 开发路线
 

@@ -1,6 +1,6 @@
 # 02 技术架构与工程设计
 
-本文件为新工程的设计决定。类名和目录是实施指导，实际创建时按职责落实，不要求提前创建空文件。
+本文件为新工程的设计决定与开发契约，尚未实现或运行验收。类名和目录是实施指导，实际创建时按职责落实，不要求提前创建空文件。
 
 ## 1. 技术选择
 
@@ -103,8 +103,8 @@ TerminalOwner   = ServerKey + ClientInstanceID + TabID
 | 状态 | 所有者 | 保存位置 | 恢复方式 |
 |---|---|---|---|
 | 项目、文件、消息、任务、权限 | 服务器 | 服务器 | 重新读取对应接口 |
-| 文件编辑草稿与基线 | DocumentSession | Room | 与服务端 revision 比较 |
-| 未确认的写命令身份 | 会话级 CommandStore | Room | 读取 active / 历史后判断结果 |
+| 文件编辑草稿与基线 | DocumentSession | Room | 恢复已确认提交的世代，与服务端 revision 比较 |
+| 可恢复 Agent / Game 命令身份及输入快照 | 会话级 CommandStore | Room | 读取已提交记录，再用 active / 历史核对结果 |
 | 消息展示投影 | 会话状态持有者 | 内存，最小恢复锚点可持久化 | 历史 + active + 正确的流边界 |
 | 页面、选中 ID、标签、滚动 | 页面 / 导航持有者 | SavedStateHandle + 必要的偏好 | ID 有效性验证后恢复 |
 | 富文本内存 AST、选区、IME | 编辑器适配器 | 内存；必要选区锚点轻量保存 | 从 canonical Markdown 恢复 |
@@ -113,13 +113,17 @@ TerminalOwner   = ServerKey + ClientInstanceID + TabID
 
 ViewModel 用于跨配置变化保留状态；进程被回收后，不能依赖内存。SavedStateHandle / rememberSaveable 保存 ID、选择与轻量状态，大文档与消息列表放持久层。依据 [Android 状态保存说明](https://developer.android.com/develop/ui/compose/state-saving)。
 
+本地持久化以 Room 事务成功提交为确认边界，排队或开始写入不能显示为已保存。编辑期间按 DocumentKey 持续提交草稿、基线和 editGeneration，分别跟踪内存世代与已提交世代；较旧事务完成不能确认更新的输入。允许合并尚未提交的快照，但最大未提交窗口须在 [06 的 D03 性能基准](06-development-and-validation.md#4-测试数据) 中冻结并测量。恢复仅使用已确认提交的本地版本，不承诺立即终止进程后保留尚未提交的按键；本地提交失败需保留可见错误，不能继续宣称草稿已落盘。
+
+具有 command_id 的可恢复 Agent / Game 业务命令，必须在 HTTP 发送前，以同一 Room 事务保存服务器与实体作用域、稳定 command_id、输入快照、适用 target 身份及 submitting 状态；事务提交失败则不发送。回执与操作绑定落盘确认后才更新本地已确认状态。进程重建先核对服务端 canonical 状态，不因本地记录仍为 submitting 就创建新命令或盲目重发。该命令记录不用于保存登录凭证、配对 token 或任意敏感设置请求体；具体提交与核对流程见 [03](03-api-and-state.md#6-写入与任务状态机)。
+
 ## 6. 界面与会话生命周期
 
 写作正文 / Agent 切换时复用同一 DocumentSession 与 ConversationSession。页面隐藏可以停渲染，但不能隐式丢弃草稿、创建新会话或取消远程任务。其他缓存目的地按 Web 的保留行为建立状态。
 
-进入后台：立即把未落盘输入与恢复身份持久化；不把停止收流等同于停止服务端任务。恢复前台：校验认证，读取 canonical 状态，再重建视图与附接。旋转：以稳定 owner 和 key 复用状态，避免重复订阅。
+进入后台时补充 flush 已排队的本地写入，不把后台或销毁回调作为唯一保存时点。系统终止进程时不依赖清理回调补存数据，依据 [Android 进程生命周期说明](https://developer.android.com/guide/components/activities/process-lifecycle)。停止收流不等同于停止服务端任务。恢复前台：校验认证，读取 canonical 状态，再重建视图与附接。旋转：以稳定 owner 和 key 复用状态，避免重复订阅。
 
-进程重建：读取 ServerKey 和路由身份，先验证连接与登录，再读取实体及 active 状态，最后恢复草稿与游标。实体被删除或权限改变时呈现对应错误，保留可导出的本地草稿。
+进程重建：读取已确认提交的 ServerKey、路由身份、草稿及命令记录，先验证连接与登录，再读取实体及 active 状态，核对后恢复草稿与游标。未确认命令不自动重复发送。实体被删除或权限改变时呈现对应错误，保留可导出的本地草稿。
 
 持续后台保活不是本项目默认前提。若后续需要前台服务或系统通知，必须作为独立产品能力决定；本方案的验收依赖恢复机制。
 
