@@ -26,8 +26,10 @@
 
 | 文件 | 用途 | 当前边界 |
 |---|---|---|
-| [复刻矩阵](android-web-parity/parity-matrix.csv) | 以矩阵 ID 跟踪功能、步骤、预期 UI / 服务端副作用、实现与验证证据 | 118 条首批场景；不是全量完成清单 |
-| [API 路由登记](android-web-parity/api-inventory.csv) | 静态登记方法、路径、注册门控、handler 和源码行号 | 277 条注册记录；不等于完整 DTO / 权限审计 |
+| [复刻矩阵摘要](android-web-parity/parity-matrix.csv) | 按矩阵 ID 查看功能族、阶段、实现状态、验证状态和证据路径 | 118 条首批场景；完整步骤与预期结果见 gzip 原始矩阵 |
+| [完整复刻矩阵 CSV（gzip）](android-web-parity/parity-matrix.full.csv.gz) | 保留原始矩阵的完整字段、步骤和预期结果 | 需解压后查看 |
+| [API 路由登记说明](android-web-parity/api-inventory.md) | 说明完整 API 清单字段、来源和边界 | 277 条静态注册记录；不等于完整 DTO / 权限审计 |
+| [完整 API 路由 CSV（gzip）](android-web-parity/api-inventory.full.csv.gz) | 保留原始方法、路径、作用域、注册门控、handler、来源文件和行号 | 需解压后查看 |
 | [游戏事件契约](android-web-parity/game-event-contract.csv) | 游戏 SSE 事件及 Web handled / ignored 分类 | 35 类事件；实现和测试尚未开始 |
 | [基线元数据](android-web-parity/baseline.json) | 固定提交、源文件 blob SHA、盘点计数和验证状态 | Web 运行、测试、Android 构建和真机均未执行 |
 
