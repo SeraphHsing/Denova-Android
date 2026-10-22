@@ -4,7 +4,7 @@
 
 Android 对现有接口进行独立实现。方法、路径、字段名、空值、默认值、分页、revision 与权限均以固定基线为准。
 
-[API 路由登记说明](api-inventory.md) 指向完整的 [压缩 CSV 清单](api-inventory.full.csv.gz)，其中登记路由方法、完整路径、作用域、注册中间件、handler、来源文件和行号。它覆盖 `routes.go` 的 API 注册与 `remote_access.go` 的认证注册；`/api/platform/manage/*path` 的内部子路由仍需沿平台调用展开。清单不推断 handler 内权限和完整 DTO。
+完整可读清单位于 [api-inventory.csv](api-inventory.csv)，压缩归档位于 [api-inventory.full.csv.gz](api-inventory.full.csv.gz)。清单登记路由方法、完整路径、作用域、注册中间件、handler、来源文件和行号。它覆盖 `routes.go` 的 API 注册与 `remote_access.go` 的认证注册；`/api/platform/manage/*path` 的内部子路由仍需沿平台调用展开。清单不推断 handler 内权限和完整 DTO。
 
 每条被页面使用的接口在实现前补齐：Web 调用位置、请求与响应字段、可空与可省略语义、成功和错误 fixture、认证及权限、缓存键、失效范围、重试条件。新增契约文档附在对应功能目录，链接回矩阵 ID。
 

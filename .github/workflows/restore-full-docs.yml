@@ -1,0 +1,58 @@
+name: Restore complete documentation sources
+
+on:
+  push:
+    branches:
+      - docs/organize-project-docs
+    paths:
+      - ".github/workflows/restore-full-docs.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out documentation branch
+        uses: actions/checkout@v4
+        with:
+          ref: docs/organize-project-docs
+
+      - name: Restore complete CSV files and validate them
+        shell: bash
+        run: |
+          set -euo pipefail
+          gzip -t docs/android-web-parity/parity-matrix.full.csv.gz
+          gzip -t docs/android-web-parity/api-inventory.full.csv.gz
+          gzip -dc docs/android-web-parity/parity-matrix.full.csv.gz > docs/android-web-parity/parity-matrix.csv
+          gzip -dc docs/android-web-parity/api-inventory.full.csv.gz > docs/android-web-parity/api-inventory.csv
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+
+          checks = [
+              (Path("docs/android-web-parity/parity-matrix.csv"), 118, 10),
+              (Path("docs/android-web-parity/api-inventory.csv"), 277, 8),
+          ]
+          for path, minimum_rows, minimum_columns in checks:
+              with path.open(encoding="utf-8-sig", newline="") as stream:
+                  rows = list(csv.reader(stream))
+              if len(rows) - 1 < minimum_rows:
+                  raise SystemExit(f"{path}: expected at least {minimum_rows} data rows, got {len(rows) - 1}")
+              if not rows or len(rows[0]) < minimum_columns:
+                  raise SystemExit(f"{path}: incomplete header ({len(rows[0]) if rows else 0} columns)")
+              print(f"{path}: {len(rows) - 1} data rows, {len(rows[0])} columns")
+              print("Header:", ", ".join(rows[0]))
+          PY
+
+      - name: Commit restored full sources and remove temporary workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/restore-full-docs.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A docs/android-web-parity/parity-matrix.csv docs/android-web-parity/api-inventory.csv .github/workflows/restore-full-docs.yml
+          git commit -m "docs: restore complete parity matrix and API inventory"
+          git push origin HEAD:docs/organize-project-docs

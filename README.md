@@ -20,9 +20,10 @@ Denova Android 是面向 Denova 手机 Web 工作区的原生 Android 客户端�
 
 - [当前状态](docs/STATUS.md)
 - [规格与矩阵索引](docs/README.md)
-- [复刻矩阵（CSV）](docs/android-web-parity/parity-matrix.csv)
+- [完整复刻矩阵（CSV）](docs/android-web-parity/parity-matrix.csv)
 - [API 路由登记说明](docs/android-web-parity/api-inventory.md)
-- [完整 API 路由 CSV（gzip）](docs/android-web-parity/api-inventory.full.csv.gz)
-- [完整复刻矩阵 CSV（gzip）](docs/android-web-parity/parity-matrix.full.csv.gz)
+- [完整 API 路由清单（CSV）](docs/android-web-parity/api-inventory.csv)
+- [完整复刻矩阵归档（gzip）](docs/android-web-parity/parity-matrix.full.csv.gz)
+- [完整 API 路由归档（gzip）](docs/android-web-parity/api-inventory.full.csv.gz)
 - [游戏流事件契约（CSV）](docs/android-web-parity/game-event-contract.csv)
 - [固定基线元数据](docs/android-web-parity/baseline.json)
