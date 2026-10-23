@@ -26,6 +26,7 @@
 - 2026-10-23 完成 P0-05/06 性能冻结：`06-development-and-validation.md` D03 冻结可重现输入（D03-W 文档 / D03-A 消息 / D03-S 流 / D03-P PTY 数据规模）、最低设备（模拟器 Pixel 6 / API 33 / 8GB）与测量方法；G2/G4/G5 数值预算按用户决定全部待实测，不编造。
 - 2026-10-23 完成 P0-07 工程建立：固定工具链（AGP 9.3.0 内置 Kotlin + Compose 编译器插件 2.4.21、Gradle Wrapper 9.5.1、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26、JDK 17），创建单 `app` 模块 + Version Catalog + `gradle/libs.versions.toml` + Compose 空白首屏 + 1 个 JVM 单测 + `.github/workflows/android.yml`；本地 `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿（debug APK 11MB）。`AGENTS.md` §6.1 同步为 `./gradlew`。
 - 2026-10-23 完成 G1 首轮（连接与认证原型）：`ServerKey` 连接身份规范化、`DenovaClient`(OkHttp + 内存 CookieJar 按服务器隔离 + 错误映射 + 共享 `okHttpClient` 供图片/SSE/WS)、status/login/pair/logout、`ConnectionStore`(DataStore 持久化服务器地址)、`ConnectionScreen`(服务器输入/登录/配对/状态/退出)；本地 + CI 全绿；真机（小米14 Pro / Android 16）对 `http://192.168.2.102:18081` 完成连接 + status + 登录 + 退出真实往返，DataStore 重启后服务器地址持久化验证通过。
+- 2026-10-23 完成 G2 首轮（Markdown 编辑器）：`MarkdownDocument`(commonmark 0.30.0 + GFM 表格扩展，parse/toHtml/toPlainText) + 8 个 JVM 序列化测试（标题/加粗斜体/列表/代码/引用/图片/表格/纯文本）；`EditorScreen` 源码模式 + WebView 预览双模式切换，认证后路由进入；修复 Android 15+ edge-to-edge 顶栏被状态栏遮挡问题（两屏均加 statusBars inset）。真机验证：登录后进入编辑器、源码模式正常、顶栏按钮手指可点（adb 注入触摸在顶部区域被设备悬浮层拦截，属设备环境非应用问题）。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -38,7 +39,7 @@
 | API 契约 | 281 条已按 85ec97c 重提取；handler→DTO 契约已按族核对（认证/写作/Agent流/游戏流/设置模型/终端/长尾族） | 逐字段嵌套 DTO 与双端读回验证在 P1 按需展开 |
 | Android 工程 | 已创建；本地 + CI `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿（APK 11MB） | 固定 JDK17、AGP 9.3.0（内置 Kotlin）、Gradle Wrapper 9.5.1、Compose 编译器插件 2.4.21、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26；CI 构建通过 |
 | G1 认证与网络 | 完成：连接 + status + 登录 + 退出 已真机真实往返通过；DataStore 服务器地址持久化完成 | 配对、受保护图片、SSE、WS、HTTPS/WSS、迟到 401 完成真实往返 |
-| G2 Markdown 编辑器 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双模式、IME、序列化与 D03 性能预算 |
+| G2 Markdown 编辑器 | 首轮完成：序列化层（commonmark 0.30.0 + GFM 表格，8 个 JVM 测试）+ 源码/预览双模式编辑器 + 认证后路由；本地 + CI 全绿；真机登录后可进入 | 富文本模式、原生渲染、图片/表格编辑、中文 IME、选区、D03 性能预算 |
 | G3 保存并发 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收 revision、草稿事务、进程恢复与并发冲突 |
 | G4 Agent / Game 流恢复 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
 | G5 原生终端 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收 ANSI / VT、输入、resize、owner 生命周期与 D03 性能预算 |

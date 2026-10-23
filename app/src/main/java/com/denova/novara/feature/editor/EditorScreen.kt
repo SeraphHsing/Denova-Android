@@ -4,9 +4,12 @@ import android.annotation.SuppressLint
 import android.webkit.WebView
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -56,7 +59,12 @@ fun EditorScreen(onLogout: () -> Unit) {
     var source by remember { mutableStateOf(SAMPLE) }
     var preview by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize()) {
+    // Android 15+ 强制 edge-to-edge，顶栏必须让出状态栏，否则按钮被状态栏拦截点不到。
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.statusBars),
+    ) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             Text("Novara 编辑器", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
             TextButton(onClick = { preview = !preview }) {
