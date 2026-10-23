@@ -186,6 +186,36 @@ checkpoint、rehydrate、turn persisted、ask、suspended、recovery、done / ab
 
 来源：[UIMessage 业务类型](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/agent-ui.ts#L39)、[SSE parser](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/sse.ts)、[游戏事件表](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/interactive/components/story-stage/story-stage-stream-events.ts#L8)。
 
+### 5.3 Agent 聊天与游戏流 endpoint 契约（85ec97c handler）
+
+**发送（三个入口，均强制 `command_id`，缺失 → 400 `agent_runtime.invalid_command`）**
+- 写作 `POST /api/chat`：见 §4 请求形状（`session_id/command_id/message/references/lore_references/style_scenes/selections/plan_mode`）。
+- 项目 Agent `POST /api/projects/:id/agent-chat/chat`：body `{session_id, command_id, message, ...ChatRequest}`；空 message 且无附件 → 400 messageRequired；成功后 `StreamTaskUI`。
+- 游戏 `POST /api/interactive/chat`：body `{command_id, mode("story"), story_id, branch, message, start_opening, resume_interruption_id, style_scenes, regenerate_from_turn_id, attachments}`；空 story_id → 400 storyIDRequired；mode 非 story → 400 storyModeOnly；`start_opening` 不允许携带输入/附件（否则 400）；成功后 `StreamTask`。
+
+**命令 `POST .../chat/commands`**（agent-chat / interactive / 全局 chat）
+- body `{session_id, type, command_id, target_operation_id, target_command_id?, input, reason}`；`type` ∈ steer_queued / cancel_queued / abort / suspend / follow_up 等；abort/suspend 与队列控制不要求 `input.message`；返回 `202 {command_id, operation_id, cursor}`。
+
+**恢复 `POST .../chat/recovery`**
+- body `{action:{action_id, kind(attach|resume|abort), command_id, operation_id}, session_id | story_id+branch_id}`；kind 非法或 identity 不完整 → 400 invalid_recovery；返回 `202 {task_id, status, stream_cursor, cursor, recovery_action}`；错误 409 recovery_changed / stream_attached / context_changed、400 invalid_recovery、409 no_workspace、503 recovery_failed。
+
+**流重连 `GET .../chat/stream?task_id=`**
+- 必填 `task_id`，失效 → 409 `agent_runtime.rehydrate_required`；游标来自 `?after=` 或 `Last-Event-ID`；游标无效 → 400、过期 → 409 `agent_stream.cursor_expired`（响应含 `earliest_cursor/latest_cursor`）。
+
+**active `GET .../chat/active`**
+- 返回 `{active, status, task_id, stream_cursor, pending_ask(s), pending_interruption_id, runtime projection}`；无任务 → `{active:false}`。
+
+**上下文分析 `POST .../chat/context-analysis`**
+- agent-chat body `{session_id, message}`；interactive body `{mode, story_id, branch, message, style_scenes}`；返回分析对象。
+
+**ask 应答 `POST .../asks/:ask_id/answer | cancel`**
+- answer body `{session_id|story_id, answers:[...]}`；cancel body `{session_id|story_id, reason}`；错误码 definition_mismatch / ask_stale / invalid_ask_answer / ask_conflict / ask_not_found / no_workspace。
+
+**SSE 帧格式（`sse/task.go`）**
+- 游戏 `StreamTask`：`id: <cursor>\nevent: <type>\ndata: <json>\n\n`；checkpoint 序列为 `task_checkpoint`（无 id）→ 事件回放 → `task_checkpoint_committed`（id=cursor）；投影超预算 → `task_rehydrate_required`。
+- Agent UI `StreamTaskUI`：AI SDK UI message 流，响应头 `x-vercel-ai-ui-message-stream: v1`，不携带 Last-Event-ID（一个 Task 事件可拆多个 AI SDK 帧）；checkpoint 不完整时发 typed `task_rehydrate_required` data part + `error` + `finish("error")`。
+- 两种流不可混用：游戏走 `StreamTask`，Agent 走 `StreamTaskUI`，分别解析、测试、恢复。
+
 ## 6. 写入与任务状态机
 
 客户端提交状态建议分为 `draft → submitting → accepted / uncertain / rejected`。这是客户端交付状态；服务端的 operation、phase、active、queue、pending_ask 和 recovery projection 保留原字段及语义。
