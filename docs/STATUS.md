@@ -32,6 +32,8 @@
 - 2026-10-23 完成 G3 编排层：`FileSaveCoordinator`（抽象 `FileRemote`/`DraftStorage` 接口）——落草稿→保存→409→读服务器版→`ThreeWayMerge`→干净用新 revision 重存/冲突产材料，同一文件按 `Mutex` 串行；3 个测试覆盖无冲突/干净合并重存/冲突材料。
 - 2026-10-23 完成 G3 UI 集成并真机验证：`EditorViewModel`（打开文件/编辑/防抖自动保存/冲突状态）+ `EditorScreen` 项目ID+文件路径输入与保存状态显示 + `ConnectionViewModel` 暴露 client + `MainActivity` 绑定。真机（小米14 Pro）对 `灵渊劫-问道` 项目的 `ideas.md` 完成两次完整保存周期：打开（390 字符加载）→ 插入空格 → 自动保存（"已保存"，revision `459b…`→`3bcf…`，长度 391）→ 删除 → 再自动保存（`2a80…`，长度恢复 390）。并发 409 冲突场景需双端联调，待实测。
 - 2026-10-23 补齐日志与调试基础设施（工程准备，不属业务矩阵；此前登记为"完成"但实现缺失，本次补齐并校正描述）：`core/logging`（`LogLevel`/`LogEntry`/`Redactor` 脱敏/`LogSink` 接口 + `LogcatSink`/`MemoryLogSink` 环形缓冲/`LogSystem` 级别过滤/`DenovaLog` 静态门面）、`feature/debug` 运行时 Debug 面板（实时刷新、级别/tag 过滤、清空）、`MainActivity` 挂 `LogcatSink` 并开启 `buildConfig`。关键路径打点（连接/认证/编辑器保存）已接入。新增 7 个 JVM 测试（脱敏/级别过滤/环形缓冲/门面）。日志语言统一英文、不记密码/Cookie/配对与 attach token/API key/私人正文（见 AGENTS.md §5）。`FileLogSink`/`DenovaHttpLogger`/`DebugSettings`/`AppContainer` 未实现，留待需要时补充。
+- 2026-10-23 完成 G4 首轮（游戏流事件模型 + checkpoint 游标状态机）：`GameEventType`（35 类事件、handled/checkpoint 标记、wireName snake_case 映射）+ `GameStreamState`（checkpoint 回放窗口、committed 游标、rehydrate 标记）。
+- 2026-10-23 完成 G4 第 2 轮（SSE 解析器 + 流会话，纯逻辑，可 JVM 单测）：`SseParser`（`\n\n`/`\r\r`/`\r\n\r\n` 分帧、注释/空行、多行 data、前导空格、EOF 剩余，对齐 Web `sse.ts`）、`GameStreamDecoder`、`GameStreamSession`（解析 + 游标/回放/rehydrate 状态 + `resetForRehydrate` + rehydrate 重连参数提取）。**修正 `GameStreamState` 游标语义为「按事件非零 id 推进」**（对齐 Web `id && id !== '0'`，此前仅在 `task_checkpoint_committed` 记录游标会漏掉后续 buffered/live 事件的推进）。新增 9 个 SSE 解析器测试 + 5 个流会话测试，并补充 3 个状态测试（非零 id 推进 / rehydrate 退出回放 / reset）。SSE 网络层（OkHttp）与 active/recovery HTTP 编排、游戏 UI 投影、真机双端恢复待下一轮。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -46,7 +48,7 @@
 | G1 认证与网络 | 完成：连接 + status + 登录 + 退出 已真机真实往返通过；DataStore 服务器地址持久化完成 | 配对、受保护图片、SSE、WS、HTTPS/WSS、迟到 401 完成真实往返 |
 | G2 Markdown 编辑器 | 两轮完成：序列化层（commonmark 0.30.0 + GFM 表格，8 测试）+ 源码/富文本/预览三模式；富文本 = 标记隐藏(零宽替换) + 内联样式 + 格式化工具栏，纯逻辑层 4 测试；本地 + CI 全绿；真机验证富文本渲染 | 图片/表格编辑、中文 IME、选区增强、D03 性能预算 |
 | G3 保存并发 | 三轮完成：三方合并 `ThreeWayMerge`（diff3，5 测试）+ 文件读写 revision 校验 + 本地草稿 `DraftStore` + 保存编排 `FileSaveCoordinator`（Mutex 串行，3 测试）+ 编辑器 UI 集成（`EditorViewModel` 打开文件/防抖自动保存/冲突提示 + `EditorScreen` 项目ID/路径输入 + 保存状态）；本地 26 测试 + CI 全绿；真机两次完整保存周期（插入空格→已保存→revision 递增→删除→再保存→恢复） | 真机并发（双端编辑触发 409→合并）、迟到回包、进程恢复实测 |
-| G4 Agent / Game 流恢复 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
+| G4 Agent / Game 流恢复 | 进行中：事件模型 + checkpoint 游标状态机 + SSE 解析器 + 流会话（纯逻辑）已本地全绿；SSE 网络层（OkHttp）+ active/recovery HTTP 编排 + 游戏 UI 投影 + 真机双端恢复待做 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
 | G5 原生终端 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收 ANSI / VT、输入、resize、owner 生命周期与 D03 性能预算 |
 | G6 远程权限与双端共存 | 未开始 | 以[路线中的G6](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)为准；误删对方PTY或丢失会话内容时未通过，仅记录限制不能退出 |
 | CI 与 APK | 已配置并通过（GitHub Actions 全绿，APK 工件 `novara-debug-apk` 上传成功） | GitHub Actions 运行构建、测试、Lint 并保存报告与 APK 工件 |

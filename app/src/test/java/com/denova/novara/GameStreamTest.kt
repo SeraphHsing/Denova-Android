@@ -51,12 +51,34 @@ class GameStreamTest {
     }
 
     @Test
-    fun `normal events do not change state`() {
+    fun `events with non-zero ids advance cursor`() {
         val state = GameStreamState()
         state.onEvent("id-1", GameEventType.CHUNK)
-        state.onEvent("id-2", GameEventType.DONE)
-        assertNull(state.cursor)
+        state.onEvent(null, GameEventType.THINKING)
+        state.onEvent("0", GameEventType.DONE)
+        assertEquals("id-1", state.cursor)
         assertFalse(state.replayingCheckpoint)
         assertFalse(state.rehydrationRequired)
+    }
+
+    @Test
+    fun `rehydrate required sets flag and exits replay`() {
+        val state = GameStreamState()
+        state.onEvent(null, GameEventType.TASK_CHECKPOINT)
+        assertTrue(state.replayingCheckpoint)
+        state.onEvent(null, GameEventType.TASK_REHYDRATE_REQUIRED)
+        assertTrue(state.rehydrationRequired)
+        assertFalse(state.replayingCheckpoint)
+    }
+
+    @Test
+    fun `reset clears all recovery state`() {
+        val state = GameStreamState()
+        state.onEvent("10", GameEventType.TASK_CHECKPOINT_COMMITTED)
+        state.onEvent(null, GameEventType.TASK_REHYDRATE_REQUIRED)
+        state.reset()
+        assertNull(state.cursor)
+        assertFalse(state.rehydrationRequired)
+        assertFalse(state.replayingCheckpoint)
     }
 }
