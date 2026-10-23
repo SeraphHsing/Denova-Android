@@ -30,6 +30,8 @@ import com.denova.novara.feature.debug.DebugPanelScreen
 import com.denova.novara.feature.debug.DebugPanelViewModel
 import com.denova.novara.feature.editor.EditorScreen
 import com.denova.novara.feature.editor.EditorViewModel
+import com.denova.novara.feature.game.GameScreen
+import com.denova.novara.feature.game.GameViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,6 +52,11 @@ class MainActivity : ComponentActivity() {
                         checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
                     )
                 }
+                val gameViewModel: GameViewModel = viewModel {
+                    GameViewModel(
+                        checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
+                    )
+                }
                 val debugViewModel: DebugPanelViewModel = viewModel {
                     DebugPanelViewModel(
                         checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
@@ -57,18 +64,27 @@ class MainActivity : ComponentActivity() {
                 }
                 val state by connectionViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
+                var showGame by remember { mutableStateOf(false) }
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (state) {
                         is ConnectionUiState.Authenticated -> {
                             val client = connectionViewModel.client
                             LaunchedEffect(client) {
-                                if (client != null) editorViewModel.bindClient(client)
+                                if (client != null) {
+                                    editorViewModel.bindClient(client)
+                                    gameViewModel.bindClient(client)
+                                }
                             }
-                            EditorScreen(
-                                viewModel = editorViewModel,
-                                onLogout = { connectionViewModel.logout() },
-                            )
+                            if (showGame) {
+                                GameScreen(viewModel = gameViewModel, onBack = { showGame = false })
+                            } else {
+                                EditorScreen(
+                                    viewModel = editorViewModel,
+                                    onOpenGame = { showGame = true },
+                                    onLogout = { connectionViewModel.logout() },
+                                )
+                            }
                         }
                         else -> ConnectionScreen(connectionViewModel)
                     }
