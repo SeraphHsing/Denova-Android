@@ -59,7 +59,7 @@
 
 ### 6.1 常用命令
 
-P0-07 起仓库已有 Gradle 工程与 Wrapper。工具链固定：AGP 9.3.0、Kotlin 2.4.21（`android.builtInKotlin=false` 显式用 KGP，与本地 kotlinc 一致）、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26、JDK 17、Gradle Wrapper 9.5.1。本地与 CI 均用 `./gradlew`。
+P0-07 起仓库已有 Gradle 工程与 Wrapper。工具链固定：AGP 9.3.0（内置 Kotlin）、Compose 编译器插件 2.4.21、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26、JDK 17、Gradle Wrapper 9.5.1。本地与 CI 均用 `./gradlew`。
 
 - 主检查（应用代码、构建配置或依赖变更时）：`./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
 - 单个测试：`./gradlew --no-daemon :app:testDebugUnitTest --tests "*ExampleUnitTest*"`

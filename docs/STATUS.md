@@ -24,7 +24,7 @@
 - 2026-10-23 完成 P0-03 首轮静态盘点：新增 [08 页面/表面全量清单](android-web-parity/08-surface-inventory.md)，从后端 `web/src` 与 `internal/api/routes.go` 枚举 14 个顶层表面、子表面、条件入口与 API 族映射；Web 基线由 671ef4eb 升级至 85ec97c（仅 AGENTS.md / routes.go / settings-sections.ts 三文件变化，routes.go 净增 4 条项目作用域 interactive/stories 路由）；api-inventory.csv 已按 85ec97c 重提取为 281 条（routes.go 276 + remote_access.go 认证 5；671ef4eb 为 277 条），parity-matrix 源文件未变。逐字段展开矩阵待续。
 - 2026-10-23 完成 P0-04 API 契约 handler 级核对：`03-api-and-state.md` 新增 §2 认证精确契约、§4.1 写作 surfaces、§4.2 设置/模型/对话配置、§4.3 长尾族、§5.3 Agent 聊天+游戏流（含 SSE 两套帧格式）、§9 终端 WS 帧，覆盖 G1 认证、files/book/versions/changes、Agent/游戏流、设置模型、终端及 books/skills/automations/messages/market/lore/styles/images/update 长尾族。
 - 2026-10-23 完成 P0-05/06 性能冻结：`06-development-and-validation.md` D03 冻结可重现输入（D03-W 文档 / D03-A 消息 / D03-S 流 / D03-P PTY 数据规模）、最低设备（模拟器 Pixel 6 / API 33 / 8GB）与测量方法；G2/G4/G5 数值预算按用户决定全部待实测，不编造。
-- 2026-10-23 完成 P0-07 工程建立：固定工具链（AGP 9.3.0、Gradle Wrapper 9.5.1、Kotlin 2.4.21 走 `android.builtInKotlin=false` 显式 KGP、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26、JDK 17），创建单 `app` 模块 + Version Catalog + `gradle/libs.versions.toml` + Compose 空白首屏 + 1 个 JVM 单测 + `.github/workflows/android.yml`；本地 `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿（debug APK 11MB）。`AGENTS.md` §6.1 同步为 `./gradlew`。
+- 2026-10-23 完成 P0-07 工程建立：固定工具链（AGP 9.3.0 内置 Kotlin + Compose 编译器插件 2.4.21、Gradle Wrapper 9.5.1、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26、JDK 17），创建单 `app` 模块 + Version Catalog + `gradle/libs.versions.toml` + Compose 空白首屏 + 1 个 JVM 单测 + `.github/workflows/android.yml`；本地 `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿（debug APK 11MB）。`AGENTS.md` §6.1 同步为 `./gradlew`。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
