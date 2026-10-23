@@ -21,6 +21,14 @@ data class RehydrateRequest(
     val settled: Boolean,
 )
 
+/** 解析 `task_rehydrate_required` 的 data JSON；非法或空时返回 null。 */
+fun parseRehydrateRequest(data: String?, json: Json): RehydrateRequest? {
+    if (data.isNullOrBlank()) return null
+    val parsed = runCatching { json.decodeFromString(RehydrateData.serializer(), data) }.getOrNull()
+        ?: return null
+    return RehydrateRequest(parsed.task_id, parsed.cursor, parsed.settled)
+}
+
 /**
  * 游戏流会话：把原始 SSE 文本解析成 [GameStreamEvent] 并维护恢复状态。
  * 纯逻辑、无 Android / 网络依赖；SSE 网络层（OkHttp）在会话之上喂入文本块。
@@ -71,15 +79,8 @@ class GameStreamSession(
         val event = GameStreamDecoder.decode(frame) ?: return null
         state.onEvent(event.id, event.type, event.data)
         if (event.type == GameEventType.TASK_REHYDRATE_REQUIRED) {
-            rehydrateRequest = parseRehydrate(event.data)
+            rehydrateRequest = parseRehydrateRequest(event.data, json)
         }
         return event
-    }
-
-    private fun parseRehydrate(data: String?): RehydrateRequest? {
-        if (data.isNullOrBlank()) return null
-        val parsed = runCatching { json.decodeFromString(RehydrateData.serializer(), data) }.getOrNull()
-            ?: return null
-        return RehydrateRequest(parsed.task_id, parsed.cursor, parsed.settled)
     }
 }
