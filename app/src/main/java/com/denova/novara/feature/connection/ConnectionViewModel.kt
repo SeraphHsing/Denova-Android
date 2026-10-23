@@ -1,10 +1,12 @@
 package com.denova.novara.feature.connection
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.denova.novara.core.model.ServerKey
 import com.denova.novara.core.network.DenovaApiException
 import com.denova.novara.core.network.DenovaClient
+import com.denova.novara.core.persistence.ConnectionStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,8 +25,11 @@ sealed interface ConnectionUiState {
  * 切换服务器即重建 [DenovaClient]，隔离会话 Cookie。
  */
 class ConnectionViewModel(
+    application: Application,
     private val createClient: (ServerKey) -> DenovaClient = { DenovaClient(it) },
-) : ViewModel() {
+) : AndroidViewModel(application) {
+
+    private val store = ConnectionStore(application)
 
     private val _state = MutableStateFlow<ConnectionUiState>(ConnectionUiState.Empty)
     val state: StateFlow<ConnectionUiState> = _state.asStateFlow()
@@ -32,7 +37,16 @@ class ConnectionViewModel(
     private val _actionError = MutableStateFlow<String?>(null)
     val actionError: StateFlow<String?> = _actionError.asStateFlow()
 
+    private val _savedServer = MutableStateFlow<String?>(null)
+    val savedServer: StateFlow<String?> = _savedServer.asStateFlow()
+
     private var client: DenovaClient? = null
+
+    init {
+        viewModelScope.launch {
+            _savedServer.value = store.loadServer()
+        }
+    }
 
     fun connect(input: String) {
         val key = ServerKey.parse(input)
@@ -41,6 +55,7 @@ class ConnectionViewModel(
             return
         }
         client = createClient(key)
+        viewModelScope.launch { store.saveServer(input) }
         checkStatus(key)
     }
 

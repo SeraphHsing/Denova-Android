@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 fun ConnectionScreen(viewModel: ConnectionViewModel) {
     val state by viewModel.state.collectAsState()
     val actionError by viewModel.actionError.collectAsState()
+    val savedServer by viewModel.savedServer.collectAsState()
 
     Column(
         modifier = Modifier
@@ -41,9 +42,9 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
         Text("Novara", style = MaterialTheme.typography.headlineLarge)
 
         when (val s = state) {
-            is ConnectionUiState.Empty -> ServerInput(viewModel, actionError)
+            is ConnectionUiState.Empty -> ServerInput(viewModel, actionError, savedServer)
             is ConnectionUiState.Failed -> {
-                ServerInput(viewModel, actionError)
+                ServerInput(viewModel, actionError, savedServer)
                 Spacer(Modifier.height(8.dp))
                 Text(s.message, color = MaterialTheme.colorScheme.error)
             }
@@ -78,8 +79,8 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
 }
 
 @Composable
-private fun ServerInput(viewModel: ConnectionViewModel, actionError: String?) {
-    var server by remember { mutableStateOf("192.168.2.102:18081") }
+private fun ServerInput(viewModel: ConnectionViewModel, actionError: String?, initialServer: String?) {
+    var server by remember(initialServer) { mutableStateOf(initialServer ?: "192.168.2.102:18081") }
     OutlinedTextField(
         value = server,
         onValueChange = { server = it },

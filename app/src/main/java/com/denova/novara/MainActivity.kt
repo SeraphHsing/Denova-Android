@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.denova.novara.feature.connection.ConnectionScreen
 import com.denova.novara.feature.connection.ConnectionViewModel
@@ -13,7 +14,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             MaterialTheme {
-                val connectionViewModel: ConnectionViewModel = viewModel { ConnectionViewModel() }
+                val connectionViewModel: ConnectionViewModel = viewModel {
+                    ConnectionViewModel(
+                        checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
+                    )
+                }
                 ConnectionScreen(connectionViewModel)
             }
         }

@@ -52,7 +52,8 @@ class DenovaClient(private val server: ServerKey) {
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
-    private val client = OkHttpClient.Builder()
+    /** 共享 OkHttpClient（含会话 CookieJar）：受保护图片、SSE、WS 都复用此实例，保证会话一致。 */
+    val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .cookieJar(InMemoryCookieJar())
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
@@ -61,7 +62,7 @@ class DenovaClient(private val server: ServerKey) {
     suspend fun status(): AuthStatusResponse {
         val request = Request.Builder().url(server.baseUrl + "/api/auth/status").get().build()
         return withContext(Dispatchers.IO) {
-            client.newCall(request).execute().use { resp ->
+            okHttpClient.newCall(request).execute().use { resp ->
                 val body = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toException(resp.code, body)
                 json.decodeFromString(AuthStatusResponse.serializer(), body)
@@ -85,7 +86,7 @@ class DenovaClient(private val server: ServerKey) {
             .post("".toRequestBody(null))
             .build()
         withContext(Dispatchers.IO) {
-            client.newCall(request).execute().use { resp ->
+            okHttpClient.newCall(request).execute().use { resp ->
                 // 204 No Content 是成功；其余非 2xx 抛异常。
                 if (resp.code != 204 && !resp.isSuccessful) {
                     throw toException(resp.code, resp.body?.string().orEmpty())
@@ -100,7 +101,7 @@ class DenovaClient(private val server: ServerKey) {
             .post(body.toRequestBody(jsonMediaType))
             .build()
         return withContext(Dispatchers.IO) {
-            client.newCall(request).execute().use { resp ->
+            okHttpClient.newCall(request).execute().use { resp ->
                 val text = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toException(resp.code, text)
                 json.decodeFromString(AuthResult.serializer(), text)
