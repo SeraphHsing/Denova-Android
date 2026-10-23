@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.commonmark)
     implementation(libs.commonmark.gfm.tables)
+    implementation(libs.java.diff.utils)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.android)

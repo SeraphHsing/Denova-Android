@@ -3,11 +3,13 @@ package com.denova.novara.core.network
 import com.denova.novara.core.model.ServerKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.Cookie
 import okhttp3.CookieJar
 import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -35,6 +37,37 @@ data class PairRequest(val token: String)
 
 @Serializable
 data class ApiErrorBody(val error: String? = null, val code: String? = null)
+
+@Serializable
+data class ProjectFileDocument(
+    val path: String,
+    val content: String? = null,
+    val revision: String = "",
+)
+
+@Serializable
+data class OptionalFileResponse(
+    @SerialName("project_id") val projectId: String = "",
+    val path: String,
+    val found: Boolean = false,
+    val document: ProjectFileDocument? = null,
+)
+
+@Serializable
+data class SaveFileRequest(
+    val path: String,
+    val content: String,
+    @SerialName("base_revision") val baseRevision: String,
+)
+
+@Serializable
+data class SaveFileResponse(
+    @SerialName("project_id") val projectId: String = "",
+    val path: String,
+    val revision: String = "",
+    val changed: Boolean = false,
+    val message: String? = null,
+)
 
 /** 服务端非 2xx 的异常。code 为服务端错误键，message 为服务端本地化错误文本。 */
 class DenovaApiException(
@@ -108,6 +141,47 @@ class DenovaClient(private val server: ServerKey) {
             }
         }
     }
+
+    suspend fun readFile(projectId: String, path: String): ProjectFileDocument {
+        val request = Request.Builder().url(fileUrl(projectId, path)).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, body)
+                json.decodeFromString(ProjectFileDocument.serializer(), body)
+            }
+        }
+    }
+
+    /** 保存文件；revision 冲突（409）抛 [DenovaApiException]，code 为服务端错误键。 */
+    suspend fun saveFile(
+        projectId: String,
+        path: String,
+        content: String,
+        baseRevision: String,
+    ): SaveFileResponse {
+        val body = json.encodeToString(
+            SaveFileRequest.serializer(),
+            SaveFileRequest(path = path, content = content, baseRevision = baseRevision),
+        )
+        val request = Request.Builder()
+            .url(fileUrl(projectId, path))
+            .put(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(SaveFileResponse.serializer(), text)
+            }
+        }
+    }
+
+    private fun fileUrl(projectId: String, path: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/files/file")
+            .addQueryParameter("path", path)
+            .build()
 
     private fun toException(status: Int, body: String): DenovaApiException {
         val parsed = runCatching { json.decodeFromString(ApiErrorBody.serializer(), body) }.getOrNull()
