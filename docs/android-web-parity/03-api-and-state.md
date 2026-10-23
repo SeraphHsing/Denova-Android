@@ -136,6 +136,36 @@ Content-Type: application/json
 
 来源：[写作发送](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/chat.ts#L16)、[工作台发送](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/agent-chat/api.ts#L55)、[游戏发送](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/interactive/api.ts#L331)、[设置保存](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/settings/api.ts#L70)、[终端](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/agent-chat/terminal/api.ts#L38)。
 
+### 4.1 写作 surfaces 已核对契约（85ec97c handler）
+
+以下为 `handler_project_files.go` / `handler_project_book.go` / `handler_versions.go` / `handler_workspace_changes.go` 已核对结论，均走项目作用域（`requireProjectScope`）。
+
+**项目文件 `files/*`**
+- `GET /files/file?path=&optional=`：缺 `path` → `400 pathMissing`；`optional=true` 且文件不存在 → `200 {project_id, path, found:false}`；存在 → `{project_id, path, found:true, document}`；否则返回 document。
+- `PUT /files/file`：body `{path, content, base_revision}`；空 path → `400 pathContentRequired`；成功 `{project_id, path, revision, changed, message}`。
+- `GET /files/asset?path=`：二进制 + Range（`206`）；响应头 `Cache-Control: no-cache`、`X-Content-Type-Options: nosniff`、`Accept-Ranges: bytes`。
+- `POST /files/resolve`：body `{targets}`；空 targets → `400 resolveTargetsRequired`。
+- `POST /files/operations`：body `{operations}`；成功 `{project_id, results:[{id,kind,ok,path,code?,error?}]}`；空 → `400 operationsRequired`。
+- `POST /files/reveal`：loopback-only（`localHostEffectMiddleware`）。
+- 统一错误码（`writeProjectFilesError`）：`not_found`→404、`revision_conflict`/`conflict`/`durability_pending`→409、`invalid_edit`→400、其余→500。
+
+**项目书籍与资料 `book/*`**
+- `GET /book`（snapshot）；`GET /book/tree` → `{project_id, workspace, tree}`；`GET /book/summary` → `{project_id, workspace, summary}`。
+- `PATCH /book/chapter-status`：body `{path, confirmed}`；空 path → `400 chapterStatusPathRequired`。
+- lore 条目：`GET items` → `{project_id, items}`；`POST items`（`booklore.ItemInput`）；`PUT items/:id` 要求完整字段（`enabled/type/name/importance/tags/brief_description/keywords/load_mode/content`），缺字段 → `400 loreFieldsRequired`，body id 与路径 id 不一致 → `400 loreIDMismatch`，revision 冲突 → `409`；`DELETE items/:id` → `{project_id, status:"ok"}`。
+- 文档审阅：`GET /book/document-review` → `{project_id, workspace, review_thread}`；`POST /book/document-comments` → `201 {..., review_thread, comment}`；`PATCH/DELETE /book/document-comments/:id` → `200`。错误 `not_found`→404、`conflict`→409、`invalid`→400；无活动 Book → `bookRequired`（404/400）。
+
+**版本 `versions/*`**
+- `GET /versions/status`；`GET /versions?limit=`（默认 30）→ `{versions}`；`POST /versions` body `{message}`（可空）→ 版本对象，错误 `400 invalidCreateRequest`、无变更 `400 noChanges`、`404 notFound`。
+- `GET /versions/:id/diff?comparison=workspace|parent&path=&view=initial`（缺 id → `400 idRequired`；comparison 非法 → `400 invalidDiffComparison`）。
+- `POST /versions/:id/restore-plan` / `POST /versions/:id/restore`：body `{paths}`（可空）→ 计划/结果；错误 `400 idRequired` / `invalidRestoreRequest`。
+
+**变更 `changes/*`**
+- `GET /changes/groups?status=&path=&run_id=&session_id=&review_thread_id=` → `{project_id, workspace, groups}`；`GET /changes/groups/:id` → hydrated group；`GET /changes/review-threads/:id` → `{..., review_thread}`。
+- `POST /changes/groups/:id/review` body `{decision}`（reject 且影响路径时触发 auto-version）；`POST /changes/groups/:id/undo` / `redo`。
+- `POST /changes/comments` → `201`；`PATCH/DELETE /changes/comments/:id` → `200`。
+- 错误：`project_transitioning`/`workspace_changed`/`no_workspace`→409；`revision_conflict`/`conflict`/`no_redo`/`durability_pending`→409；`not_found`→404；`invalid_edit`→400。
+
 ## 5. 两种实时协议
 
 ### 5.1 Agent UIMessage
