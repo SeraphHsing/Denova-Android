@@ -166,6 +166,29 @@ Content-Type: application/json
 - `POST /changes/comments` → `201`；`PATCH/DELETE /changes/comments/:id` → `200`。
 - 错误：`project_transitioning`/`workspace_changed`/`no_workspace`→409；`revision_conflict`/`conflict`/`no_redo`/`durability_pending`→409；`not_found`→404；`invalid_edit`→400。
 
+### 4.2 设置 / 模型 / 对话配置契约（85ec97c handler）
+
+**设置 `/api/settings`（全局）与 `/api/projects/:id/settings`（项目）**
+- `GET` → `LayeredSettings` 快照 + `agent_configuration`（Effective 的 ProjectAgentConfiguration）。
+- `PATCH` body `{layer, base_revision?, changes}`（strict JSON，仅应用 changes 中出现的字段，缺省不覆盖，JSON null 清除继承值）；`layer` 非法 → 400；成功返回快照。错误：`409 revisionConflict`、`400 workspaceMissing`、`400 invalidTerminalCommand/invalidAgentQuickPrompt/invalidSettingsPatch/unsupportedSettingsLayer`、`400 lanUsernameRequired/lanPasswordRequired/invalidRegistryURL`、部分保存 `settings_file_save_failed`（带 `details.files`）。
+- `DELETE /api/settings/agent-approval-rules/:id` → 原子撤销单条规则并返回快照。
+
+**模型 `/api/models/*`**
+- `GET /models/catalog` → 可执行协议 + 供应商预设。
+- `POST /models/discover` body `{endpoint, profile}` → 上游模型建议；供应商错误 → 422，其余 → 400。
+- `POST /models/ping` body `{endpoint, profile}` → 最小真实生成探测；供应商错误 → 422，其余 → 400。
+
+**引擎 `/api/agent-runtimes*`**
+- `GET /agent-runtimes` → `{items: Catalog}`。
+- `POST /agent-runtimes/:id/check`（空 body `{}`）→ 探测结果；`GET /agent-runtimes/:id/models` → 模型列表。错误：`404 notFound`、`400 capabilityUnsupported`、`409 busy/notReady`、`422 modelUnavailable`、`503 connectionFailed/notInstalled/versionUnsupported`。
+
+**对话配置 `/api/conversation-config`（+ 项目）**
+- `GET` binding 来自 query（`mode/project_id/session_id/story_id/branch_id/origin/resource_id/run_id`）→ 快照 + `runtime_capabilities` + `runtime_status`；引擎不存在 → 404。
+- `PATCH` body `{binding, base_revision, changes}` → 快照；revision 冲突 → `409 api.conversationConfig.revisionConflict`；错误 `422 apiProfileUnavailable/modelUnavailable`、`404 notFound`、`503 notInstalled/versionUnsupported`、`409 busy/notReady`、`400 capabilityUnsupported/workspaceMissing/invalid`。
+
+**对话目标 `/api/conversation-goal`（+ 项目）**
+- `GET` → `{goal: ...|null}`；`POST` body `{binding, ...GoalMutation}` → `{goal}`；错误 `400 capabilityUnsupported`、`409 revisionConflict/stateChanged`、`400 invalid`。
+
 ## 5. 两种实时协议
 
 ### 5.1 Agent UIMessage
