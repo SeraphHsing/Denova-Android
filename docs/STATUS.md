@@ -29,6 +29,7 @@
 - 2026-10-23 完成 G2 首轮（Markdown 编辑器）：`MarkdownDocument`(commonmark 0.30.0 + GFM 表格扩展，parse/toHtml/toPlainText) + 8 个 JVM 序列化测试（标题/加粗斜体/列表/代码/引用/图片/表格/纯文本）；`EditorScreen` 源码模式 + WebView 预览双模式切换，认证后路由进入；修复 Android 15+ edge-to-edge 顶栏被状态栏遮挡问题（两屏均加 statusBars inset）。真机验证：登录后进入编辑器、源码模式正常、顶栏按钮手指可点（adb 注入触摸在顶部区域被设备悬浮层拦截，属设备环境非应用问题）。
 - 2026-10-23 完成 G2 富文本模式：`MarkdownVisualTransformation`（`**`/`*`/`` ` ``/`~~` 标记逐字符替换为零宽字符→偏移映射恒等，光标/选区天然对齐）+ 内联样式渲染 + 格式化工具栏（B/I/`</>`/S 选区包裹）；`parseInlineSpans` 纯逻辑层 4 测试。真机验证：富文本渲染标记隐藏、样式正确。
 - 2026-10-23 完成 G3 首轮（保存并发基础）：`ThreeWayMerge` 行级三方合并（java-diff-utils 计算 diff，diff3 合并，重叠冲突标记，5 测试覆盖不重叠/相同/冲突/删改/双插入）；`DenovaClient.readFile`/`saveFile`（revision 校验，409 冲突抛 `DenovaApiException`）；`DraftStore` 本地草稿（按文件 key 存 content+base_revision）。
+- 2026-10-23 完成 G3 编排层：`FileSaveCoordinator`（抽象 `FileRemote`/`DraftStorage` 接口）——落草稿→保存→409→读服务器版→`ThreeWayMerge`→干净用新 revision 重存/冲突产材料，同一文件按 `Mutex` 串行；3 个测试覆盖无冲突/干净合并重存/冲突材料。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -42,7 +43,7 @@
 | Android 工程 | 已创建；本地 + CI `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿（APK 11MB） | 固定 JDK17、AGP 9.3.0（内置 Kotlin）、Gradle Wrapper 9.5.1、Compose 编译器插件 2.4.21、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26；CI 构建通过 |
 | G1 认证与网络 | 完成：连接 + status + 登录 + 退出 已真机真实往返通过；DataStore 服务器地址持久化完成 | 配对、受保护图片、SSE、WS、HTTPS/WSS、迟到 401 完成真实往返 |
 | G2 Markdown 编辑器 | 两轮完成：序列化层（commonmark 0.30.0 + GFM 表格，8 测试）+ 源码/富文本/预览三模式；富文本 = 标记隐藏(零宽替换) + 内联样式 + 格式化工具栏，纯逻辑层 4 测试；本地 + CI 全绿；真机验证富文本渲染 | 图片/表格编辑、中文 IME、选区增强、D03 性能预算 |
-| G3 保存并发 | 首轮完成：三方合并 `ThreeWayMerge`（diff3，5 测试）+ 文件读写 `readFile`/`saveFile`（revision 校验）+ 本地草稿 `DraftStore`；本地 + CI 全绿 | 保存编排（冲突→取回→合并→重存）、按文件串行、并发/进程恢复实测 |
+| G3 保存并发 | 两轮完成：三方合并 `ThreeWayMerge`（diff3，5 测试）+ 文件读写 revision 校验 + 本地草稿 `DraftStore` + 保存编排 `FileSaveCoordinator`（落草稿→保存→409→合并→干净重存/冲突材料，按文件 Mutex 串行，3 测试）；本地 + CI 全绿 | 真机并发（双端编辑）、迟到回包、进程恢复实测 |
 | G4 Agent / Game 流恢复 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
 | G5 原生终端 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收 ANSI / VT、输入、resize、owner 生命周期与 D03 性能预算 |
 | G6 远程权限与双端共存 | 未开始 | 以[路线中的G6](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)为准；误删对方PTY或丢失会话内容时未通过，仅记录限制不能退出 |

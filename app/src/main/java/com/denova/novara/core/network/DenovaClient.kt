@@ -1,6 +1,7 @@
 package com.denova.novara.core.network
 
 import com.denova.novara.core.model.ServerKey
+import com.denova.novara.core.save.FileRemote
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
@@ -80,7 +81,7 @@ class DenovaApiException(
  * 单个服务器的认证客户端。每个 ServerKey 一个实例；Cookie 通过内存 [InMemoryCookieJar]
  * 隔离，切换服务器即重建客户端，从而隔离会话 Cookie。
  */
-class DenovaClient(private val server: ServerKey) {
+class DenovaClient(private val server: ServerKey) : FileRemote {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -142,7 +143,7 @@ class DenovaClient(private val server: ServerKey) {
         }
     }
 
-    suspend fun readFile(projectId: String, path: String): ProjectFileDocument {
+    override suspend fun readFile(projectId: String, path: String): ProjectFileDocument {
         val request = Request.Builder().url(fileUrl(projectId, path)).get().build()
         return withContext(Dispatchers.IO) {
             okHttpClient.newCall(request).execute().use { resp ->
@@ -154,7 +155,7 @@ class DenovaClient(private val server: ServerKey) {
     }
 
     /** 保存文件；revision 冲突（409）抛 [DenovaApiException]，code 为服务端错误键。 */
-    suspend fun saveFile(
+    override suspend fun saveFile(
         projectId: String,
         path: String,
         content: String,
