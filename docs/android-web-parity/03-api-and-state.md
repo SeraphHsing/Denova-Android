@@ -314,6 +314,14 @@ revision 冲突时，以 base / local / remote 三方合并。无重叠则按新
 
 启动清理只作用于本 App 创建且持久记录的 owner；陌生 owner 不作为孤儿释放。浏览器对全局 detached PTY 的清理可能影响 App 会话，必须在 P1 双客户端实测，见 [07](07-evidence-and-decisions.md)。
 
+精确契约（85ec97c `handler_terminal.go`）：
+
+- `GET /api/terminal/sessions` → `{enabled, shell, commands, default_cwd, max_sessions, sessions:[{...Info, token}], scrollback_kb}`；未启用 → `503 disabled`。列表附 attach token（本端点已认证，供刷新后重挂接）。
+- `POST /api/projects/:id/terminal/sessions` body `{owner_tab_id, profile_id, title, cols, rows}`；空 `owner_tab_id` → 400；返回 `{...Info, token}`；错误 `503 disabled`、`429 tooMany`、`409 ownerConflict`、`400 invalidProfile`、`400 invalidLaunchCommand`、`404 notFound`。
+- `DELETE /api/terminal/sessions/:id` → `{id, closed}`；**幂等**（不存在 → `closed:false`，不报错，兼容启动对账与关标签竞态）。
+- `GET /api/terminal/sessions/:id/attach?token=` → WebSocket 升级；token 不匹配 → `403 tokenInvalid`。
+- WS 帧：server→client **binary=PTY 原始输出**、**text=JSON 控制** `ready{type,session}` / `exit{type,code,error}` / `error{type,error}` / `pong{type}`；client→server **binary=原始输入**、**text=JSON** `input{type,data}` / `resize{type,cols,rows}` / `ping{type}`。
+
 ## 10. 错误与可观测性
 
 解析 HTTP status、`code`、`messageKey` / 本地化字段、details、`request_id` 和 `X-Request-ID`。保留错误 payload 便于语义判断；用户界面采用当前语言的对应文本，日志以英文记录操作、作用域、状态与请求 ID。
