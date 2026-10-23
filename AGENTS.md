@@ -59,12 +59,11 @@
 
 ### 6.1 常用命令
 
-仓库当前只有文档：没有 Gradle 工程、没有 Wrapper、没有 CI。以下命令在 `app/` 工程建立（P0-07）后才适用。
+P0-07 起仓库已有 Gradle 工程与 Wrapper。工具链固定：AGP 9.3.0、Kotlin 2.4.21（`android.builtInKotlin=false` 显式用 KGP，与本地 kotlinc 一致）、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26、JDK 17、Gradle Wrapper 9.5.1。本地与 CI 均用 `./gradlew`。
 
-- 本地工具链装在用户目录：JDK 17、Gradle 9.5.1、Android SDK（`ANDROID_HOME`），均为免管理员安装。CI 通过 `gradle/actions/setup-gradle` 固定 Gradle 9.5.1 且不使用 Wrapper，因此本地直接调用 `gradle`，与 CI 保持同一版本，不使用动态 `+` 版本。
-- 主检查（应用代码、构建配置或依赖变更时）：`gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
-- 单个测试：`gradle --no-daemon :app:testDebugUnitTest --tests "*SseFramingTest*"`
-- 仪器测试（需已连接的模拟器或真机）：`gradle --no-daemon :app:connectedDebugAndroidTest`
+- 主检查（应用代码、构建配置或依赖变更时）：`./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`
+- 单个测试：`./gradlew --no-daemon :app:testDebugUnitTest --tests "*ExampleUnitTest*"`
+- 仪器测试（需已连接的模拟器或真机）：`./gradlew --no-daemon :app:connectedDebugAndroidTest`
 - 纯文档变更：只检查 Markdown 相对链接与锚点、JSON / CSV 格式、清单计数、状态与事实源一致性，不运行 Gradle，也不得据此宣称构建通过。
 
 ### 6.2 验证纪律
