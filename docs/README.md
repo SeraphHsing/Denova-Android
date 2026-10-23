@@ -21,6 +21,7 @@
 | 05 | [开发路线与阶段验收](android-web-parity/05-roadmap.md) | P0–P6、G1–G6、依赖、任务包和退出条件 |
 | 06 | [开发、测试与交付](android-web-parity/06-development-and-validation.md) | 测试数据、恢复组合、双端对照、CI、APK 与发布候选 |
 | 07 | [证据、决策与待验证事项](android-web-parity/07-evidence-and-decisions.md) | 固定源码索引、ADR、风险、平台差异和官方依据 |
+| 08 | [页面/表面全量清单](android-web-parity/08-surface-inventory.md) | 顶层表面、子表面、条件入口与 API 族映射（P0-03 静态盘点） |
 
 ## 3. 验收矩阵与数据清单
 

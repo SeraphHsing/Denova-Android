@@ -12,7 +12,7 @@
 | UI 路线 | Kotlin 原生；Compose 组织页面，复杂输入与绘制允许通过 AndroidView 接入原生 View |
 | 工程起点 | 新仓库、新构建配置、新源码、新资源、新测试和新 CI |
 | 服务端边界 | 通过现有接口访问；不新增接口，不修改后端代码、数据格式和权限规则 |
-| 对照基线 | `SeraphHsing/denova@671ef4eb609523f07d1c234cdcd242d63ce12652` |
+| 对照基线 | `SeraphHsing/denova@85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e` |
 | 最低系统 | Android 8.0 / API 26；在 P0 锁定 compileSdk、targetSdk 与兼容工具链 |
 | 工程组织 | 先建立一个 `app` Gradle 模块，内部按职责组织 package |
 | 数据归属 | 服务端为业务事实源；本地保存连接、轻量界面状态、草稿与恢复锚点 |

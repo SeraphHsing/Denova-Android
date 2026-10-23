@@ -26,7 +26,7 @@ Cookie 名包含服务端端口，具体值由 Set-Cookie 决定。REST、受保
 
 原生请求无需伪造浏览器 Origin / Referer；服务器明确处理无这两个头的原生请求。任何连接方式均保持服务端判定的远程权限。
 
-来源：[认证前端](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/remote-access/api.ts#L11)、[服务端认证](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/internal/api/remote_access.go#L78)、[401 处理](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/api-client/client.ts#L180)。
+来源：[认证前端](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/remote-access/api.ts#L11)、[服务端认证](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/internal/api/remote_access.go#L78)、[401 处理](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/client.ts#L180)。
 
 ## 3. 主要接口族
 
@@ -124,7 +124,7 @@ Content-Type: application/json
 
 终端尺寸以实际可用网格计算；80×24 仅为示例。响应提供 session ID 和 attach token，附接到 `/api/terminal/sessions/SESSION_ID/attach?token=TOKEN`。
 
-来源：[写作发送](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/api-client/chat.ts#L16)、[工作台发送](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/agent-chat/api.ts#L55)、[游戏发送](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/interactive/api.ts#L331)、[设置保存](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/settings/api.ts#L70)、[终端](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/agent-chat/terminal/api.ts#L38)。
+来源：[写作发送](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/chat.ts#L16)、[工作台发送](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/agent-chat/api.ts#L55)、[游戏发送](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/interactive/api.ts#L331)、[设置保存](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/settings/api.ts#L70)、[终端](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/agent-chat/terminal/api.ts#L38)。
 
 ## 5. 两种实时协议
 
@@ -144,7 +144,7 @@ Content-Type: application/json
 
 checkpoint、rehydrate、turn persisted、ask、suspended、recovery、done / aborted / error 分别测试。流到达 done 仍需核对 canonical 历史与最终轮次；事件 transport 的结束不自动等于业务成功。
 
-来源：[UIMessage 业务类型](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/agent-ui.ts#L39)、[SSE parser](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/api-client/sse.ts)、[游戏事件表](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/interactive/components/story-stage/story-stage-stream-events.ts#L8)。
+来源：[UIMessage 业务类型](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/agent-ui.ts#L39)、[SSE parser](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/sse.ts)、[游戏事件表](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/interactive/components/story-stage/story-stage-stream-events.ts#L8)。
 
 ## 6. 写入与任务状态机
 
@@ -197,7 +197,7 @@ sequenceDiagram
 
 游戏恢复保留 story / branch；`abandon_pending` 仅针对匹配的暂停输入，body 为 `type/story_id/branch_id/resume_interruption_id`。不能把其误用为普通停止。
 
-来源：[任务身份](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/api-client/chat.ts#L173)、[流恢复](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/agent-ui.ts#L151)、[游戏恢复](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/interactive/api.ts#L448)。
+来源：[任务身份](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/chat.ts#L173)、[流恢复](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/agent-ui.ts#L151)、[游戏恢复](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/interactive/api.ts#L448)。
 
 ## 8. 文档保存与并发冲突
 
@@ -209,7 +209,7 @@ revision 冲突时，以 base / local / remote 三方合并。无重叠则按新
 
 网络不明写入结果与已确认的 revision 冲突是不同路径。前者先读回判断，不盲目覆盖；后者允许基线定义的合并后有限提交。
 
-来源：[文件写入](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/api-client/project-files.ts#L154)、[保存队列与合并](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/Editor/useEditorDraftPersistence.ts#L121)。
+来源：[文件写入](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/project-files.ts#L154)、[保存队列与合并](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/Editor/useEditorDraftPersistence.ts#L121)。
 
 ## 9. 终端契约
 

@@ -33,7 +33,7 @@ Web 使用 CSS px / rem，Android 布局使用 dp / sp。P0 在同一设备读�
 | 游戏行动列表最大高度 | `min(25dvh, 12rem)` |
 | 浮动输入区域边距 | 8px / 12px；底部随 safe area 和键盘状态变化 |
 
-参数来源：[mobile.css](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/mobile.css)。颜色需同时读取主题变量与 computed style；不凭截图肉眼挑近似色。
+参数来源：[mobile.css](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/mobile.css)。颜色需同时读取主题变量与 computed style；不凭截图肉眼挑近似色。
 
 ## 3. 设计参数和素材
 
@@ -65,7 +65,7 @@ DesignTokens 覆盖背景 / surface / hover / active / border / text / muted / p
 
 Android 系统边缘返回与抽屉识别存在交汇，需要真机分别验证手势导航和三键导航。保持系统返回的优先权；抽屉始终有可点击入口，系统占用区域记录为平台差异，不假设所有边缘坐标均由 App 接收。
 
-来源：[手势实现](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/layout/use-mobile-drawer-swipe.ts#L23)。
+来源：[手势实现](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/layout/use-mobile-drawer-swipe.ts#L23)。
 
 ## 6. 安全区、键盘与滚动
 
@@ -87,7 +87,7 @@ Web 的 visual viewport 高度检测用于浏览器；原生通过系统 Insets 
 
 源码模式只按基线规范 CRLF / CR 为 LF，不把正文包装成代码围栏。切换模式时按基线清理不兼容撤销历史并重建可用选区。
 
-来源：[MarkdownContentEditor](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/Editor/MarkdownContentEditor.tsx#L49)、[源码文档](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/Editor/markdownSourceDocument.ts#L77)。
+来源：[MarkdownContentEditor](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/Editor/MarkdownContentEditor.tsx#L49)、[源码文档](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/Editor/markdownSourceDocument.ts#L77)。
 
 ### 7.2 选型门槛
 

@@ -8,34 +8,34 @@
 
 ## 2. 固定源码索引
 
-以下路径全部相对于 [固定提交](https://github.com/SeraphHsing/denova/tree/671ef4eb609523f07d1c234cdcd242d63ce12652)。点击路径可直接检查。
+以下路径全部相对于 [固定提交](https://github.com/SeraphHsing/denova/tree/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e)。点击路径可直接检查。
 
 | 来源 | 用于核对 |
 |---|---|
-| [WorkbenchShell.tsx](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/workbench/WorkbenchShell.tsx#L189) | 常规、开发、插件与设置入口 |
-| [workspace-mobile-layout.tsx](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/layout/workspace-mobile-layout.tsx#L45) | 共享顶栏、导航与右抽屉 |
-| [MobileWritingWorkspace.tsx](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/workbench/MobileWritingWorkspace.tsx#L13) | 正文 / Agent保留状态 |
-| [mobile.css](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/mobile.css) | 断点、尺寸、触控、字体与键盘布局 |
-| [use-mobile-drawer-swipe.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/layout/use-mobile-drawer-swipe.ts#L23) | 手势阈值和排除区域 |
-| [remote-access/api.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/remote-access/api.ts#L11) | status、登录、配对、退出和local身份 |
-| [remote_access.go](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/internal/api/remote_access.go#L120) | 认证注册、原生来源与Cookie |
-| [routes.go](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/internal/api/routes.go#L20) | 主API路由与注册中间件 |
-| [client.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/api-client/client.ts#L180) | 错误与401复核 |
-| [chat.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/api-client/chat.ts#L173) | 命令、任务、游标和恢复身份 |
-| [agent-ui.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/agent-ui.ts#L151) | UIMessage数据和附接恢复 |
-| [游戏api.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/interactive/api.ts#L331) | 游戏发送、分支、暂停恢复 |
-| [story-stage-stream-events.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/interactive/components/story-stage/story-stage-stream-events.ts#L8) | 35类事件及处理分类 |
-| [project-files.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/lib/api-client/project-files.ts#L154) | 文件保存和revision |
-| [useEditorDraftPersistence.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/Editor/useEditorDraftPersistence.ts#L121) | 自动保存、队列、三方合并及冲突材料 |
-| [MarkdownContentEditor.tsx](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/Editor/MarkdownContentEditor.tsx#L49) | Markdown双表示和撤销语义 |
-| [settings/api.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/settings/api.ts#L70) | 分层、revision及部分保存 |
-| [settings-sections.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/settings/settings-sections.ts#L19) | 14个设置section |
-| [platform/api.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/platform/api.ts#L148) | 本机限定和远程允许的管理操作 |
-| [terminal/api.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/agent-chat/terminal/api.ts#L38) | 终端owner、创建和附接 |
-| [终端生命周期](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/agent-chat/terminal/use-terminal-session-lifecycle.ts#L71) | detached PTY清理与owner归属 |
-| [终端handler](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/internal/api/handlers/handler_terminal.go#L49) | 认证下的终端列表及附接token |
-| [mobile-workspace.spec.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/tests/browser/mobile-workspace.spec.ts) | 手机导航、草稿、游戏、横屏和键盘的测试定义 |
-| [mobile-reading.spec.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/tests/browser/mobile-reading.spec.ts) | 消息已读、编辑和标签交互测试定义 |
+| [WorkbenchShell.tsx](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/workbench/WorkbenchShell.tsx#L189) | 常规、开发、插件与设置入口 |
+| [workspace-mobile-layout.tsx](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/layout/workspace-mobile-layout.tsx#L45) | 共享顶栏、导航与右抽屉 |
+| [MobileWritingWorkspace.tsx](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/workbench/MobileWritingWorkspace.tsx#L13) | 正文 / Agent保留状态 |
+| [mobile.css](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/mobile.css) | 断点、尺寸、触控、字体与键盘布局 |
+| [use-mobile-drawer-swipe.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/layout/use-mobile-drawer-swipe.ts#L23) | 手势阈值和排除区域 |
+| [remote-access/api.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/remote-access/api.ts#L11) | status、登录、配对、退出和local身份 |
+| [remote_access.go](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/internal/api/remote_access.go#L120) | 认证注册、原生来源与Cookie |
+| [routes.go](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/internal/api/routes.go#L20) | 主API路由与注册中间件 |
+| [client.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/client.ts#L180) | 错误与401复核 |
+| [chat.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/chat.ts#L173) | 命令、任务、游标和恢复身份 |
+| [agent-ui.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/agent-ui.ts#L151) | UIMessage数据和附接恢复 |
+| [游戏api.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/interactive/api.ts#L331) | 游戏发送、分支、暂停恢复 |
+| [story-stage-stream-events.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/interactive/components/story-stage/story-stage-stream-events.ts#L8) | 35类事件及处理分类 |
+| [project-files.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/project-files.ts#L154) | 文件保存和revision |
+| [useEditorDraftPersistence.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/Editor/useEditorDraftPersistence.ts#L121) | 自动保存、队列、三方合并及冲突材料 |
+| [MarkdownContentEditor.tsx](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/Editor/MarkdownContentEditor.tsx#L49) | Markdown双表示和撤销语义 |
+| [settings/api.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/settings/api.ts#L70) | 分层、revision及部分保存 |
+| [settings-sections.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/settings/settings-sections.ts#L19) | 14个设置section |
+| [platform/api.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/platform/api.ts#L148) | 本机限定和远程允许的管理操作 |
+| [terminal/api.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/agent-chat/terminal/api.ts#L38) | 终端owner、创建和附接 |
+| [终端生命周期](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/agent-chat/terminal/use-terminal-session-lifecycle.ts#L71) | detached PTY清理与owner归属 |
+| [终端handler](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/internal/api/handlers/handler_terminal.go#L49) | 认证下的终端列表及附接token |
+| [mobile-workspace.spec.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/tests/browser/mobile-workspace.spec.ts) | 手机导航、草稿、游戏、横屏和键盘的测试定义 |
+| [mobile-reading.spec.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/tests/browser/mobile-reading.spec.ts) | 消息已读、编辑和标签交互测试定义 |
 
 ## 3. 架构决定
 

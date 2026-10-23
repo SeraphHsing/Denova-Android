@@ -16,12 +16,12 @@
 - 目标是对固定基线中的全部手机 Web 页面、子页面、条件入口、操作流程、状态和权限表现进行原生 Android 对应实现。
 - 使用 Kotlin、Jetpack Compose、单 Activity；复杂编辑和终端控件可在 P1 原型验证后通过 Android View 互操作。
 - 后端代码零修改。不新增后端接口、不改变服务端 DTO、权限规则或既有协议来迁就客户端。
-- 固定 Web 基线：`SeraphHsing/denova@671ef4eb609523f07d1c234cdcd242d63ce12652`。基线变化必须先登记行为差异并更新相关文档和矩阵。
+- 固定 Web 基线：`SeraphHsing/denova@85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e`。基线变化必须先登记行为差异并更新相关文档和矩阵。
 - 规格中的技术选择、接口形状与验收条件是开发约束；标记为“建议”或“待验证”的内容不能被描述为已经实现。
 
 ## 2.1 架构与事实来源（摘要）
 
-- 后端零改动；固定 Web 基线 `SeraphHsing/denova@671ef4eb`。协议与字段的权威来源是后端 Go 源码（本地副本优先：`E:\Work\Git\denova\denova`，内层目录才是 git 仓库；GitHub 仅作兜底）。仓库内 `docs/` 是冻结快照，与 Go 源码冲突时以源码为准并回写文档。
+- 后端零改动；固定 Web 基线 `SeraphHsing/denova@85ec97c`。协议与字段的权威来源是后端 Go 源码（本地副本优先：`E:\Work\Git\denova\denova`，内层目录才是 git 仓库；GitHub 仅作兜底）。仓库内 `docs/` 是冻结快照，与 Go 源码冲突时以源码为准并回写文档。
 - 目标形态：Kotlin + Jetpack Compose、单 Activity、单 `app` 模块，内部按 feature package 隔离所有权；OkHttp + kotlinx.serialization 处理 REST / SSE / WebSocket，Room 存草稿与命令身份，DataStore 存轻量偏好，AppContainer 手动注入。详细目录与状态所有权见 [02 技术架构](docs/android-web-parity/02-architecture.md)。
 - 服务端是业务事实源；本地只持久化连接偏好、轻量界面状态、草稿、命令身份与恢复锚点。
 - 稳定身份为 Android 内部 key，传输字段仍用现有接口：`ServerKey` → `ProjectKey` → `DocumentKey`，另有 `WritingSession` / `WorkbenchChat` / `GameSession` / `TaskBinding` / `TerminalOwner`。禁止把显示名、列表下标或“当前项目指针”当作持久身份。

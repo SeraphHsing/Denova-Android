@@ -9,7 +9,7 @@
 - Android 目标：Kotlin + Jetpack Compose 原生客户端，最低支持版本规划为 Android 8.0 / API 26。
 - 应用身份（P0-01 已定）：应用名 **Novara**，applicationId **`com.denova.novara`**；签名归属 = 项目负责人个人持有（自持 release keystore，私钥离线备份、不进仓库，CI 用加密 secret 注入）；分发渠道 = 纯侧载 / 内部测试。
 - 后端边界：不修改 Denova 后端、不新增服务端接口，使用既有认证、REST、Agent UIMessage、游戏 SSE 和终端 WebSocket 协议。
-- Web 源码基线：[`SeraphHsing/denova@671ef4eb609523f07d1c234cdcd242d63ce12652`](https://github.com/SeraphHsing/denova/tree/671ef4eb609523f07d1c234cdcd242d63ce12652)。
+- Web 源码基线：[`SeraphHsing/denova@85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e`](https://github.com/SeraphHsing/denova/tree/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e)。
 - 测试服务器基线（P0-02 部分确定）：地址 `http://192.168.2.102:18081`，后端版本 `0.6.3`，commit `85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e`（版本号已重置对齐上游）；隔离测试账号已提供（凭证本地保存、不进仓库），数据快照与复现步骤待补。
 - 文档来源：`Denova-Android-开发规划-2026-10-22.zip`，规划日期为 2026-10-22。
 
@@ -21,6 +21,7 @@
 - 已记录架构决策、风险、证据边界和阶段退出条件。
 - 2026-10-23 已补充命令与草稿的本地事务边界、统一 G6 退出条件、加入性能基准冻结记录，并同步 P0 / 纯文档检查规则；失效归档引用已清理，链接、锚点与结构化清单已静态核对。
 - 2026-10-23 已在 `AGENTS.md` 登记：2.1 架构与事实来源摘要（后端零改动与固定基线、协议权威来源、稳定身份 key、三套协议、P0–P6 / G1–G6 路线）、6.1 常用命令与工具链（本地固定 Gradle 9.5.1 与 CI 对齐；当前无 Gradle 工程 / Wrapper / CI，命令在 P0-07 后适用）、6.2 验证纪律、变更流程中的分支前缀与 Conventional Commits 约定。本次为纯文档维护，未改动业务矩阵行或实现状态。
+- 2026-10-23 完成 P0-03 首轮静态盘点：新增 [08 页面/表面全量清单](android-web-parity/08-surface-inventory.md)，从后端 `web/src` 与 `internal/api/routes.go` 枚举 14 个顶层表面、子表面、条件入口与 API 族映射，并记录 api-inventory.csv(277)/parity-matrix.csv(118) 与 `85ec97c` 服务端 routes.go 的族差异（trajectory/agent-runtimes/event-packages/rule-systems/actor-states/image-presets/game-planning-templates/update/activity/messages/speech/comfyui/conversation-goal 等），已决定升级 Web 基线至 `85ec97c`（`baseline.json` 已更新 commit、源 blob SHA 与比较 URL；671ef4eb→85ec97c 仅 3 个文件变化：AGENTS.md / routes.go / settings-sections.ts）；api-inventory.csv(277) 仍需按 85ec97c 的 routes.go 重提取，逐字段展开矩阵待续。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -28,9 +29,9 @@
 
 | 项目 | 当前状态 | 退出条件 |
 |---|---|---|
-| Web 与服务端运行基线 | 部分完成：已登记 `http://192.168.2.102:18081`、版本 0.6.3、commit `85ec97c`、隔离账号（本地保存） | 补数据快照与复现步骤；核对 Web 基线 671ef4eb 与服务端 85ec97c 的对应关系 |
+| Web 与服务端运行基线 | 部分完成：已登记 `http://192.168.2.102:18081`、版本 0.6.3、commit `85ec97c`、隔离账号（本地保存）；Web 基线已升级至 `85ec97c`（与服务端一致） | 补数据快照与复现步骤 |
 | 全量页面与字段盘点 | 部分完成；118 条为首批场景 | 展开每个页面、控件、字段、状态、权限与条件入口并冻结范围 |
-| API 契约 | 277 条路由静态登记；handler / DTO / 调用关系仍需追踪 | 对每个实际调用补齐请求、响应、错误、权限、作用域与读回验证 |
+| API 契约 | 277 条为旧基线 671ef4eb 的静态登记；routes.go 已在 85ec97c 变更，需按新基线重提取 | 对每个实际调用补齐请求、响应、错误、权限、作用域与读回验证 |
 | Android 工程 | 尚未创建 | 固定 JDK、AGP、Gradle、Kotlin、Compose BOM、SDK，CI 构建通过 |
 | G1 认证与网络 | 未开始 | status、登录、配对、Cookie、受保护图片、SSE、WS、退出完成真实往返 |
 | G2 Markdown 编辑器 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双模式、IME、序列化与 D03 性能预算 |

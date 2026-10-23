@@ -35,13 +35,13 @@
 
 手机壳采用一个共享顶栏、左导航抽屉、右项目 / 控制台抽屉。写作和游戏在导航中为两个并排入口。默认工具顺序为工作台、资料库、创作方案、版本管理、书籍管理、Skills、Agents、自动化、资源中心；设置位于末尾。开发模式的 trajectory 位于工作台之后。动态插件默认插入 story 之后，在手机归入工具组；用户已保存的排序优先。
 
-手机导航从 `allActivityItems` 构造，不筛选 `hiddenActivityIDs`；桌面隐藏的入口在手机仍显示。验收需包含保存隐藏设置后进入手机布局的场景，手机不增加基线未提供的隐藏功能。来源：[默认顺序](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/workbench/workbench-activity-order.ts#L17)、[手机可见性](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/workbench/WorkbenchShell.tsx#L438)。
+手机导航从 `allActivityItems` 构造，不筛选 `hiddenActivityIDs`；桌面隐藏的入口在手机仍显示。验收需包含保存隐藏设置后进入手机布局的场景，手机不增加基线未提供的隐藏功能。来源：[默认顺序](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/workbench/workbench-activity-order.ts#L17)、[手机可见性](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/workbench/WorkbenchShell.tsx#L438)。
 
 导航顶部包含书籍切换、命令搜索、消息入口和通知提示；设置拥有独立入口。点击目的地先关闭抽屉，再切换内容。任意时刻只有一个一级目的地高亮。菜单排序、自定义和条件入口按基线逐项核对。
 
 写作的“正文 / Agent”分别保留状态；选择文件进入正文。当前路由负责顶栏控件，缓存的其他页面不得占用顶栏。项目目录和游戏控制台按当前页面提供右侧内容。
 
-来源：[WorkbenchShell](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/workbench/WorkbenchShell.tsx#L189)、[手机布局](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/layout/workspace-mobile-layout.tsx#L45)、[写作分页](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/components/workbench/MobileWritingWorkspace.tsx#L13)。
+来源：[WorkbenchShell](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/workbench/WorkbenchShell.tsx#L189)、[手机布局](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/layout/workspace-mobile-layout.tsx#L45)、[写作分页](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/workbench/MobileWritingWorkspace.tsx#L13)。
 
 ## 4. 每个页面必须展开的状态
 
@@ -84,7 +84,7 @@ ID / 基线提交 / 页面及控件
 
 插件运行界面使用 loopback runtime / iframe。纯原生 Android 没有据此获得通用的插件 UI 渲染契约。本项目只承诺固定手机远程 Web 基线下实际可用的表现；若实测有远程可用的任意 HTML 运行页面，登记原生路线的能力缺口并在该模块开工前作出明确产品决定。
 
-管理端例外规则见 [platform/api.ts](https://github.com/SeraphHsing/denova/blob/671ef4eb609523f07d1c234cdcd242d63ce12652/web/src/features/platform/api.ts#L148)。
+管理端例外规则见 [platform/api.ts](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/platform/api.ts#L148)。
 
 ## 8. 全量完成标准
 
