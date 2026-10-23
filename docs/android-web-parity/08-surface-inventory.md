@@ -108,19 +108,18 @@ Web 是单页 SPA，无 URL 路由，靠 `workspace-store.mode`（`WorkspaceRout
 | `/trajectory/outcomes`, `/projects/:id/agent-runs*` | trajectory |
 | `/settings*`, `/models/*`, `/images/*`, `/speech*`, `/update/*`, `/analytics*`, `/conversation-config`, `/conversation-goal`, `/activity/summary`, `/messages*` | settings / 跨表面 |
 
-## 5. 与既有清单的差异（已升级基线，待重提取）
+## 5. 与既有清单的差异（已按 85ec97c 重提取）
 
-- `docs/android-web-parity/api-inventory.csv`（277 条）与 `parity-matrix.csv`（118 条）产自 Web 基线
-  `671ef4eb`；本轮服务端已登记为 `85ec97c`（0.6.3）。`routes.go`（85ec97c）含若干 csv 未见的族：
-  `/trajectory/outcomes`、`/agent-runs`、`/agent-runtimes`、`/event-packages`、`/rule-systems`、
-  `/actor-states`、`/image-presets`、`/game-planning-templates`、`/update/*`、`/host/dialogs/directory`、
-  `/activity/summary`、`/messages*`、`/speech*`、`/images/comfyui/*`、`/conversation-goal`、
-  `/interactive/actor-traits/roll`、`/interactive/context-compaction`、`/workspace/switch|current`。
-  → Web 基线已升级至 85ec97c（`baseline.json` 已更新 commit、源 blob SHA 与比较 URL；671ef4eb→85ec97c
-  仅 AGENTS.md / routes.go / settings-sections.ts 三个文件变化）。api-inventory.csv 需在 85ec97c 重提取；
-  parity-matrix.csv 的源文件 blob 在两端一致，URL 已同步指向 85ec97c。
+- `671ef4eb → 85ec97c` 仅 3 个文件变化：`AGENTS.md`、`internal/api/routes.go`、`web/src/features/settings/settings-sections.ts`。
+- `routes.go` 净增 4 条项目作用域路由（插在 `projects.GET("/book/lore/items")` 之后）：
+  `GET /api/projects/:project_id/interactive/stories`（HandleProjectStories）、
+  `.../interactive/stories/:id/branches`（HandleProjectStoryBranches）、
+  `.../interactive/stories/:id/mentions`（HandleProjectStoryMentions）、
+  `.../interactive/stories/:id/narrative`（HandleProjectStoryNarrative）。
+- `api-inventory.csv` 已按 85ec97c 重提取：共 **276 条**（671ef4eb 为 272 条；旧文档「277」为计数偏差，已纠正）。
+- `parity-matrix.csv` 的源文件 blob 在两端一致，`source_url` 已同步指向 85ec97c，无需重提取。
 
 ## 6. 下一步（P0-03/04 续）
 1. 对每个顶层表面展开子页面/控件/字段/状态/权限/条件入口，逐条写入 `parity-matrix.csv`。
 2. 沿 Web 调用 → 路由 → handler → DTO 核对请求/响应/错误/权限/作用域，更新 `api-inventory.csv`。
-3. 在 85ec97c 重提取 api-inventory.csv（routes.go 已变更），并核对与 parity-matrix.csv 的一致性。
+3. 核对 `settings-sections.ts` 变化对 settings 表面相关 parity 行的影响。

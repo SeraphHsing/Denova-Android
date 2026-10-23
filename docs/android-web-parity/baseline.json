@@ -31,17 +31,17 @@
       "internal/api/routes.go",
       "web/src/features/settings/settings-sections.ts"
     ],
-    "inventory_re_extraction_pending": ["api_inventory", "parity_matrix", "game_events"]
+    "inventory_re_extraction_pending": []
   },
   "inventory": {
-    "api_registration_rows": 277,
+    "api_registration_rows": 276,
     "parity_rows": 118,
     "parity_function_groups": 17,
     "parity_status": "initial scenario matrix; P0 expands fields and freezes scope",
     "game_events": 35,
     "game_handled": 25,
     "game_ignored": 10,
-    "extraction_baseline": "671ef4eb609523f07d1c234cdcd242d63ce12652 (pending re-extraction at 85ec97c)"
+    "extraction_baseline": "85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e (re-extracted 2026-10-23)"
   },
   "sources": [
     {"path":"AGENTS.md","blob_sha":"e6dbf7354beb48c56334de90fb75759d5b83a6e9","url":"https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/AGENTS.md"},
