@@ -30,6 +30,8 @@
 - 2026-10-23 完成 G2 富文本模式：`MarkdownVisualTransformation`（`**`/`*`/`` ` ``/`~~` 标记逐字符替换为零宽字符→偏移映射恒等，光标/选区天然对齐）+ 内联样式渲染 + 格式化工具栏（B/I/`</>`/S 选区包裹）；`parseInlineSpans` 纯逻辑层 4 测试。真机验证：富文本渲染标记隐藏、样式正确。
 - 2026-10-23 完成 G3 首轮（保存并发基础）：`ThreeWayMerge` 行级三方合并（java-diff-utils 计算 diff，diff3 合并，重叠冲突标记，5 测试覆盖不重叠/相同/冲突/删改/双插入）；`DenovaClient.readFile`/`saveFile`（revision 校验，409 冲突抛 `DenovaApiException`）；`DraftStore` 本地草稿（按文件 key 存 content+base_revision）。
 - 2026-10-23 完成 G3 编排层：`FileSaveCoordinator`（抽象 `FileRemote`/`DraftStorage` 接口）——落草稿→保存→409→读服务器版→`ThreeWayMerge`→干净用新 revision 重存/冲突产材料，同一文件按 `Mutex` 串行；3 个测试覆盖无冲突/干净合并重存/冲突材料。
+- 2026-10-23 完成 G3 UI 集成并真机验证：`EditorViewModel`（打开文件/编辑/防抖自动保存/冲突状态）+ `EditorScreen` 项目ID+文件路径输入与保存状态显示 + `ConnectionViewModel` 暴露 client + `MainActivity` 绑定。真机（小米14 Pro）对 `灵渊劫-问道` 项目的 `ideas.md` 完成两次完整保存周期：打开（390 字符加载）→ 插入空格 → 自动保存（"已保存"，revision `459b…`→`3bcf…`，长度 391）→ 删除 → 再自动保存（`2a80…`，长度恢复 390）。并发 409 冲突场景需双端联调，待实测。
+- 2026-10-23 完成日志与调试基础设施（工程准备，不属业务矩阵）：`core/logging`（`LogLevel`/`LogEntry`/`Redactor` 脱敏/`LogSink` 接口 + `LogcatSink`/`MemoryLogSink` 环形缓冲/`FileLogSink` 按天滚动/`LogSystem` 级别过滤/`DenovaLog` 静态门面）、`core/network/DenovaHttpLogger`（OkHttp 拦截器：脱敏 URL query、不记 body/header）、`core/debug/DebugSettings`（DataStore 持久化输出级别与文件日志开关）、`app/AppContainer` + `NovaraApplication`（手动注入组装；release 默认 WARN / debug 默认 DEBUG）、`feature/debug` 运行时 Debug 面板（实时日志、级别/tag 过滤、搜索、导出、清空、文件日志开关、应用信息）。关键路径接入打点（连接/认证/编辑器保存/三方合并）。新增 17 个 JVM 测试（脱敏/级别过滤/环形缓冲/网络拦截器），本地主检查 `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿。日志语言统一英文、不记密码/Cookie/配对与 attach token/API key/私人正文（见 [02 §9 日志与调试](android-web-parity/02-architecture.md#9-日志与调试基础设施)）。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -43,7 +45,7 @@
 | Android 工程 | 已创建；本地 + CI `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿（APK 11MB） | 固定 JDK17、AGP 9.3.0（内置 Kotlin）、Gradle Wrapper 9.5.1、Compose 编译器插件 2.4.21、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26；CI 构建通过 |
 | G1 认证与网络 | 完成：连接 + status + 登录 + 退出 已真机真实往返通过；DataStore 服务器地址持久化完成 | 配对、受保护图片、SSE、WS、HTTPS/WSS、迟到 401 完成真实往返 |
 | G2 Markdown 编辑器 | 两轮完成：序列化层（commonmark 0.30.0 + GFM 表格，8 测试）+ 源码/富文本/预览三模式；富文本 = 标记隐藏(零宽替换) + 内联样式 + 格式化工具栏，纯逻辑层 4 测试；本地 + CI 全绿；真机验证富文本渲染 | 图片/表格编辑、中文 IME、选区增强、D03 性能预算 |
-| G3 保存并发 | 两轮完成：三方合并 `ThreeWayMerge`（diff3，5 测试）+ 文件读写 revision 校验 + 本地草稿 `DraftStore` + 保存编排 `FileSaveCoordinator`（落草稿→保存→409→合并→干净重存/冲突材料，按文件 Mutex 串行，3 测试）；本地 + CI 全绿 | 真机并发（双端编辑）、迟到回包、进程恢复实测 |
+| G3 保存并发 | 三轮完成：三方合并 `ThreeWayMerge`（diff3，5 测试）+ 文件读写 revision 校验 + 本地草稿 `DraftStore` + 保存编排 `FileSaveCoordinator`（Mutex 串行，3 测试）+ 编辑器 UI 集成（`EditorViewModel` 打开文件/防抖自动保存/冲突提示 + `EditorScreen` 项目ID/路径输入 + 保存状态）；本地 26 测试 + CI 全绿；真机两次完整保存周期（插入空格→已保存→revision 递增→删除→再保存→恢复） | 真机并发（双端编辑触发 409→合并）、迟到回包、进程恢复实测 |
 | G4 Agent / Game 流恢复 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
 | G5 原生终端 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收 ANSI / VT、输入、resize、owner 生命周期与 D03 性能预算 |
 | G6 远程权限与双端共存 | 未开始 | 以[路线中的G6](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)为准；误删对方PTY或丢失会话内容时未通过，仅记录限制不能退出 |

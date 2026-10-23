@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,60 +26,92 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.denova.novara.core.editor.MarkdownDocument
 
-private const val SAMPLE = """# 第一章
-
-这是一段 **加粗** 和 *斜体* 的正文，含行内 `代码` 与 ~~删除线~~。
-
-## 小节
-
-- 列表项甲
-- 列表项乙
-
-1. 有序一
-2. 有序二
-
-| 列1 | 列2 |
-| --- | --- |
-| a   | b   |
-
-> 引用块
-
-```kotlin
-val x = 1
-```
-
-![示例](https://example.com/img.png)
-"""
-
 private enum class EditorMode { SOURCE, RICH, PREVIEW }
 
 /**
- * Markdown 编辑器（G2）：源码 / 富文本（隐藏标记 + 内联样式 + 格式化工具栏）/ 预览 三模式。
+ * Markdown 编辑器（G2/G3）：打开文件 → 源码/富文本/预览三模式 → 防抖自动保存 + 冲突提示。
  */
 @Composable
-fun EditorScreen(onLogout: () -> Unit) {
-    var value by remember { mutableStateOf(TextFieldValue(SAMPLE)) }
+fun EditorScreen(viewModel: EditorViewModel, onLogout: () -> Unit) {
+    val uiState by viewModel.uiState.collectAsState()
     var mode by remember { mutableStateOf(EditorMode.SOURCE) }
+    var projectId by remember { mutableStateOf("") }
+    var filePath by remember { mutableStateOf("") }
+    var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
+
+    // 外部内容变化（打开文件/冲突合并）时重置本地编辑态。
+    LaunchedEffect(uiState.loaded, uiState.filePath, uiState.conflictText) {
+        android.util.Log.d("EditorScreen", "sync: loaded=${uiState.loaded} contentLen=${uiState.content.length}")
+        textFieldValue = TextFieldValue(uiState.content)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
-        // 顶栏
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-            Text(
-                "Novara 编辑器",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(8.dp),
-            )
+            Text("Novara 编辑器", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+            TextButton(onClick = { viewModel.save() }) { Text("保存") }
             TextButton(onClick = onLogout) { Text("退出") }
+        }
+
+        // 打开文件
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            OutlinedTextField(
+                value = projectId,
+                onValueChange = { projectId = it },
+                label = { Text("项目ID") },
+                singleLine = true,
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+            )
+            OutlinedTextField(
+                value = filePath,
+                onValueChange = { filePath = it },
+                label = { Text("文件路径") },
+                singleLine = true,
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+            )
+            OutlinedButton(onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) }) { Text("打开") }
+        }
+
+        // 保存状态
+        val status = when (uiState.saveStatus) {
+            SaveStatus.IDLE -> if (uiState.loaded) "" else "输入项目 ID 与文件路径后打开"
+            SaveStatus.SAVING -> "保存中…"
+            SaveStatus.SAVED -> "已保存"
+            SaveStatus.MERGED -> "已自动合并保存"
+            SaveStatus.CONFLICT -> "冲突"
+            SaveStatus.ERROR -> "错误"
+        }
+        if (status.isNotEmpty()) {
+            Text(status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
+        }
+        uiState.message?.let {
+            Text(
+                it,
+                color = if (uiState.saveStatus == SaveStatus.CONFLICT || uiState.saveStatus == SaveStatus.ERROR)
+                    MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+        }
+        if (uiState.saveStatus == SaveStatus.CONFLICT) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                Text(
+                    "发现冲突，请在下方编辑解决冲突标记",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            }
         }
 
         // 模式切换
@@ -86,32 +121,31 @@ fun EditorScreen(onLogout: () -> Unit) {
             ModeButton("预览", mode == EditorMode.PREVIEW) { mode = EditorMode.PREVIEW }
         }
 
-        // 富文本格式化工具栏
         if (mode == EditorMode.RICH) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                FormatButton("B") { value = wrapSelection(value, "**") }
-                FormatButton("I") { value = wrapSelection(value, "*") }
-                FormatButton("</>") { value = wrapSelection(value, "`") }
-                FormatButton("S") { value = wrapSelection(value, "~~") }
+                FormatButton("B") { textFieldValue = wrapSelection(textFieldValue, "**"); viewModel.updateContent(textFieldValue.text) }
+                FormatButton("I") { textFieldValue = wrapSelection(textFieldValue, "*"); viewModel.updateContent(textFieldValue.text) }
+                FormatButton("</>") { textFieldValue = wrapSelection(textFieldValue, "`"); viewModel.updateContent(textFieldValue.text) }
+                FormatButton("S") { textFieldValue = wrapSelection(textFieldValue, "~~"); viewModel.updateContent(textFieldValue.text) }
             }
         }
 
         when (mode) {
             EditorMode.SOURCE -> BasicTextField(
-                value = value,
-                onValueChange = { value = it },
+                value = textFieldValue,
+                onValueChange = { textFieldValue = it; viewModel.updateContent(it.text) },
                 textStyle = TextStyle(fontSize = 16.sp),
                 modifier = Modifier.fillMaxSize().padding(12.dp),
             )
             EditorMode.RICH -> BasicTextField(
-                value = value,
-                onValueChange = { value = it },
+                value = textFieldValue,
+                onValueChange = { textFieldValue = it; viewModel.updateContent(it.text) },
                 visualTransformation = MarkdownVisualTransformation(),
                 textStyle = TextStyle(fontSize = 16.sp),
                 modifier = Modifier.fillMaxSize().padding(12.dp),
             )
             EditorMode.PREVIEW -> MarkdownPreview(
-                source = value.text,
+                source = uiState.content,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -128,7 +162,7 @@ private fun ModeButton(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun FormatButton(label: String, onClick: () -> Unit) {
     OutlinedButton(onClick = onClick, modifier = Modifier.padding(end = 8.dp)) {
-        Text(label, style = TextStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
+        Text(label, style = TextStyle(fontWeight = FontWeight.Bold))
     }
 }
 
