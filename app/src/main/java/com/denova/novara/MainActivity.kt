@@ -4,10 +4,14 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.denova.novara.feature.connection.ConnectionScreen
+import com.denova.novara.feature.connection.ConnectionUiState
 import com.denova.novara.feature.connection.ConnectionViewModel
+import com.denova.novara.feature.editor.EditorScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,7 +23,12 @@ class MainActivity : ComponentActivity() {
                         checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
                     )
                 }
-                ConnectionScreen(connectionViewModel)
+                val state by connectionViewModel.state.collectAsState()
+                when (state) {
+                    is ConnectionUiState.Authenticated ->
+                        EditorScreen(onLogout = { connectionViewModel.logout() })
+                    else -> ConnectionScreen(connectionViewModel)
+                }
             }
         }
     }

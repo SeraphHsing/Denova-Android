@@ -63,17 +63,8 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
                 }
                 AuthForms(viewModel, actionError)
             }
-            is ConnectionUiState.Authenticated -> {
-                Spacer(Modifier.height(24.dp))
-                Text("已连接到 ${s.server.origin}", style = MaterialTheme.typography.titleMedium)
-                if (s.local) {
-                    Text("本机身份", color = MaterialTheme.colorScheme.primary)
-                }
-                Spacer(Modifier.height(16.dp))
-                Button(onClick = { viewModel.logout() }) {
-                    Text("退出登录")
-                }
-            }
+            // 已认证态由 MainActivity 路由到编辑器，此分支不可达。
+            is ConnectionUiState.Authenticated -> Unit
         }
     }
 }
