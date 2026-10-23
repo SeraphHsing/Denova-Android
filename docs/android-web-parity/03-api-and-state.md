@@ -189,6 +189,44 @@ Content-Type: application/json
 **对话目标 `/api/conversation-goal`（+ 项目）**
 - `GET` → `{goal: ...|null}`；`POST` body `{binding, ...GoalMutation}` → `{goal}`；错误 `400 capabilityUnsupported`、`409 revisionConflict/stateChanged`、`400 invalid`。
 
+### 4.3 长尾族契约（85ec97c handler）
+
+**书籍 `/api/books*`**
+- `GET /books` → `{books, sort_mode}`；`POST /books/create` body `{title, author?, description?}` → `{project_id, workspace, book_meta}`（400 titleRequired、重名 409、未配置目录 500 novaDirMissing）。
+- `GET /books/cover?path=` → 二进制；`POST /books/cover/generate` body `{path, mode("agent"|非), command_id?, image_preset_id?, instruction?}`；`POST /books/cover/upload`（multipart `file` + `path`，≤16MB，400 coverTooLarge）。
+- `GET /books/export?path=&format=txt` → 附件下载（`Content-Disposition` + `Cache-Control: no-store`；400 exportFormatUnsupported / exportNoChapters）。
+- `POST /books/remove` body `{path}`（只移除记录，不删磁盘）；`POST /books/reorder` body `{paths}`；`POST /books/sort-mode` body `{mode}`；`GET /books/info?path=`；`PUT /books/info` body `{path, title, author, description}`。
+
+**Skills `/api/skills*`（+ 项目）**
+- `GET /skills` → 快照；`GET /skills/document?scope=&name=`；`GET /skills/file?scope=&name=&path=`。
+- `POST /skills` body `{scope, name, description, agents, category, capabilities}`；`PUT /skills/document` body `{scope, name, content, target_scope?, target_name?, base_revision}`（409 revisionConflict）；`PUT /skills/file` body `{scope, name, path, content, base_revision}`（409）；`DELETE /skills/document?scope=&name=`。
+
+**Automations `/api/automations*`**
+- `GET /automations?project_id=&workspace=`（至少其一，否则 400）→ `{tasks}`；`GET /automations/templates?locale=`；`GET /automations/catalog` → `{projects}`；`GET /automations/inbox?project_id=&workspace=`。
+- `POST /automations/inbox/:item_id/confirm|dismiss|read`；`POST /automations/:id/check` → `{items}`。
+- `POST /automations` body TaskDefinition；`PATCH /automations/:id` body Task + `base_revision`（缺失 → 400 `base_revision_required`；冲突 → 409 `revision_conflict`）；`DELETE /automations/:id`。
+- `POST /automations/:id/run` body `{command_id, trigger_evidence}` → `202 {run}`；缺 command_id → 400 invalid_command；command_id 复用 → 409 command_conflict。
+
+**消息 `/api/messages*`、`/api/activity/summary`**
+- `GET /messages`；`GET /activity/summary`；`POST /messages/:id/read`（id 需 URL 反解）；`POST /messages/read-all`。
+
+**市场 `/api/resource-market/*`**
+- `GET /resource-market/catalog`；`POST /resource-market/catalog/refresh`（loopback-only）；失败 → 503 catalogUnavailable。
+
+**Lore 索引与分类 `/api/projects/:id/book/lore/*`**
+- `GET /book/lore/categories` → 分类数组；`POST /book/lore/categories` body CategoryMutation → 分类数组（400 lore.categories.invalid）。
+- `GET /book/lore/index` → IndexGuide；`PUT /book/lore/index` body IndexGuideUpdate → 结果（409 revisionConflict、400 lore.index.invalid）；`POST /book/lore/index/preview` body IndexGuide → `{...IndexPreview, token_estimate}`。
+- 条目子资产（`handler_lore.go`）：`POST /book/lore/items/:id/image/generate`、`/speech/generate`、`/materials/upload`、`POST /book/lore/items/:id/materials`、`GET /book/lore/assets`。
+
+**风格引用 `/api/styles*`**
+- `GET /styles` → `{styles}`；`POST /styles` body WriteRequest → ref；`GET /styles/file?path=`；`PUT /styles/file` body UpdateRequest（409 revisionConflict）；`DELETE /styles?path=` → `{status:ok}`。
+
+**图像 `/api/images*`**
+- `POST /images/ping` body `{endpoint, profile}`（供应商错误 → 422）；`POST /images/comfyui/workflows/discover` body `{endpoint, profile}`；`POST /images/comfyui/workflows/load` body `{endpoint, profile, path}`；`POST /images/generate` body GenerateRequest（无工作区 → 400 workspaceMissing）。
+
+**更新 `/api/update*`**
+- `GET /update/status`（no-store）；`GET /update/check`（502 checkFailed）；`POST /update/install`（502 installFailed）；`POST /update/install/stream` → SSE（`StreamTask`）；`POST /update/apply` body `{when}`（默认 now）；`POST /update/upload`（multipart `file`，超限 413；错误 newerRequired / wrongPlatform / tooLarge / busy / invalidPackage）。
+
 ## 5. 两种实时协议
 
 ### 5.1 Agent UIMessage
