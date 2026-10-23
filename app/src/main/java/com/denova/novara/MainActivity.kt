@@ -21,6 +21,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.denova.novara.core.logging.DenovaLog
+import com.denova.novara.core.logging.LogcatSink
 import com.denova.novara.feature.connection.ConnectionScreen
 import com.denova.novara.feature.connection.ConnectionUiState
 import com.denova.novara.feature.connection.ConnectionViewModel
@@ -32,6 +34,10 @@ import com.denova.novara.feature.editor.EditorViewModel
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!logcatInstalled) {
+            logcatInstalled = true
+            DenovaLog.addSink(LogcatSink())
+        }
         setContent {
             MaterialTheme {
                 val connectionViewModel: ConnectionViewModel = viewModel {
@@ -86,5 +92,10 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    companion object {
+        @Volatile
+        private var logcatInstalled = false
     }
 }
