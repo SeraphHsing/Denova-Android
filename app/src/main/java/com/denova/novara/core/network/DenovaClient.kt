@@ -9,6 +9,7 @@ import com.denova.novara.core.stream.GameStreamTransport
 import com.denova.novara.core.stream.RecoveryAction
 import com.denova.novara.core.stream.RecoveryReceipt
 import com.denova.novara.core.stream.RecoveryRequest
+import com.denova.novara.core.stream.StoryHistoryPage
 import com.denova.novara.core.stream.parseGameStreamError
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -240,6 +241,21 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
         }
     }
 
+    /** 读取 story 的 canonical 历史（rehydrate 后重建叙事基线）。 */
+    suspend fun interactiveHistory(storyId: String, branchId: String, limit: Int): StoryHistoryPage {
+        val request = Request.Builder()
+            .url(interactiveHistoryUrl(storyId, branchId, limit))
+            .get()
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
+                json.decodeFromString(StoryHistoryPage.serializer(), body)
+            }
+        }
+    }
+
     private fun interactiveChatUrl(path: String): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/chat/$path").build()
 
@@ -260,6 +276,13 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
             .addQueryParameter("branch", branchId)
             .addQueryParameter("task_id", taskId)
             .apply { if (after != null) addQueryParameter("after", after) }
+            .build()
+
+    private fun interactiveHistoryUrl(storyId: String, branchId: String, limit: Int): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/interactive/stories/$storyId/history")
+            .addQueryParameter("branch", branchId)
+            .addQueryParameter("limit", limit.toString())
             .build()
 
     private fun toGameStreamError(status: Int, body: String): GameStreamError =

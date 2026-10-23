@@ -11,6 +11,7 @@ import com.denova.novara.core.stream.GameStageState
 import com.denova.novara.core.stream.GameStreamEvent
 import com.denova.novara.core.stream.GameStreamRecoveryCoordinator
 import com.denova.novara.core.stream.RehydrateRequest
+import com.denova.novara.core.stream.buildCanonicalNarrative
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,9 +93,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun reloadCanonical(request: RehydrateRequest?) {
-        DenovaLog.w("Game", "rehydrate required task=${request?.taskId} cursor=${request?.cursor}")
-        // 简化：重置叙事与投影；canonical 历史（/interactive/stories/:id/history）重建待后续轮次。
-        _uiState.value = _uiState.value.copy(narrative = "", stage = GameStageState())
+        val client = client
+        val storyId = _uiState.value.storyId
+        val branchId = _uiState.value.branchId
+        DenovaLog.w("Game", "rehydrate required task=${request?.taskId} cursor=${request?.cursor}; reload canonical history")
+        val narrative = if (client != null && storyId.isNotBlank()) {
+            try {
+                val page = client.interactiveHistory(storyId, branchId, limit = 50)
+                buildCanonicalNarrative(page.turns)
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "reload canonical history failed", e)
+                ""
+            }
+        } else {
+            ""
+        }
+        _uiState.value = _uiState.value.copy(narrative = narrative, stage = GameStageState())
     }
 
     override fun onCleared() {
