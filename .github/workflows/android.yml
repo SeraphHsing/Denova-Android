@@ -18,13 +18,22 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platforms;android-37 build-tools;36.0.0 platform-tools'
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      # android-actions/setup-android@v3 cannot resolve the preview-channel
+      # `platforms;android-37`, so install the SDK packages manually with a
+      # channel fallback (stable -> preview).
+      - name: Set up Android SDK
+        run: |
+          SDKROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          SDKMANAGER=$(find "$SDKROOT/cmdline-tools" -name sdkmanager -type f 2>/dev/null | sort | tail -1)
+          echo "sdkmanager: ${SDKMANAGER:-<not found, assuming on PATH>}"
+          SDKMANAGER="${SDKMANAGER:-sdkmanager}"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "build-tools;36.0.0" > /dev/null 2>&1 || true
+          "$SDKMANAGER" --channel=3 "platforms;android-37" > /dev/null 2>&1 \
+            || "$SDKMANAGER" "platforms;android-37" > /dev/null 2>&1
 
       - name: Build and test
         run: ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
