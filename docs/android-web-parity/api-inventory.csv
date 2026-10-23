@@ -275,3 +275,8 @@
 "DELETE","/api/terminal/sessions/:id","global","注册行无额外中间件；需核对handler","apiHandlers.HandleTerminalSessionDelete","internal/api/routes.go","302","静态注册已核对；运行未验证"
 "GET","/api/terminal/sessions/:id/attach","global","注册行无额外中间件；需核对handler","apiHandlers.HandleTerminalAttach","internal/api/routes.go","303","静态注册已核对；运行未验证"
 "GET","/api/status","global","注册行无额外中间件；需核对handler","apiHandlers.HandleStatus","internal/api/routes.go","304","静态注册已核对；运行未验证"
+"GET","/api/auth/status","authentication","注册行无额外中间件；需核对handler","g.status","internal/api/remote_access.go","120","静态注册已核对；运行未验证"
+"POST","/api/auth/login","authentication","注册行无额外中间件；需核对handler","g.login","internal/api/remote_access.go","121","静态注册已核对；运行未验证"
+"POST","/api/auth/logout","authentication","注册行无额外中间件；需核对handler","g.logout","internal/api/remote_access.go","122","静态注册已核对；运行未验证"
+"POST","/api/auth/pair","authentication","注册行无额外中间件；需核对handler","g.pair","internal/api/remote_access.go","123","静态注册已核对；运行未验证"
+"POST","/api/auth/link","authentication","localHostEffectMiddleware","g.link","internal/api/remote_access.go","124","静态注册已核对；运行未验证"

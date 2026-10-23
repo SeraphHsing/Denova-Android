@@ -26,6 +26,16 @@ Cookie 名包含服务端端口，具体值由 Set-Cookie 决定。REST、受保
 
 原生请求无需伪造浏览器 Origin / Referer；服务器明确处理无这两个头的原生请求。任何连接方式均保持服务端判定的远程权限。
 
+精确契约（85ec97c `internal/api/remote_access.go`，已核对）：
+
+- `status` 响应 `{"local": bool, "authenticated": bool, "lan_url": "http://<lan>/"}`；`lan_url` 仅在本机且 AllowLANAccess 且监听 LAN 时出现；`Cache-Control: no-store`。
+- `login` 请求体 `{"username","password"}`（≤4096 字节）：`200 {"local","authenticated":true}` + Set-Cookie；错误 `403` lanDisabled、`400` invalidBody、`401` invalidCredentials、`503` storeFailed。
+- `pair` 请求体 `{"token"}`（≤4096 字节），一次性消费：`200 {"local","authenticated":true}` + Set-Cookie；错误 `400`、`401` pairingInvalid、`503`。
+- `logout`：撤销会话 + 清 Cookie，`204 No Content`。
+- `link`（loopback-only，`localHostEffectMiddleware`）：`200 {"url":"...#pair=<token>","expires_in":300}`；错误 `403` localHostEffect / lanDisabled。
+- Cookie：名 `denova_session_<port>`，HttpOnly、SameSite=Lax、HTTPS 时 Secure、path `/`。
+- 认证中间件：`/api/*` 带 Origin/Referer 且非同源 → `403` originRejected；写方法（非 GET/HEAD/OPTIONS）与 WebSocket 升级必须同源；本机 IP 免认证；`!AllowLANAccess` → `403` lanDisabled；否则未认证 → `401` authRequired（响应头 `X-Denova-Auth: required` + `Cache-Control: no-store`）。
+
 来源：[认证前端](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/features/remote-access/api.ts#L11)、[服务端认证](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/internal/api/remote_access.go#L78)、[401 处理](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/lib/api-client/client.ts#L180)。
 
 ## 3. 主要接口族

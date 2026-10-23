@@ -28,7 +28,7 @@
 | 文件 | 用途 | 当前边界 |
 |---|---|---|
 | [复刻矩阵（CSV，首批118场景）](android-web-parity/parity-matrix.csv) | 唯一维护的场景矩阵，保留步骤、预期 UI、服务端副作用和验收信息 | 118 条场景仍需在 P0 扩展全站盘点，尚未冻结完整范围 |
-| [完整 API 路由清单（CSV）](android-web-parity/api-inventory.csv) | 完整可读的静态 API 注册记录 | 276 条注册记录；不等于完整 DTO / 权限审计 |
+| [完整 API 路由清单（CSV）](android-web-parity/api-inventory.csv) | 完整可读的静态 API 注册记录 | 281 条注册记录；不等于完整 DTO / 权限审计 |
 | [API 清单说明](android-web-parity/api-inventory.md) | 来源、字段、边界与核验方式 | 配套说明文档 |
 | [游戏事件契约](android-web-parity/game-event-contract.csv) | 游戏 SSE 事件及 Web handled / ignored 分类 | 35 类事件；实现和测试尚未开始 |
 | [基线元数据](android-web-parity/baseline.json) | 固定提交、源文件 blob SHA、盘点计数和验证状态 | Web 运行、测试、Android 构建和真机均未执行 |

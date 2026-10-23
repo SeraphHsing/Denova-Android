@@ -116,7 +116,7 @@ Web 是单页 SPA，无 URL 路由，靠 `workspace-store.mode`（`WorkspaceRout
   `.../interactive/stories/:id/branches`（HandleProjectStoryBranches）、
   `.../interactive/stories/:id/mentions`（HandleProjectStoryMentions）、
   `.../interactive/stories/:id/narrative`（HandleProjectStoryNarrative）。
-- `api-inventory.csv` 已按 85ec97c 重提取：共 **276 条**（671ef4eb 为 272 条；旧文档「277」为计数偏差，已纠正）。
+- `api-inventory.csv` 已按 85ec97c 重提取：共 **281 条**（`routes.go` 276 + `remote_access.go` 认证 5；671ef4eb 为 277 条）。
 - `parity-matrix.csv` 的源文件 blob 在两端一致，`source_url` 已同步指向 85ec97c，无需重提取。
 
 ## 6. 下一步（P0-03/04 续）

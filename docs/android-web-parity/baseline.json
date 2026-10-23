@@ -34,7 +34,7 @@
     "inventory_re_extraction_pending": []
   },
   "inventory": {
-    "api_registration_rows": 276,
+    "api_registration_rows": 281,
     "parity_rows": 118,
     "parity_function_groups": 17,
     "parity_status": "initial scenario matrix; P0 expands fields and freezes scope",

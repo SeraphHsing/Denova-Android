@@ -17,11 +17,11 @@
 
 - 已整理项目级协作约束和文档阅读顺序。
 - 已建立规格索引、项目状态入口和 Android 开发方案文档目录。
-- 已从固定 Web 提交静态核对并登记首批资料：118 条复刻场景、276 条 API 注册记录（85ec97c）、35 类游戏流事件（25 类 handled、10 类 ignored）。
+- 已从固定 Web 提交静态核对并登记首批资料：118 条复刻场景、281 条 API 注册记录（85ec97c）、35 类游戏流事件（25 类 handled、10 类 ignored）。
 - 已记录架构决策、风险、证据边界和阶段退出条件。
 - 2026-10-23 已补充命令与草稿的本地事务边界、统一 G6 退出条件、加入性能基准冻结记录，并同步 P0 / 纯文档检查规则；失效归档引用已清理，链接、锚点与结构化清单已静态核对。
 - 2026-10-23 已在 `AGENTS.md` 登记：2.1 架构与事实来源摘要（后端零改动与固定基线、协议权威来源、稳定身份 key、三套协议、P0–P6 / G1–G6 路线）、6.1 常用命令与工具链（本地固定 Gradle 9.5.1 与 CI 对齐；当前无 Gradle 工程 / Wrapper / CI，命令在 P0-07 后适用）、6.2 验证纪律、变更流程中的分支前缀与 Conventional Commits 约定。本次为纯文档维护，未改动业务矩阵行或实现状态。
-- 2026-10-23 完成 P0-03 首轮静态盘点：新增 [08 页面/表面全量清单](android-web-parity/08-surface-inventory.md)，从后端 `web/src` 与 `internal/api/routes.go` 枚举 14 个顶层表面、子表面、条件入口与 API 族映射；Web 基线由 671ef4eb 升级至 85ec97c（仅 AGENTS.md / routes.go / settings-sections.ts 三文件变化，routes.go 净增 4 条项目作用域 interactive/stories 路由）；api-inventory.csv 已按 85ec97c 重提取为 276 条（旧文档「277」为计数偏差），parity-matrix 源文件未变。逐字段展开矩阵待续。
+- 2026-10-23 完成 P0-03 首轮静态盘点：新增 [08 页面/表面全量清单](android-web-parity/08-surface-inventory.md)，从后端 `web/src` 与 `internal/api/routes.go` 枚举 14 个顶层表面、子表面、条件入口与 API 族映射；Web 基线由 671ef4eb 升级至 85ec97c（仅 AGENTS.md / routes.go / settings-sections.ts 三文件变化，routes.go 净增 4 条项目作用域 interactive/stories 路由）；api-inventory.csv 已按 85ec97c 重提取为 281 条（routes.go 276 + remote_access.go 认证 5；671ef4eb 为 277 条），parity-matrix 源文件未变。逐字段展开矩阵待续。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -31,7 +31,7 @@
 |---|---|---|
 | Web 与服务端运行基线 | 部分完成：已登记 `http://192.168.2.102:18081`、版本 0.6.3、commit `85ec97c`、隔离账号（本地保存）；Web 基线已升级至 `85ec97c`（与服务端一致） | 补数据快照与复现步骤 |
 | 全量页面与字段盘点 | 部分完成；118 条为首批场景 | 展开每个页面、控件、字段、状态、权限与条件入口并冻结范围 |
-| API 契约 | 276 条已按 85ec97c 重提取（671ef4eb 为 272 条）；handler / DTO / 调用关系仍需追踪 | 对每个实际调用补齐请求、响应、错误、权限、作用域与读回验证 |
+| API 契约 | 281 条已按 85ec97c 重提取（671ef4eb 为 277 条）；handler / DTO / 调用关系仍需追踪 | 对每个实际调用补齐请求、响应、错误、权限、作用域与读回验证 |
 | Android 工程 | 尚未创建 | 固定 JDK、AGP、Gradle、Kotlin、Compose BOM、SDK，CI 构建通过 |
 | G1 认证与网络 | 未开始 | status、登录、配对、Cookie、受保护图片、SSE、WS、退出完成真实往返 |
 | G2 Markdown 编辑器 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双模式、IME、序列化与 D03 性能预算 |
