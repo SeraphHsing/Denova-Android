@@ -2,7 +2,19 @@ package com.denova.novara.core.network
 
 import com.denova.novara.core.model.ServerKey
 import com.denova.novara.core.save.FileRemote
+import com.denova.novara.core.stream.GameActiveView
+import com.denova.novara.core.stream.GameStreamError
+import com.denova.novara.core.stream.GameStreamEvent
+import com.denova.novara.core.stream.GameStreamTransport
+import com.denova.novara.core.stream.RecoveryAction
+import com.denova.novara.core.stream.RecoveryReceipt
+import com.denova.novara.core.stream.RecoveryRequest
+import com.denova.novara.core.stream.parseGameStreamError
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -81,7 +93,7 @@ class DenovaApiException(
  * 单个服务器的认证客户端。每个 ServerKey 一个实例；Cookie 通过内存 [InMemoryCookieJar]
  * 隔离，切换服务器即重建客户端，从而隔离会话 Cookie。
  */
-class DenovaClient(private val server: ServerKey) : FileRemote {
+class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransport {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
@@ -177,6 +189,81 @@ class DenovaClient(private val server: ServerKey) : FileRemote {
             }
         }
     }
+
+    override suspend fun active(storyId: String, branchId: String): GameActiveView {
+        val request = Request.Builder().url(interactiveActiveUrl(storyId, branchId)).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
+                json.decodeFromString(GameActiveView.serializer(), body)
+            }
+        }
+    }
+
+    override fun stream(
+        storyId: String,
+        branchId: String,
+        taskId: String,
+        after: String?,
+    ): Flow<GameStreamEvent> = flow {
+        val request = Request.Builder()
+            .url(interactiveStreamUrl(storyId, branchId, taskId, after))
+            .get()
+            .build()
+        okHttpClient.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
+            }
+            val source = resp.body?.source()
+                ?: throw GameStreamError(resp.code, null, "empty stream body")
+            emitAll(sseEventsFromSource(source))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    override suspend fun recover(
+        storyId: String,
+        branchId: String,
+        action: RecoveryAction,
+    ): RecoveryReceipt {
+        val body = json.encodeToString(RecoveryRequest.serializer(), RecoveryRequest(action, storyId, branchId))
+        val request = Request.Builder()
+            .url(interactiveChatUrl("recovery"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toGameStreamError(resp.code, text)
+                json.decodeFromString(RecoveryReceipt.serializer(), text)
+            }
+        }
+    }
+
+    private fun interactiveChatUrl(path: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/chat/$path").build()
+
+    private fun interactiveActiveUrl(storyId: String, branchId: String): HttpUrl =
+        interactiveChatUrl("active").newBuilder()
+            .addQueryParameter("story_id", storyId)
+            .addQueryParameter("branch", branchId)
+            .build()
+
+    private fun interactiveStreamUrl(
+        storyId: String,
+        branchId: String,
+        taskId: String,
+        after: String?,
+    ): HttpUrl =
+        interactiveChatUrl("stream").newBuilder()
+            .addQueryParameter("story_id", storyId)
+            .addQueryParameter("branch", branchId)
+            .addQueryParameter("task_id", taskId)
+            .apply { if (after != null) addQueryParameter("after", after) }
+            .build()
+
+    private fun toGameStreamError(status: Int, body: String): GameStreamError =
+        parseGameStreamError(status, body, json)
 
     private fun fileUrl(projectId: String, path: String): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder()
