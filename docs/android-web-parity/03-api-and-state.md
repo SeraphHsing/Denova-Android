@@ -355,9 +355,9 @@ revision 冲突时，以 base / local / remote 三方合并。无重叠则按新
 精确契约（85ec97c `handler_terminal.go`）：
 
 - `GET /api/terminal/sessions` → `{enabled, shell, commands, default_cwd, max_sessions, sessions:[{...Info, token}], scrollback_kb}`；未启用 → `503 disabled`。列表附 attach token（本端点已认证，供刷新后重挂接）。
-- `POST /api/projects/:id/terminal/sessions` body `{owner_tab_id, profile_id, title, cols, rows}`；空 `owner_tab_id` → 400；返回 `{...Info, token}`；错误 `503 disabled`、`429 tooMany`、`409 ownerConflict`、`400 invalidProfile`、`400 invalidLaunchCommand`、`404 notFound`。
+- `POST /api/projects/:id/terminal/sessions` body `{owner_tab_id, profile_id, title, cols, rows}`；空 `owner_tab_id` → 400；返回 `{...Info, token}`；错误 `503 disabled`、`429 tooMany`、`409 ownerConflict`、`400 invalidProfile`、`400 invalidLaunchCommand`、`404 notFound`。**`profile_id` 不可为空**：`Manager.ResolveStartupCommand` 只接受 `"shell"` 或已注册 profile id，空值直接 `400 invalidProfile`（实测确认）。同一 `owner_tab_id` 在别的项目仍存活 → `409 ownerConflict`，客户端复用前必须按 `owner_tab_id + project_id` 匹配。
 - `DELETE /api/terminal/sessions/:id` → `{id, closed}`；**幂等**（不存在 → `closed:false`，不报错，兼容启动对账与关标签竞态）。
-- `GET /api/terminal/sessions/:id/attach?token=` → WebSocket 升级；token 不匹配 → `403 tokenInvalid`。
+- `GET /api/terminal/sessions/:id/attach?token=` → WebSocket 升级；token 不匹配 → `403 tokenInvalid`。升级成功先回放该会话的 scrollback（binary 帧）再发 `ready`，因此客户端必须**先按会话 `cols/rows` 解释回放**，之后才能切到本机画布尺寸并下发 `resize`；缺 `Origin` 头的原生客户端可通过同源校验。
 - WS 帧：server→client **binary=PTY 原始输出**、**text=JSON 控制** `ready{type,session}` / `exit{type,code,error}` / `error{type,error}` / `pong{type}`；client→server **binary=原始输入**、**text=JSON** `input{type,data}` / `resize{type,cols,rows}` / `ping{type}`。
 
 ## 10. 错误与可观测性
