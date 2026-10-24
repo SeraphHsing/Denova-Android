@@ -19,7 +19,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.logging.LogcatSink
@@ -48,36 +47,13 @@ class MainActivity : ComponentActivity() {
         DenovaLog.i("Perf", "process-start")
         setContent {
             MaterialTheme {
-                val connectionViewModel: ConnectionViewModel = viewModel {
-                    ConnectionViewModel(
-                        checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
-                    )
-                }
-                val editorViewModel: EditorViewModel = viewModel {
-                    EditorViewModel(
-                        checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
-                    )
-                }
-                val gameViewModel: GameViewModel = viewModel {
-                    GameViewModel(
-                        checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
-                    )
-                }
-                val agentViewModel: AgentViewModel = viewModel {
-                    AgentViewModel(
-                        checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
-                    )
-                }
-                val terminalViewModel: TerminalViewModel = viewModel {
-                    TerminalViewModel(
-                        checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
-                    )
-                }
-                val debugViewModel: DebugPanelViewModel = viewModel {
-                    DebugPanelViewModel(
-                        checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
-                    )
-                }
+                val container = (application as NovaraApplication).container
+                val connectionViewModel: ConnectionViewModel = viewModel(factory = container.viewModelFactory)
+                val editorViewModel: EditorViewModel = viewModel(factory = container.viewModelFactory)
+                val gameViewModel: GameViewModel = viewModel(factory = container.viewModelFactory)
+                val agentViewModel: AgentViewModel = viewModel(factory = container.viewModelFactory)
+                val terminalViewModel: TerminalViewModel = viewModel(factory = container.viewModelFactory)
+                val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val state by connectionViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
                 var showGame by remember { mutableStateOf(false) }
