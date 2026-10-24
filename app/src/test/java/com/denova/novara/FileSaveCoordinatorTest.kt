@@ -43,6 +43,7 @@ class FileSaveCoordinatorTest {
     private class FakeDrafts : DraftStorage {
         val map = mutableMapOf<String, Draft>()
         override suspend fun saveDraft(fileKey: String, draft: Draft) { map[fileKey] = draft }
+        override suspend fun loadDraft(fileKey: String): Draft? = map[fileKey]
         override suspend fun clearDraft(fileKey: String) { map.remove(fileKey) }
     }
 

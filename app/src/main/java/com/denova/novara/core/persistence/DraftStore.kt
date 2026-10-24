@@ -12,6 +12,7 @@ data class Draft(
 /** 草稿存取最小抽象，便于单测注入 fake。 */
 interface DraftStorage {
     suspend fun saveDraft(fileKey: String, draft: Draft)
+    suspend fun loadDraft(fileKey: String): Draft?
     suspend fun clearDraft(fileKey: String)
 }
 
@@ -22,7 +23,7 @@ class DraftStore(private val dao: DraftDao) : DraftStorage {
         dao.upsert(DraftEntity(fileKey, draft.content, draft.baseRevision, draft.baseContent))
     }
 
-    suspend fun loadDraft(fileKey: String): Draft? =
+    override suspend fun loadDraft(fileKey: String): Draft? =
         dao.get(fileKey)?.let { Draft(it.content, it.baseRevision, it.baseContent) }
 
     override suspend fun clearDraft(fileKey: String) {
