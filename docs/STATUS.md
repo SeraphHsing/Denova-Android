@@ -47,6 +47,7 @@
 - 2026-10-24 完成 G4 第 12 轮（Agent 写作 UI + 发送，真机验证）：`AgentUiReducer`（`text-delta` 累积正文、`reasoning-delta` 累积思考、`tool-input-start` 记活动、`finish`/`error` 定终态）、`DenovaClient.postChat`（`POST /api/chat` 返回 AI SDK UI 流）、`AgentViewModel`（恢复 + 发送先落命令事务 + 首帧 ACCEPTED）、`AgentScreen` + MainActivity「写作」入口。真机（session `default`）验证：发送 → text-delta 流式累积 → 服务端 `status=done`，客户端显示「完成」+ 完整正文，无 crash。附带修正 `Redactor` 误把 `session` 当敏感键脱敏。
 - 2026-10-24 完成 G4 第 13 轮（流空闲兜底）：`collectWithIdleGuard`（流空闲 60s 查 `active`，任务已结束则取消流并返回终止信号，仍活动则重置计时），Game/Agent 发送流均已接入；空闲终止时 UI 提示"流空闲超时，任务可能已结束"。新增 2 个测试。用于服务端任务 error 后展示流未关闭时避免 UI 永久停留在「运行中」（第 9 轮真机已观察到该现象）。真机复现需服务端 error 场景自然出现。
 - 2026-10-24 完成 G4 第 14 轮（Agent canonical 历史重建）：`AgentMessage`/`AgentMessagesPage` DTO + `buildAgentHistoryNarrative`（只取 `type=="text"` part，user 消息加 `> ` 前缀）；`DenovaClient.sessionMessages`（`GET /api/session/messages?limit=`）；`AgentViewModel` 在挂接前与 rehydrate 时加载历史基线。真机（session `default`）验证：挂接后 `canonical history loaded len=2064`，历史问答正确显示。新增 6 个测试。
+- 2026-10-24 完成 G4 第 15 轮（异常收尾真机验证）：设备断网（`svc wifi/data disable`）后，SSE 流读立即抛 `SocketException: Software caused connection abort` → `send uncertain` → `finishStream` → UI 显示「错误」+ 错误信息，**不卡「运行中」**；并修复错误态仍残留「思考中」（`finishStream` 清空 activity，Game/Agent 同步）。另验证：「任务仍活动 → 客户端继续等待」分支（服务端 LLM 卡住 4.5 分钟无输出、最终自动 `aborted`，客户端全程正确显示运行中，不误杀）。仅「任务结束但展示流未关闭」的终止分支无法主动制造（真实服务器任务正常时会关闭流），由 2 个单测覆盖、待自然场景确认。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -61,7 +62,7 @@
 | G1 认证与网络 | 完成：连接 + status + 登录 + 退出 已真机真实往返通过；DataStore 服务器地址持久化完成 | 配对、受保护图片、SSE、WS、HTTPS/WSS、迟到 401 完成真实往返 |
 | G2 Markdown 编辑器 | 两轮完成：序列化层（commonmark 0.30.0 + GFM 表格，8 测试）+ 源码/富文本/预览三模式；富文本 = 标记隐藏(零宽替换) + 内联样式 + 格式化工具栏，纯逻辑层 4 测试；本地 + CI 全绿；真机验证富文本渲染 | 图片/表格编辑、中文 IME、选区增强、D03 性能预算 |
 | G3 保存并发 | 三轮完成：三方合并 `ThreeWayMerge`（diff3，5 测试）+ 文件读写 revision 校验 + 本地草稿 `DraftStore` + 保存编排 `FileSaveCoordinator`（Mutex 串行，3 测试）+ 编辑器 UI 集成（`EditorViewModel` 打开文件/防抖自动保存/冲突提示 + `EditorScreen` 项目ID/路径输入 + 保存状态）；本地 26 测试 + CI 全绿；真机两次完整保存周期（插入空格→已保存→revision 递增→删除→再保存→恢复） | 真机并发（双端编辑触发 409→合并）、迟到回包、进程恢复实测 |
-| G4 Agent / Game 流恢复 | **两套流均真机端到端通过**：Game 发送→流→done→断线恢复；Agent 写作发送→流式累积→done。命令持久化（先落事务 + command_id 幂等）、流空闲兜底、Agent canonical 历史重建均已接入。仍缺 D03 性能预算实测、流空闲兜底的 error 场景真机复现 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
+| G4 Agent / Game 流恢复 | **两套流均真机端到端通过**：Game 发送→流→done→断线恢复；Agent 写作发送→流式累积→done。命令持久化、流空闲兜底（异常收尾已真机验证）、Agent canonical 历史重建均已接入。仍缺 D03 性能预算实测、流兜底「任务结束但流未关闭」自然场景确认 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
 | G5 原生终端 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收 ANSI / VT、输入、resize、owner 生命周期与 D03 性能预算 |
 | G6 远程权限与双端共存 | 未开始 | 以[路线中的G6](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)为准；误删对方PTY或丢失会话内容时未通过，仅记录限制不能退出 |
 | CI 与 APK | 已配置并通过（GitHub Actions 全绿，APK 工件 `novara-debug-apk` 上传成功） | GitHub Actions 运行构建、测试、Lint 并保存报告与 APK 工件 |
