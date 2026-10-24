@@ -109,6 +109,30 @@ data class TextSelectionRef(
     val content: String,
 )
 
+/**
+ * Agent 运行时命令（`POST /api/chat/commands`，AGT-005）。
+ *
+ * `target_operation_id` 是必填项：必须来自当前 active 投影（[com.denova.novara.core.stream.AgentActiveView.activeOperationId]），
+ * 服务端据此判断目标是否仍是用户看到的那个操作，避免把命令打到已经换代的运行上。
+ */
+@Serializable
+data class AgentCommandRequest(
+    @SerialName("session_id") val sessionId: String,
+    /** `abort`（停止）或 `suspend`（暂停）。 */
+    val type: String,
+    @SerialName("command_id") val commandId: String,
+    @SerialName("target_operation_id") val targetOperationId: String,
+    val reason: String? = null,
+)
+
+/** 命令受理回执：服务端确认后的命令身份、操作身份与游标。 */
+@Serializable
+data class AgentCommandReceipt(
+    @SerialName("command_id") val commandId: String = "",
+    @SerialName("operation_id") val operationId: String = "",
+    val cursor: Long = 0,
+)
+
 @Serializable
 data class SendChatRequest(
     @SerialName("command_id") val commandId: String,
@@ -544,6 +568,25 @@ class DenovaClient(
                 val body = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
                 json.decodeFromString(AgentActiveView.serializer(), body)
+            }
+        }
+    }
+
+    /**
+     * 提交运行时命令（暂停 / 停止，AGT-005）：`POST /api/chat/commands`。
+     * 失败按 `agent_runtime.*` 错误码抛 [DenovaApiException]，由上层区分「无活动运行」与「目标已变化」。
+     */
+    suspend fun submitAgentCommand(request: AgentCommandRequest): AgentCommandReceipt {
+        val body = json.encodeToString(AgentCommandRequest.serializer(), request)
+        val call = Request.Builder()
+            .url(agentChatUrl("commands"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(call).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentCommandReceipt.serializer(), text)
             }
         }
     }

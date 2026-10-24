@@ -4,6 +4,15 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/** 一次 Agent 运行的身份（`active.last_operation`），用于确认停止后的最终结果。 */
+@Serializable
+data class AgentOperationView(
+    @SerialName("operation_id") val operationId: String = "",
+    @SerialName("command_id") val commandId: String = "",
+    val status: String? = null,
+    val reason: String? = null,
+)
+
 /** `GET /api/chat/active`（写作 Agent）的活动投影。 */
 @Serializable
 data class AgentActiveView(
@@ -16,6 +25,14 @@ data class AgentActiveView(
     @SerialName("recovery_paused") val recoveryPaused: Boolean = false,
     @SerialName("stream_attached") val streamAttached: Boolean = false,
     val phase: String? = null,
+    /**
+     * 当前操作的权威身份（`active_operation_id`）。暂停 / 停止必须把它原样作为
+     * `target_operation_id` 回传，服务端据此校验目标是否已变化（AGT-005）。
+     */
+    @SerialName("active_operation_id") val activeOperationId: String = "",
+    /** Agent Runtime journal 游标；不可用作 SSE `after`。 */
+    val cursor: Long? = null,
+    @SerialName("last_operation") val lastOperation: AgentOperationView? = null,
     @SerialName("recovery_actions") val recoveryActions: List<RecoveryAction> = emptyList(),
 )
 

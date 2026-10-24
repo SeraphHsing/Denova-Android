@@ -95,6 +95,38 @@ fun AgentScreen(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+
+        // 暂停 / 停止（AGT-005）：只有服务端投影给出当前操作身份时才可点；
+        // 命令提交中禁用避免重复下发，停止请求后显示「正在停止…」等待最终状态。
+        val canControl = state.activeOperationId.isNotBlank()
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = { viewModel.pause() },
+                enabled = canControl && !state.commandSubmitting,
+                modifier = Modifier.padding(end = 8.dp),
+            ) { Text(stringResource(R.string.agent_pause)) }
+            OutlinedButton(
+                onClick = { viewModel.abort() },
+                enabled = canControl && !state.commandSubmitting,
+            ) {
+                Text(stringResource(if (state.abortPending) R.string.agent_stopping else R.string.agent_stop))
+            }
+            val phaseLabel = when (state.runtimePhase) {
+                "suspended" -> stringResource(R.string.agent_suspended)
+                "" -> ""
+                else -> state.runtimePhase
+            }
+            if (phaseLabel.isNotBlank()) {
+                Text(
+                    phaseLabel,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+        }
         state.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
         }

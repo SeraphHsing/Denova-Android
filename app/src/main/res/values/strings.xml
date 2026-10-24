@@ -69,4 +69,10 @@
     <!-- 选区引用（WRI-009） -->
     <string name="quote_selection">Quote to AI</string>
     <string name="selections_title">References</string>
+
+    <!-- Agent 暂停与停止（AGT-005） -->
+    <string name="agent_pause">Pause</string>
+    <string name="agent_stop">Stop</string>
+    <string name="agent_stopping">Stopping…</string>
+    <string name="agent_suspended">Paused</string>
 </resources>
