@@ -28,8 +28,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.denova.novara.core.logging.DenovaLog
+import okhttp3.Call
 import okhttp3.Cookie
 import okhttp3.CookieJar
+import okhttp3.EventListener
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.MediaType.Companion.toMediaType
@@ -39,6 +42,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
+import java.io.IOException
 
 @Serializable
 data class AuthStatusResponse(
@@ -128,6 +132,11 @@ class DenovaClient(
     private val cookieJar: CookieJar = InMemoryCookieJar(),
 ) : FileRemote, GameStreamTransport, AgentStreamTransport {
 
+    companion object {
+        /** 退出登录时等待在途请求收尾的上限；超时后照常退出，避免无限卡住。 */
+        const val LOGOUT_DRAIN_MILLIS = 3_000L
+    }
+
     /** 连接身份（隔离 key）：HistoryStore / 草稿等按此分目录。 */
     val serverOrigin: String get() = server.origin
 
@@ -139,11 +148,21 @@ class DenovaClient(
     }
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
+    /** 在途请求计数：退出登录时据此等待进行中的读取/流收尾。 */
+    val inFlight = InFlightTracker()
+
     /** 共享 OkHttpClient（含会话 CookieJar）：受保护图片、SSE、WS 都复用此实例，保证会话一致。 */
     val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .cookieJar(cookieJar)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .eventListenerFactory {
+            object : EventListener() {
+                override fun callStart(call: Call) = inFlight.begin(call)
+                override fun callEnd(call: Call) = inFlight.end(call)
+                override fun callFailed(call: Call, ioe: IOException) = inFlight.end(call)
+            }
+        }
         .build()
 
     /**
@@ -176,6 +195,16 @@ class DenovaClient(
     }
 
     suspend fun logout() {
+        // 先等进行中的读取/流收尾（最多 [LOGOUT_DRAIN_MILLIS]），再清会话；
+        // 否则退出会把服务端回包丢掉，迟到响应还可能落到下一次登录上。
+        val pending = inFlight.count
+        if (pending > 0) {
+            val drained = inFlight.awaitIdle(LOGOUT_DRAIN_MILLIS)
+            DenovaLog.i(
+                "Connection",
+                "logout drain pending=$pending drained=$drained after=${LOGOUT_DRAIN_MILLIS}ms",
+            )
+        }
         val request = Request.Builder()
             .url(server.baseUrl + "/api/auth/logout")
             .post("".toRequestBody(null))
