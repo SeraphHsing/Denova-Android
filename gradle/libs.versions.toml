@@ -11,6 +11,7 @@ datastorePreferences = "1.1.1"
 commonmark = "0.30.0"
 javaDiffUtils = "4.15"
 coil = "3.6.3"
+navigationCompose = "2.10.2"
 junit = "4.13.2"
 
 [libraries]
@@ -31,6 +32,7 @@ commonmark-gfm-tables = { group = "org.commonmark", name = "commonmark-ext-gfm-t
 java-diff-utils = { group = "io.github.java-diff-utils", name = "java-diff-utils", version.ref = "javaDiffUtils" }
 coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
 coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
+navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

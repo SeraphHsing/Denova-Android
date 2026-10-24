@@ -20,6 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.logging.LogcatSink
 import com.denova.novara.feature.agent.AgentScreen
@@ -56,10 +61,7 @@ class MainActivity : ComponentActivity() {
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val state by connectionViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
-                var showGame by remember { mutableStateOf(false) }
-                var showAgent by remember { mutableStateOf(false) }
-                var showTerminal by remember { mutableStateOf(false) }
-                var terminalProjectId by remember { mutableStateOf("") }
+                val navController = rememberNavController()
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (state) {
@@ -73,24 +75,38 @@ class MainActivity : ComponentActivity() {
                                     terminalViewModel.bindClient(client)
                                 }
                             }
-                            when {
-                                showAgent -> AgentScreen(viewModel = agentViewModel, onBack = { showAgent = false })
-                                showGame -> GameScreen(viewModel = gameViewModel, onBack = { showGame = false })
-                                showTerminal -> TerminalScreen(
-                                    viewModel = terminalViewModel,
-                                    initialProjectId = terminalProjectId,
-                                    onBack = { showTerminal = false },
-                                )
-                                else -> EditorScreen(
-                                    viewModel = editorViewModel,
-                                    onOpenGame = { showGame = true },
-                                    onOpenAgent = { showAgent = true },
-                                    onOpenTerminal = { projectId ->
-                                        terminalProjectId = projectId
-                                        showTerminal = true
-                                    },
-                                    onLogout = { connectionViewModel.logout() },
-                                )
+                            NavHost(
+                                navController = navController,
+                                startDestination = "editor",
+                            ) {
+                                composable("editor") {
+                                    EditorScreen(
+                                        viewModel = editorViewModel,
+                                        onOpenGame = { navController.navigate("game") },
+                                        onOpenAgent = { navController.navigate("agent") },
+                                        onOpenTerminal = { projectId ->
+                                            navController.navigate("terminal/$projectId")
+                                        },
+                                        onLogout = { connectionViewModel.logout() },
+                                    )
+                                }
+                                composable("game") {
+                                    GameScreen(viewModel = gameViewModel, onBack = { navController.popBackStack() })
+                                }
+                                composable("agent") {
+                                    AgentScreen(viewModel = agentViewModel, onBack = { navController.popBackStack() })
+                                }
+                                composable(
+                                    route = "terminal/{projectId}",
+                                    arguments = listOf(navArgument("projectId") { type = NavType.StringType }),
+                                ) { entry ->
+                                    val projectId = entry.arguments?.getString("projectId").orEmpty()
+                                    TerminalScreen(
+                                        viewModel = terminalViewModel,
+                                        initialProjectId = projectId,
+                                        onBack = { navController.popBackStack() },
+                                    )
+                                }
                             }
                         }
                         else -> ConnectionScreen(connectionViewModel)
