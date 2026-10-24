@@ -39,7 +39,12 @@ private enum class EditorMode { SOURCE, RICH, PREVIEW }
  * Markdown 编辑器（G2/G3）：打开文件 → 源码/富文本/预览三模式 → 防抖自动保存 + 冲突提示。
  */
 @Composable
-fun EditorScreen(viewModel: EditorViewModel, onOpenGame: () -> Unit, onLogout: () -> Unit) {
+fun EditorScreen(
+    viewModel: EditorViewModel,
+    onOpenGame: () -> Unit,
+    onOpenAgent: () -> Unit,
+    onLogout: () -> Unit,
+) {
     val uiState by viewModel.uiState.collectAsState()
     var mode by remember { mutableStateOf(EditorMode.SOURCE) }
     var projectId by remember { mutableStateOf("") }
@@ -61,6 +66,7 @@ fun EditorScreen(viewModel: EditorViewModel, onOpenGame: () -> Unit, onLogout: (
             Text("Novara 编辑器", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
             TextButton(onClick = { viewModel.save() }) { Text("保存") }
             TextButton(onClick = onOpenGame) { Text("游戏") }
+            TextButton(onClick = onOpenAgent) { Text("写作") }
             TextButton(onClick = onLogout) { Text("退出") }
         }
 

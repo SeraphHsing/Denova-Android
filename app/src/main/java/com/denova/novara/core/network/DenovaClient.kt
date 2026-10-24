@@ -88,6 +88,13 @@ data class SendInteractiveChatRequest(
 )
 
 @Serializable
+data class SendChatRequest(
+    @SerialName("command_id") val commandId: String,
+    @SerialName("session_id") val sessionId: String,
+    val message: String,
+)
+
+@Serializable
 data class SaveFileResponse(
     @SerialName("project_id") val projectId: String = "",
     val path: String,
@@ -292,6 +299,23 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
      * 响应为 AI SDK UI message stream（`x-vercel-ai-ui-message-stream: v1`），
      * 不依赖 Last-Event-ID，重连游标通过 `after=` 显式传递。
      */
+    /** 发送写作输入：`POST /api/chat`，响应为 AI SDK UI message 流。 */
+    fun postChat(request: SendChatRequest): Flow<AgentUiFrame> = flow {
+        val body = json.encodeToString(SendChatRequest.serializer(), request)
+        val req = Request.Builder()
+            .url(chatSendUrl())
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        streamHttpClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
+            }
+            val source = resp.body?.source()
+                ?: throw GameStreamError(resp.code, null, "empty chat stream body")
+            emitAll(agentFramesFromSource(source))
+        }
+    }.flowOn(Dispatchers.IO)
+
     override suspend fun agentActive(sessionId: String): AgentActiveView {
         val request = Request.Builder().url(agentActiveUrl(sessionId)).get().build()
         return withContext(Dispatchers.IO) {
@@ -372,6 +396,9 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
 
     private fun interactiveSendUrl(): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/chat").build()
+
+    private fun chatSendUrl(): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/chat").build()
 
     private fun agentChatUrl(path: String): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/chat/$path").build()
