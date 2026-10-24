@@ -30,23 +30,21 @@ I Connection: logout drain pending=1 drained=false after=3000ms
 
 **说明**：WebSocket 的 `callEnd` 在升级握手后即触发、不代表 socket 关闭，因此终端 WS 不参与该计数——它有自己的 `onCleared` 生命周期（见 G5/G6）。
 
-## 3. 一次性配对：消费脚本已备，待服务器本机出 token
+## 3. 一次性配对：真机 + 真实服务器通过
 
-`POST /api/auth/link`（创建配对链接）受 `localHostEffectMiddleware` 限制：
+`POST /api/auth/link`（创建配对链接）受 `localHostEffectMiddleware` 限制，且 Denova 跑在容器里（宿主机 18081 → 容器 8080），宿主机 loopback 会被判为 docker 网关而拒绝。经 SSH 到 NAS、`docker exec denova` 进入容器后以容器内 loopback（`127.0.0.1:8080`）创建配对链接：
 
 ```text
-POST /api/auth/link → 403
-{"code":"http.403","error":"此系统操作只能从运行 Denova 的本机触发"}
+http://192.168.16.2:8080/#pair=<token>
 ```
 
-因此从局域网客户端无法生成配对 token。已准备 `tools/g1_pair_consume.py` 消费侧验证（同一个 token 消费两次，第二次预期 4xx）。要完成 `AUTH-003`，需在服务器本机（NAS 容器内）执行：
+随后用 `tools/g1_pair_consume.py` 消费同一个 token 两次：
 
-```bash
-curl -s -X POST http://127.0.0.1:18081/api/auth/link -H 'Content-Type: application/json' \
-     --cookie '<登录后的 Cookie>' | jq -r .url   # 取 #pair= 后的 token
-# 然后在本机：
-DENOVA_BASE=http://192.168.2.102:18081 python tools/g1_pair_consume.py <token>
+```text
+pair first=200 second=401   PASS
 ```
+
+即一次性配对语义成立：首次消费进入认证态，二次消费被拒（`api.access.pairingInvalid`）。`AUTH-003` 据此回写为已完成。
 
 ## 4. HTTPS / WSS：无可用环境（客户端已就绪）
 

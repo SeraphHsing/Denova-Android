@@ -1,7 +1,7 @@
 # 项目状态
 
 **更新日期：** 2026-10-24  
-**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六个高风险原型均已出真机结论：G4 / G5 判据齐备，G6 通过（范围受限 SD-01）；**G1 / G2 / G3 仍各缺退出条件项**（见「未完成 / 尚未验证」），因此 P1 尚未整体退出。复刻矩阵按「P0–P1 已实现并验证」回写 **9 条 `已完成`**（AUTH-002 / AUTH-005 / WRI-004 / WRI-010 / WRI-012 / AGT-002 / WB-004 / WB-007 / WB-009），其余 109 条 `未开始`，口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；**尚未进入 P2**。  
+**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六个高风险原型均已出真机结论：G4 / G5 判据齐备，G6 通过（范围受限 SD-01）；**G1 / G2 / G3 仍各缺退出条件项**（见「未完成 / 尚未验证」），因此 P1 尚未整体退出。复刻矩阵按「P0–P1 已实现并验证」回写 **10 条 `已完成`**（AUTH-002 / AUTH-003 / AUTH-005 / WRI-004 / WRI-010 / WRI-012 / AGT-002 / WB-004 / WB-007 / WB-009），其余 108 条 `未开始`，口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；**尚未进入 P2**。  
 **产品实现状态：** P1 原型链路可用（连接认证 / 编辑器 / 游戏流 / 写作流 / 终端）；目标形态的公共界面（单 Activity 导航、左右抽屉、DesignTokens、主题与中英文）和业务页面尚未实现。
 
 ## 当前基线
@@ -74,6 +74,7 @@
 - 2026-10-24 G6 第 6 轮（范围决定 SD-01 通过，G6 收口）：用户（Hsing）确认 [SD-01](android-web-parity/07-evidence-and-decisions.md#范围决定scope-decision)——Web 挂载工作台回收所有 `attached=0` 且不在其持久化标签中的会话属固定基线行为，Android 侧不作对抗；Android 保证不静默重建空 PTY、7–25s 内如实提示、只 DELETE 自身会话、被回收后保留最近 64KB 只读历史（B）、进程被杀重启免登录并秒级重挂（C，[ADR-12](android-web-parity/07-evidence-and-decisions.md#3-架构决定)）。范围仅限终端 PTY 生命周期。据此 **G6 记为「通过（范围受限）」**，`05` G6 行与 `07` 均已引用 SD-01。遗留（不阻塞 G6）：多端 resize 冲突协商、R05 远程权限表现（P4-D）。
 
 - 2026-10-24 G2 D03-W 性能实测（真机）与对照语料：`tools/d03w_fixture.py` 生成 21 份文档（中英各 10 章约 51KB + 512KB 压力）并上传测试项目，新增 `EditorPerf` 埋点（`editor-open`/`editor-input-visible`/`editor-save` 含 `draftWindow`）后实测：**输入 → 可见** 标准章 p95 17–35 ms / p99 46–51 ms（n=150）、压力文档 p95 26–27 ms / p99 54 ms（n=100）；**打开** 51KB 35–65 ms、512KB 126–145 ms；**保存** 首次 589 ms / 2,768 ms，稳态 197–249 / 651–702 ms；`draftWindow` 800–1,028 ms；**PSS** 空态 170,505 KB → +22.1 MB（51KB）/ +76.4 MB（512KB）。对照语料验证：预览模式渲染标题/内联样式/两种列表/引用/代码块/GFM 表格/图片全部通过，富文本模式仅隐藏内联标记（块级标记仍显示，已登记缺口）。证据 `docs/evidence/g2-d03w-editor/xiaomi-14-pro/result.md`，数值已回填 [06 §4](android-web-parity/06-development-and-validation.md#d03-性能基准与冻结记录) 并给出建议上限，**待评审**。测量期间发现并登记后端约定：`PUT /files/file` 的 `base_revision` 必填，新建文件须传 `"missing"`（[03 §4.1](android-web-parity/03-api-and-state.md#41-写作-surfaces-已核对契约85ec97c-handler)）。fixture 与语料 22 个文件测完已从服务端删除。本次未改动业务实现。
+- 2026-10-24 G1 一次性配对（真机 + 真实服务器）：Denova 在容器内（宿主机 18081→容器 8080），配对链接只能从容器内 loopback 创建；经 SSH + `docker exec denova` 生成 token，`tools/g1_pair_consume.py` 消费同一 token 两次 → **首次 200、二次 401**，一次性语义成立，据此回写 **AUTH-003**。G1 至此仅剩 HTTPS/WSS（缺 TLS 部署）。
 - 2026-10-24 G1 退出等待进行中读取（真机）：新增 `core/network/InFlightTracker`（OkHttp `EventListener` 计数在途 call，`callEnd`/`callFailed` 按 call 幂等减）+ `DenovaClient.logout()` 先 `awaitIdle(3s)` 再清会话。真机：Agent 长提示流式生成中返回编辑器点退出 → `logout drain pending=1 drained=false after=3000ms`。新增 4 个单测。据此回写 **AUTH-005**。同时查明 WebSocket 的 `callEnd` 在升级握手即触发、不参与该计数（终端走自身生命周期，已记录）。备好 `tools/g1_pair_consume.py` 消费侧脚本；pair 与 HTTPS 均因环境（链接仅限服务器本机 / 无 TLS 部署）暂无法完成，指令已写进证据文件。
 - 2026-10-24 G1 受保护图片读取（真机，按决定引入 Coil 且仅 http）：新增 `DenovaClient.projectAssetUrl()` 与 `core/image/AuthenticatedImageLoader.kt`（Coil3 `OkHttpNetworkFetcherFactory` 复用 `DenovaClient.okHttpClient`，带会话 Cookie），Debug 面板加「受保护图片探针」。实测：`GET /api/projects/:id/files/asset?path=assets/lore/79e172b5-….png` 带会话 **200 `image/png` 3,515,744 B**、无会话 **401**，应用内正常渲染。据此回写 **AUTH-002**。同时查明 **pair 无法在本机验证**：`POST /api/auth/link` 返回 403「此系统操作只能从运行 Denova 的本机触发」；HTTPS/WSS 无 TLS 部署；**迟到 401 按决定并入 P2**。证据 `docs/evidence/g1-auth/xiaomi-14-pro/result.md`。
 - 2026-10-24 **G2 预算评审通过**（评审人 Hsing）：D03-W 的四项上限与「fixture 按 UTF-8 字节计」的口径一并确认，[06 §4](android-web-parity/06-development-and-validation.md#d03-性能基准与冻结记录) 状态改为「已冻结」并新增评审记录行。至此 G2 / G4 / G5 三个关卡的数值预算全部冻结；G2 仅剩图片/表格编辑、中文 IME 组合态、选区增强三项功能缺口。
@@ -100,14 +101,14 @@
 | Web 与服务端运行基线 | 已登记 `http://192.168.2.102:18081`、版本 0.6.3、commit `85ec97c`、隔离账号（本地保存）；Web 基线已升级并与之对齐 | 补数据快照与复现步骤 |
 | 全量页面与字段盘点 | 118 条首批场景、14 个顶层表面（08） | 展开每页控件、字段、状态、权限与条件入口并冻结范围 |
 | API 契约 | 281 条已按 `85ec97c` 重提取；handler→DTO 已按族核对（认证/写作/Agent流/游戏流/设置模型/终端/长尾族） | 逐字段嵌套 DTO 与双端读回验证（P1 按需展开） |
-| G1 认证与网络 | 连接 + status + 登录 + 退出已真机真实往返；DataStore 服务器地址持久化；持久化 Cookie 免登录；**受保护图片读取真机通过**（`/files/asset` 带会话 200、无会话 401）；**退出时等待进行中读取真机通过**（`logout drain pending=1`，上限 3s） | pair 不重复消费（创建链接仅限服务器本机，消费脚本已备）、HTTPS/WSS（无 TLS 部署，客户端已就绪）；迟到 401 并入 P2 |
+| G1 认证与网络 | 连接 + status + 登录 + 退出已真机真实往返；DataStore 服务器地址持久化；持久化 Cookie 免登录；**受保护图片读取真机通过**（`/files/asset` 带会话 200、无会话 401）；**退出时等待进行中读取真机通过**（`logout drain pending=1`）；**一次性配对真机通过**（首次 200、二次 401） | HTTPS/WSS（无 TLS 部署，客户端已就绪）；迟到 401 并入 P2 |
 | G2 Markdown 编辑器 | 序列化层（commonmark + GFM 表格，8 测试）+ 源码/富文本/预览三模式 + 标记隐藏与格式化工具栏（4 测试）；真机渲染通过；**D03-W 已实测并于 2026-10-24 评审通过**（含对照语料：预览渲染全部节点；口径按 UTF-8 字节） | 图片/表格编辑、中文 IME 组合态、选区增强 |
 | G3 保存并发 | 三方合并 `ThreeWayMerge` + revision 校验 + `DraftStore` + `FileSaveCoordinator`（含合并结果采纳回归测试）+ 编辑器 UI 集成；真机单端两次完整保存周期；**双端并发 409 → 合并 → 读回已在真机 + 真实服务器通过**（修复了合并后覆盖对端的缺陷） | 重叠冲突的真实双端用例（现仅单测）、迟到回包、草稿事务提交前后终止进程 |
 
 
 ## 下一步顺序
 
-1. **补 G1 剩余判据：** 受保护图片、退出等待进行中读取均已真机通过（见 `docs/evidence/g1-auth/`）；仍剩 pair 不重复消费（需在服务器本机生成 token，消费脚本 `tools/g1_pair_consume.py` 已备）与 HTTPS/WSS（需在 NAS 加 TLS 反代，客户端已就绪）。**迟到 401 已按决定并入 P2 的请求世代/退休机制。**
+1. **补 G1 剩余判据：** 受保护图片、退出等待进行中读取、一次性配对均已真机通过（见 `docs/evidence/g1-auth/`）；仅剩 HTTPS/WSS（需在 NAS 加 TLS 反代，客户端已就绪）。**迟到 401 已按决定并入 P2 的请求世代/退休机制。**
 2. **补 G3 剩余判据：** 真实浏览器与 App 的重叠冲突用例（当前 adb 注入只能构造可合并插入，需能精确选区替换的手段或浏览器端操作）、迟到回包、草稿事务提交前后终止进程。
 3. **P1 退出门槛：** 上述两项通过后，按 [05 §3](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据) 核对每个关卡的录屏/截图证据是否齐备。
 4. **P2 工程基础：** AppContainer、单 Activity 导航、共享顶栏与左右抽屉、DesignTokens、主题与中英文、Room 草稿与命令身份、错误模型与请求退休机制（含迟到 401）；退出验证按 [05 §4](android-web-parity/05-roadmap.md#4-p2工程基础与公共界面)。
