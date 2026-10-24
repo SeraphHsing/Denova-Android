@@ -38,6 +38,7 @@
 - 2026-10-23 完成 G4 第 4 轮（恢复协调器 + 游戏阶段投影，纯逻辑）：`GameStreamRecoveryCoordinator`（active→决策→挂接带游标→rehydrate 重挂循环，注入 `reloadCanonical` 回调与 `GameStreamTransport`，用 fake + `runBlocking` 做 JVM 单测；`task_rehydrate_required` 事件与 409 rehydrate/cursor 错误统一走重取，事件用携带游标重挂、409 则从头）、`GameStageReducer` + `GameStageState`（checkpoint/rehydrate 重置、terminal 转移、thinking/tool/repairing 活动、pendingAsk、turn 持久化）。新增 5 个协调器测试 + 8 个投影测试。Compose 游戏屏幕 + ViewModel 绑定 + 真机双端恢复待下一轮。
 - 2026-10-23 完成 G4 第 5 轮（游戏 ViewModel + Compose 屏幕 + 导航接线）：`feature/game/GameViewModel`（绑定 `DenovaClient` → `GameStreamRecoveryCoordinator`，事件流喂给 `GameStageReducer` 投影 + chunk 叙事累积，`reloadCanonical` 暂为重置）、`feature/game/GameScreen`（输入 story/branch → 挂接 → 展示 phase/activity/叙事）、`MainActivity` 加编辑器/游戏导航切换。本地 `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿。canonical 历史重建（`/interactive/stories/:id/history` DTO）与真机双端恢复验证待下一轮。
 - 2026-10-23 完成 G4 第 6 轮（canonical 历史重建）：`core/stream/GameHistory`（`StoryHistoryPage`/`TurnEvent` DTO + `buildCanonicalNarrative` 纯函数从 turn 列表重建叙事基线）、`DenovaClient.interactiveHistory`（`GET /api/interactive/stories/:id/history?branch=&limit=`）、`GameViewModel.reloadCanonical` 接入真实历史加载（rehydrate 后重建叙事而非清空）。新增 5 个叙事重建测试（累计 84 个）。仅剩真机双端恢复验证。
+- 2026-10-24 完成 G4 真机验证（小米 14 Pro，服务器 `http://192.168.2.102:18081`，story `st_dm9i0qgwe25p6bba7dbc`/branch `main`，26 turns/398 events）：自动化 adb 完成 连接→登录→游戏→挂接。**验证通过**：① 流挂接后状态 `运行中·思考中·已连接`；② `force-stop` 杀客户端后服务端任务继续（`active=running`）；③ 重启重登重挂恢复；④ `task_rehydrate_required`/409 → `reloadCanonical` 重建；⑤ canonical 叙事基线 `len=111158` 完整显示。**真机暴露并修复 2 个单测覆盖不到的问题**：`recovery_actions:null` 导致 kotlinx.serialization 崩溃（`coerceInputValues` 修复 + 回归测试）；正常挂接时历史叙事缺失（挂接前加载 canonical 基线、checkpoint 重置到基线）。前置：设备需开启「允许通过 USB 调试修改权限或模拟点击」adb 注入触摸才生效（此前记录为设备悬浮层拦截）。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -52,7 +53,7 @@
 | G1 认证与网络 | 完成：连接 + status + 登录 + 退出 已真机真实往返通过；DataStore 服务器地址持久化完成 | 配对、受保护图片、SSE、WS、HTTPS/WSS、迟到 401 完成真实往返 |
 | G2 Markdown 编辑器 | 两轮完成：序列化层（commonmark 0.30.0 + GFM 表格，8 测试）+ 源码/富文本/预览三模式；富文本 = 标记隐藏(零宽替换) + 内联样式 + 格式化工具栏，纯逻辑层 4 测试；本地 + CI 全绿；真机验证富文本渲染 | 图片/表格编辑、中文 IME、选区增强、D03 性能预算 |
 | G3 保存并发 | 三轮完成：三方合并 `ThreeWayMerge`（diff3，5 测试）+ 文件读写 revision 校验 + 本地草稿 `DraftStore` + 保存编排 `FileSaveCoordinator`（Mutex 串行，3 测试）+ 编辑器 UI 集成（`EditorViewModel` 打开文件/防抖自动保存/冲突提示 + `EditorScreen` 项目ID/路径输入 + 保存状态）；本地 26 测试 + CI 全绿；真机两次完整保存周期（插入空格→已保存→revision 递增→删除→再保存→恢复） | 真机并发（双端编辑触发 409→合并）、迟到回包、进程恢复实测 |
-| G4 Agent / Game 流恢复 | 进行中：事件模型 + checkpoint 游标状态机 + SSE 解析器 + 流会话 + SSE 网络层（OkHttp）+ active/recovery 契约与恢复决策 + 恢复协调器 + 游戏阶段投影 + 游戏 ViewModel/Compose 屏幕 + canonical 历史重建已本地全绿；仅剩真机双端恢复验证 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
+| G4 Agent / Game 流恢复 | Game 流恢复已真机验证通过（挂接/断线重连/rehydrate/canonical 基线），修复 2 个真机 bug；仍缺 Agent(UIMessage) 流、发送与命令持久化边界、D03 性能预算 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
 | G5 原生终端 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收 ANSI / VT、输入、resize、owner 生命周期与 D03 性能预算 |
 | G6 远程权限与双端共存 | 未开始 | 以[路线中的G6](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)为准；误删对方PTY或丢失会话内容时未通过，仅记录限制不能退出 |
 | CI 与 APK | 已配置并通过（GitHub Actions 全绿，APK 工件 `novara-debug-apk` 上传成功） | GitHub Actions 运行构建、测试、Lint 并保存报告与 APK 工件 |
