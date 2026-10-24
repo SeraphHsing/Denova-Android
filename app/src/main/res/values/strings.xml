@@ -38,6 +38,7 @@
     <string name="right_drawer_console">Game console</string>
 
     <!-- 项目目录（WRI-002） -->
+    <string name="writing">Write</string>
     <string name="project_directory">Project directory</string>
     <string name="refresh">Refresh</string>
     <string name="loading">Loading…</string>
@@ -47,4 +48,14 @@
     <!-- 书籍切换（P3） -->
     <string name="current_book">Current book</string>
     <string name="book_empty">No books</string>
+
+    <!-- 变更审阅（P3） -->
+    <string name="changes_title">Changes</string>
+    <string name="changes_hint">Select a book first</string>
+    <string name="changes_empty">No changes</string>
+    <string name="changes_pending_edits">%1$d pending edits / %2$d change sets</string>
+    <string name="changes_accept">Accept</string>
+    <string name="changes_reject">Reject</string>
+    <string name="changes_undo">Undo</string>
+    <string name="changes_redo">Redo</string>
 </resources>

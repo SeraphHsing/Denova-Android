@@ -349,6 +349,60 @@ class DenovaClient(
         }
     }
 
+    /** 变更分组列表：`GET /api/projects/:id/changes/groups`。 */
+    suspend fun changeGroups(projectId: String, status: String? = null): ChangeGroupsResponse {
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/changes/groups")
+            .apply { if (!status.isNullOrBlank()) addQueryParameter("status", status) }
+            .build()
+        val request = Request.Builder().url(url).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(ChangeGroupsResponse.serializer(), text)
+            }
+        }
+    }
+
+    /** 审阅变更分组：`POST .../changes/groups/:gid/review` body `{decision}`。 */
+    suspend fun reviewChangeGroup(projectId: String, groupId: String, decision: String): WorkspaceChangeMutationResult =
+        postChangeMutation(
+            projectId,
+            "groups/$groupId/review",
+            json.encodeToString(ReviewChangeRequest.serializer(), ReviewChangeRequest(decision)),
+        )
+
+    /** 撤销变更分组：`POST .../changes/groups/:gid/undo`。 */
+    suspend fun undoChangeGroup(projectId: String, groupId: String): WorkspaceChangeMutationResult =
+        postChangeMutation(projectId, "groups/$groupId/undo")
+
+    /** 重做变更分组：`POST .../changes/groups/:gid/redo`。 */
+    suspend fun redoChangeGroup(projectId: String, groupId: String): WorkspaceChangeMutationResult =
+        postChangeMutation(projectId, "groups/$groupId/redo")
+
+    private suspend fun postChangeMutation(
+        projectId: String,
+        suffix: String,
+        body: String = "{}",
+    ): WorkspaceChangeMutationResult {
+        val request = Request.Builder()
+            .url(
+                server.baseUrl.toHttpUrl().newBuilder()
+                    .addPathSegments("api/projects/$projectId/changes/$suffix")
+                    .build(),
+            )
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(WorkspaceChangeMutationResult.serializer(), text)
+            }
+        }
+    }
+
     override suspend fun active(storyId: String, branchId: String): GameActiveView {
         val request = Request.Builder().url(interactiveActiveUrl(storyId, branchId)).get().build()
         return withContext(Dispatchers.IO) {

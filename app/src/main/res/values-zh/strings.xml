@@ -38,6 +38,7 @@
     <string name="right_drawer_console">游戏控制台</string>
 
     <!-- 项目目录（WRI-002） -->
+    <string name="writing">写作</string>
     <string name="project_directory">项目目录</string>
     <string name="refresh">刷新</string>
     <string name="loading">加载中…</string>
@@ -47,4 +48,14 @@
     <!-- 书籍切换（P3） -->
     <string name="current_book">当前书籍</string>
     <string name="book_empty">暂无书籍</string>
+
+    <!-- 变更审阅（P3） -->
+    <string name="changes_title">变更</string>
+    <string name="changes_hint">先选择书籍</string>
+    <string name="changes_empty">暂无变更</string>
+    <string name="changes_pending_edits">%1$d 待处理 / %2$d 变更集</string>
+    <string name="changes_accept">接受</string>
+    <string name="changes_reject">拒绝</string>
+    <string name="changes_undo">撤销</string>
+    <string name="changes_redo">重做</string>
 </resources>

@@ -91,7 +91,7 @@ fun EditorScreen(
             TextButton(
                 onClick = { onOpenAgent(projectId.trim(), filePath.trim()) },
                 enabled = projectId.isNotBlank(),
-            ) { Text(stringResource(R.string.agent_title)) }
+            ) { Text(stringResource(R.string.writing)) }
             TextButton(onClick = onLogout) { Text(stringResource(R.string.logout)) }
             IconButton(onClick = onOpenRightDrawer) { Text("»") }
         }

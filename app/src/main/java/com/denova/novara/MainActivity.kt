@@ -3,8 +3,12 @@ package com.denova.novara
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
@@ -12,6 +16,7 @@ import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -47,11 +52,13 @@ import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.feature.game.GameScreen
 import com.denova.novara.feature.game.GameViewModel
 import com.denova.novara.feature.bookshelf.BookShelfViewModel
+import com.denova.novara.feature.changes.ChangesViewModel
 import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.shell.AppDrawer
 import com.denova.novara.feature.shell.GameConsoleContent
 import com.denova.novara.feature.shell.PlaceholderScreen
+import com.denova.novara.feature.shell.ChangesContent
 import com.denova.novara.feature.shell.ProjectDirectoryContent
 import com.denova.novara.feature.shell.RightDrawer
 import com.denova.novara.feature.shell.appDestinations
@@ -82,12 +89,15 @@ class MainActivity : AppCompatActivity() {
                 val terminalViewModel: TerminalViewModel = viewModel(factory = container.viewModelFactory)
                 val projectDirectoryViewModel: ProjectDirectoryViewModel = viewModel(factory = container.viewModelFactory)
                 val bookShelfViewModel: BookShelfViewModel = viewModel(factory = container.viewModelFactory)
+                val changesViewModel: ChangesViewModel = viewModel(factory = container.viewModelFactory)
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val state by connectionViewModel.state.collectAsState()
                 val projectState by projectDirectoryViewModel.state.collectAsState()
                 val bookState by bookShelfViewModel.state.collectAsState()
+                val changesState by changesViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
                 var showRightDrawer by remember { mutableStateOf(false) }
+                var rightTab by remember { mutableStateOf(0) }
                 // 当前编辑项目：书籍切换或编辑器输入框同步，供右抽屉项目目录加载。
                 var currentProjectId by remember { mutableStateOf("") }
                 val navController = rememberNavController()
@@ -110,6 +120,7 @@ class MainActivity : AppCompatActivity() {
                                     projectDirectoryViewModel.bindClient(client)
                                     bookShelfViewModel.bindClient(client)
                                     bookShelfViewModel.load()
+                                    changesViewModel.bindClient(client)
                                 }
                             }
                             ModalNavigationDrawer(
@@ -222,8 +233,14 @@ class MainActivity : AppCompatActivity() {
                     // 右项目 / 控制台抽屉（按当前页面）。
                     if (showRightDrawer) {
                         val isGame = currentRoute == "game"
-                        LaunchedEffect(showRightDrawer, currentProjectId, isGame) {
-                            if (!isGame) projectDirectoryViewModel.load(currentProjectId)
+                        LaunchedEffect(showRightDrawer, currentProjectId, isGame, rightTab) {
+                            if (!isGame) {
+                                if (rightTab == 0) {
+                                    projectDirectoryViewModel.load(currentProjectId)
+                                } else {
+                                    changesViewModel.load(currentProjectId)
+                                }
+                            }
                         }
                         RightDrawer(
                             title = if (isGame) {
@@ -236,17 +253,45 @@ class MainActivity : AppCompatActivity() {
                             if (isGame) {
                                 GameConsoleContent()
                             } else {
-                                ProjectDirectoryContent(
-                                    state = projectState,
-                                    onToggle = projectDirectoryViewModel::toggle,
-                                    onOpenFile = { path ->
-                                        projectDirectoryViewModel.setSelected(path)
-                                        editorViewModel.openFile(currentProjectId, path)
-                                        showRightDrawer = false
-                                        if (currentRoute != "editor") navController.navigate("editor")
-                                    },
-                                    onRefresh = projectDirectoryViewModel::refresh,
-                                )
+                                // 写作页右抽屉：项目文件 / 变更审阅。
+                                Column(Modifier.fillMaxSize()) {
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        TextButton(onClick = { rightTab = 0 }) {
+                                            Text(stringResource(R.string.right_drawer_project))
+                                        }
+                                        TextButton(onClick = { rightTab = 1 }) {
+                                            Text(stringResource(R.string.changes_title))
+                                        }
+                                    }
+                                    if (rightTab == 0) {
+                                        ProjectDirectoryContent(
+                                            state = projectState,
+                                            onToggle = projectDirectoryViewModel::toggle,
+                                            onOpenFile = { path ->
+                                                projectDirectoryViewModel.setSelected(path)
+                                                editorViewModel.openFile(currentProjectId, path)
+                                                showRightDrawer = false
+                                                if (currentRoute != "editor") navController.navigate("editor")
+                                            },
+                                            onRefresh = projectDirectoryViewModel::refresh,
+                                        )
+                                    } else {
+                                        ChangesContent(
+                                            state = changesState,
+                                            onReview = changesViewModel::review,
+                                            onUndo = changesViewModel::undo,
+                                            onRedo = changesViewModel::redo,
+                                            onRefresh = {
+                                                if (currentProjectId.isNotBlank()) {
+                                                    changesViewModel.load(currentProjectId, force = true)
+                                                }
+                                            },
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

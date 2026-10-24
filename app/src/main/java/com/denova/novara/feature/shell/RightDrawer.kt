@@ -28,7 +28,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.core.network.WorkspaceChangeGroupSummary
 import com.denova.novara.core.project.ProjectFileRow
+import com.denova.novara.feature.changes.ChangesUiState
 import com.denova.novara.feature.project.ProjectDirectoryUiState
 
 /**
@@ -125,6 +127,120 @@ fun ProjectDirectoryContent(
                         onToggle = onToggle,
                         onOpenFile = onOpenFile,
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 变更审阅（P3 链路）：列出 `/changes/groups`，支持接受 / 拒绝 / 撤销 / 重做。
+ */
+@Composable
+fun ChangesContent(
+    state: ChangesUiState,
+    onReview: (groupId: String, decision: String) -> Unit,
+    onUndo: (String) -> Unit,
+    onRedo: (String) -> Unit,
+    onRefresh: () -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.changes_title), style = MaterialTheme.typography.labelLarge)
+            TextButton(onClick = onRefresh, enabled = !state.loading) {
+                Text(stringResource(R.string.refresh))
+            }
+        }
+        val muted = MaterialTheme.colorScheme.outline
+        when {
+            state.projectId.isBlank() -> Text(
+                stringResource(R.string.changes_hint), color = muted,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            state.loading && state.groups.isEmpty() -> Text(
+                stringResource(R.string.loading), color = muted,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            state.error != null -> Text(
+                state.error, color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            state.groups.isEmpty() -> Text(
+                stringResource(R.string.changes_empty), color = muted,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            else -> LazyColumn(Modifier.fillMaxSize()) {
+                items(state.groups, key = { it.id }) { group ->
+                    ChangeGroupItem(
+                        group = group,
+                        busy = state.busyGroupId == group.id,
+                        onReview = onReview,
+                        onUndo = onUndo,
+                        onRedo = onRedo,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChangeGroupItem(
+    group: WorkspaceChangeGroupSummary,
+    busy: Boolean,
+    onReview: (String, String) -> Unit,
+    onUndo: (String) -> Unit,
+    onRedo: (String) -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            "${group.id.take(12)} · ${group.reviewStatus}/${group.applyState}",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (group.paths.isNotEmpty()) {
+            Text(
+                group.paths.joinToString(", "),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                maxLines = 2,
+            )
+        }
+        Text(
+            stringResource(R.string.changes_pending_edits, group.pendingEditCount, group.changeSetCount),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (group.reviewStatus == "pending") {
+                TextButton(onClick = { onReview(group.id, "accept") }, enabled = !busy) {
+                    Text(stringResource(R.string.changes_accept))
+                }
+                TextButton(onClick = { onReview(group.id, "reject") }, enabled = !busy) {
+                    Text(stringResource(R.string.changes_reject))
+                }
+            }
+            if (group.canUndo) {
+                TextButton(onClick = { onUndo(group.id) }, enabled = !busy) {
+                    Text(stringResource(R.string.changes_undo))
+                }
+            }
+            if (group.canRedo) {
+                TextButton(onClick = { onRedo(group.id) }, enabled = !busy) {
+                    Text(stringResource(R.string.changes_redo))
                 }
             }
         }
