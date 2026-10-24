@@ -17,6 +17,10 @@ captures/
 .codebuddy/
 .vscode/
 
+# 验证脚本的 Python 缓存
+__pycache__/
+*.pyc
+
 # 证据截图含用户正文时只留本地，不入库
 docs/evidence/g5-terminal/xiaomi-14-pro/06-cat-cjk.png
 docs/evidence/p3-project-directory/xiaomi-14-pro/right-drawer-highlight.png
