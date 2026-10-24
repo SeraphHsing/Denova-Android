@@ -175,7 +175,11 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun finishStream() {
         val current = _state.value
-        val ui = if (current.ui.phase == AgentPhase.RUNNING) current.ui.copy(phase = AgentPhase.ERROR) else current.ui
+        val ui = if (current.ui.phase == AgentPhase.RUNNING) {
+            current.ui.copy(phase = AgentPhase.ERROR, activity = "")
+        } else {
+            current.ui
+        }
         _state.value = current.copy(ui = ui, connected = false, sending = false)
     }
 

@@ -9,6 +9,7 @@ import com.denova.novara.core.command.CommandStore
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.SendInteractiveChatRequest
+import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GameEventType
 import com.denova.novara.core.stream.GamePhase
 import com.denova.novara.core.stream.GameStageReducer
@@ -188,7 +189,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun finishStream() {
         val current = _uiState.value
         val stage = if (current.stage.phase == GamePhase.RUNNING) {
-            current.stage.copy(phase = GamePhase.ERROR, streamFailed = true)
+            current.stage.copy(phase = GamePhase.ERROR, activity = GameActivity.IDLE, streamFailed = true)
         } else {
             current.stage
         }
