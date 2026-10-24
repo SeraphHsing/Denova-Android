@@ -46,9 +46,13 @@ pair first=200 second=401   PASS
 
 即一次性配对语义成立：首次消费进入认证态，二次消费被拒（`api.access.pairingInvalid`）。`AUTH-003` 据此回写为已完成。
 
-## 4. HTTPS / WSS：无可用环境（客户端已就绪）
+## 4. HTTPS / WSS：验证已放弃（环境限制，用户决定）
 
-测试服务器只监听 `http://192.168.2.102:18081`，443 端口是 NAS 自身的 nginx（302 到 `:725`），没有 Denova 的 TLS 端点。客户端侧 OkHttp 本身 scheme 无关（`ServerKey` 支持 `https`，WebSocket 用 `wss`），缺的只是部署。要完成 `AUTH-001` 的 HTTPS 一半，需在 NAS 反代加一条 TLS 规则（如 443/18081 或独立端口，证书可用自签并在 debug 构建的 network-security-config 里只信任该测试 CA），这是部署变更、非后端代码修改。
+测试服务器只监听 `http://192.168.2.102:18081`，443 端口是 NAS 自身的 nginx（302 到 `:725`），没有 Denova 的 TLS 端点。客户端侧 OkHttp 本身 scheme 无关（`ServerKey` 支持 `https`，WebSocket 用 `wss`）。
+
+2026-10-24 曾尝试用 caddy 起 TLS 反代（`18443`，`tls internal` 自签 + 反代 `127.0.0.1:18081`）：容器可正常启动、在 NAS 监听 `*:18443`，但 Windows 与 NAS 本机 curl 均 `CODE:000`（TLS 握手层面失败，疑似 host 网络下 HTTP/3 与 TCP 监听冲突）。**用户决定放弃 TLS 验证**，容器与临时文件已清理。
+
+结论：`AUTH-001` 的 HTTPS 一半与 WSS 未执行，按环境限制登记；不关闭 TLS 校验规避（AGENTS §5）。
 
 ## 5. 迟到 401：随 P2 处理
 
