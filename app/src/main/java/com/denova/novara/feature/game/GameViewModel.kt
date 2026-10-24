@@ -105,6 +105,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         dropPendingChunks()
         narrative.reset("")
         _blocks.value = emptyList()
+        resetPerfCounters()
         _uiState.value = GameUiState(storyId = storyId, branchId = branchId)
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
@@ -147,10 +148,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         perfEventCount = 0
         perfTotalNanos = 0
         perfMaxNanos = 0
-        perfFlushCount = 0
-        perfCharsPerFlush = 0
-        drawLatency.reset()
-        lastEventNanos = 0
+        resetPerfCounters()
         sendJob = viewModelScope.launch {
             commands.save(record) // 本地事务先落盘
             try {
@@ -278,6 +276,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 "flushes=$perfFlushCount avgChars=${perfCharsPerFlush / perfFlushCount} blocks=${narrative.snapshot.size}",
             )
         }
+    }
+
+    /** 每次开始挂接/发送前重置性能计数，保证单轮测量独立可重复。 */
+    private fun resetPerfCounters() {
+        perfEventCount = 0
+        perfTotalNanos = 0
+        perfMaxNanos = 0
+        perfFlushCount = 0
+        perfCharsPerFlush = 0
+        drawLatency.reset()
+        lastEventNanos = 0
     }
 
     /** 叙事面板完成一次绘制：结算「最近事件接收 → 可见」的延迟。 */

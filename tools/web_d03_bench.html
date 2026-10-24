@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>D03-S Web 基线（harness）</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #111; color: #ddd; }
+  #pane { height: 100vh; overflow: hidden; white-space: pre-wrap; font: 14px/1.6 system-ui, sans-serif; padding: 12px; box-sizing: border-box; }
+</style>
+</head>
+<body>
+<div id="pane"></div>
+<script>
+// D03-S Web 端基线 harness（不是 Web 产品代码）：
+// 消费与 Android 完全相同的 1KB/块 × 100 块/s × 60s 重放，
+// 测量「chunk 到达 → 下一帧绘制（rAF）」的延迟，结束后回报给 mock 服务。
+// 渲染策略：滚动窗口保留最近 MAX_BLOCKS 块（模拟聊天视图），避免 DOM 无限增长。
+
+const MAX_BLOCKS = 200;
+const MAX_SAMPLES = 8192;
+
+const pane = document.getElementById('pane');
+const blocks = [];
+const samples = [];
+let pendingAt = 0;
+let chunks = 0;
+
+function onChunk(text) {
+  chunks++;
+  blocks.push(text);
+  while (blocks.length > MAX_BLOCKS) blocks.shift();
+  pendingAt = performance.now();
+  pane.textContent = blocks.join('');
+  requestAnimationFrame(() => {
+    if (!pendingAt) return;
+    const delta = performance.now() - pendingAt;
+    pendingAt = 0;
+    if (samples.length < MAX_SAMPLES) samples.push(delta);
+  });
+}
+
+function percentile(sorted, p) {
+  if (!sorted.length) return 0;
+  return sorted[Math.min(sorted.length - 1, Math.floor((sorted.length - 1) * p))];
+}
+
+async function report() {
+  const sorted = [...samples].sort((a, b) => a - b);
+  const payload = {
+    n: samples.length,
+    chunks,
+    p50: +percentile(sorted, 0.50).toFixed(1),
+    p95: +percentile(sorted, 0.95).toFixed(1),
+    p99: +percentile(sorted, 0.99).toFixed(1),
+    max: +(sorted[sorted.length - 1] || 0).toFixed(1),
+    heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null,
+    maxBlocks: MAX_BLOCKS,
+    ua: navigator.userAgent,
+  };
+  await fetch('/bench/report', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+const es = new EventSource('/api/interactive/chat/stream?story_id=d03&branch=main&task_id=web-bench');
+es.addEventListener('chunk', (e) => {
+  try {
+    const data = JSON.parse(e.data);
+    onChunk(data.content || '');
+  } catch (_) { /* 忽略非法帧 */ }
+});
+es.addEventListener('done', () => {
+  es.close();
+  report();
+});
+es.onerror = () => { /* 服务端正常关闭时会触发，忽略 */ };
+</script>
+</body>
+</html>

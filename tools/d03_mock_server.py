@@ -21,6 +21,7 @@
 
 import argparse
 import json
+import os
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse
@@ -59,6 +60,12 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
+        if urlparse(self.path).path == "/bench/report":
+            length = int(self.headers.get("Content-Length") or 0)
+            payload = self.rfile.read(length).decode("utf-8", "ignore")
+            print("WEBRESULT " + payload, flush=True)
+            self._send_json({"ok": True})
+            return
         if urlparse(self.path).path in ("/api/auth/login", "/api/auth/pair"):
             self._send_json(
                 {"local": False, "authenticated": True, "lanUrl": None},
@@ -93,6 +100,16 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path == "/api/interactive/chat/stream":
             self._stream()
+            return
+        if path == "/d03/bench":
+            page = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web_d03_bench.html")
+            with open(page, "rb") as handle:
+                body = handle.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         self._send_json({})
 
