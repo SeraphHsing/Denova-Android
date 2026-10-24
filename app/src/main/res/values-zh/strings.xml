@@ -36,4 +36,11 @@
     <string name="terminal_title">终端</string>
     <string name="right_drawer_project">项目目录</string>
     <string name="right_drawer_console">游戏控制台</string>
+
+    <!-- 项目目录（WRI-002） -->
+    <string name="project_directory">项目目录</string>
+    <string name="refresh">刷新</string>
+    <string name="loading">加载中…</string>
+    <string name="project_directory_hint">先在编辑器输入项目 ID</string>
+    <string name="project_directory_empty">目录为空</string>
 </resources>

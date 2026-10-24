@@ -49,6 +49,7 @@ fun EditorScreen(
     onOpenRightDrawer: () -> Unit,
     onOpenTerminal: (String) -> Unit,
     onLogout: () -> Unit,
+    onProjectIdChange: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var mode by remember { mutableStateOf(EditorMode.SOURCE) }
@@ -61,8 +62,13 @@ fun EditorScreen(
 
     // 外部内容变化（打开文件/合并结果/冲突材料）时重置本地编辑态。
     LaunchedEffect(uiState.loaded, uiState.filePath, uiState.conflictText, uiState.contentEpoch) {
-        android.util.Log.d("EditorScreen", "sync: loaded=${uiState.loaded} contentLen=${uiState.content.length}")
         textFieldValue = TextFieldValue(uiState.content)
+    }
+
+    // 从项目目录打开文件时，把项目 ID / 文件路径回填到输入框。
+    LaunchedEffect(uiState.projectId, uiState.filePath) {
+        if (uiState.projectId.isNotEmpty()) projectId = uiState.projectId
+        if (uiState.filePath.isNotEmpty()) filePath = uiState.filePath
     }
 
     Column(
@@ -83,7 +89,7 @@ fun EditorScreen(
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
             OutlinedTextField(
                 value = projectId,
-                onValueChange = { projectId = it },
+                onValueChange = { projectId = it; onProjectIdChange(it) },
                 label = { Text("项目ID") },
                 singleLine = true,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),

@@ -273,6 +273,32 @@ class DenovaClient(
         }
     }
 
+    /** 解析项目文件树：`recursive=true` 一次铺开目录（第一版不做懒加载分页）。 */
+    suspend fun resolveProjectFiles(
+        projectId: String,
+        paths: List<String>,
+        recursive: Boolean = true,
+    ): ProjectFileTreeResolveResponse {
+        val body = json.encodeToString(
+            ProjectFileResolveRequest.serializer(),
+            ProjectFileResolveRequest(
+                targets = paths.map { ProjectFileResolveTarget(it) },
+                recursive = recursive,
+            ),
+        )
+        val request = Request.Builder()
+            .url(projectFilesResolveUrl(projectId))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(ProjectFileTreeResolveResponse.serializer(), text)
+            }
+        }
+    }
+
     override suspend fun active(storyId: String, branchId: String): GameActiveView {
         val request = Request.Builder().url(interactiveActiveUrl(storyId, branchId)).get().build()
         return withContext(Dispatchers.IO) {
@@ -612,6 +638,11 @@ class DenovaClient(
         server.baseUrl.toHttpUrl().newBuilder()
             .addPathSegments("api/projects/$projectId/files/file")
             .addQueryParameter("path", path)
+            .build()
+
+    private fun projectFilesResolveUrl(projectId: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/files/resolve")
             .build()
 
     /**

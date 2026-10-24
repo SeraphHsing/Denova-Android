@@ -12,6 +12,7 @@ import com.denova.novara.feature.debug.DebugPanelViewModel
 import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.core.persistence.PreferencesStore
 import com.denova.novara.feature.game.GameViewModel
+import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.AppCompatLocaleApplier
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.terminal.TerminalViewModel
@@ -37,6 +38,7 @@ class AppContainer(private val application: Application) {
         initializer { GameViewModel(application) }
         initializer { AgentViewModel(application) }
         initializer { TerminalViewModel(application) }
+        initializer { ProjectDirectoryViewModel(application) }
         initializer { DebugPanelViewModel(application) }
         initializer { SettingsViewModel(PreferencesStore(application), AppCompatLocaleApplier) }
     }

@@ -46,6 +46,7 @@ import com.denova.novara.feature.editor.EditorScreen
 import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.feature.game.GameScreen
 import com.denova.novara.feature.game.GameViewModel
+import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.shell.AppDrawer
 import com.denova.novara.feature.shell.GameConsoleContent
@@ -78,10 +79,14 @@ class MainActivity : AppCompatActivity() {
                 val gameViewModel: GameViewModel = viewModel(factory = container.viewModelFactory)
                 val agentViewModel: AgentViewModel = viewModel(factory = container.viewModelFactory)
                 val terminalViewModel: TerminalViewModel = viewModel(factory = container.viewModelFactory)
+                val projectDirectoryViewModel: ProjectDirectoryViewModel = viewModel(factory = container.viewModelFactory)
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val state by connectionViewModel.state.collectAsState()
+                val projectState by projectDirectoryViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
                 var showRightDrawer by remember { mutableStateOf(false) }
+                // 当前编辑项目：编辑器输入框同步，供右抽屉项目目录加载。
+                var currentProjectId by remember { mutableStateOf("") }
                 val navController = rememberNavController()
                 val drawerState = rememberDrawerState(DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -97,6 +102,7 @@ class MainActivity : AppCompatActivity() {
                                     gameViewModel.bindClient(client)
                                     agentViewModel.bindClient(client)
                                     terminalViewModel.bindClient(client)
+                                    projectDirectoryViewModel.bindClient(client)
                                 }
                             }
                             ModalNavigationDrawer(
@@ -133,6 +139,7 @@ class MainActivity : AppCompatActivity() {
                                                 navController.navigate("terminal/$projectId")
                                             },
                                             onLogout = { connectionViewModel.logout() },
+                                            onProjectIdChange = { currentProjectId = it },
                                         )
                                     }
                                     composable("game") {
@@ -178,15 +185,33 @@ class MainActivity : AppCompatActivity() {
 
                     // 右项目 / 控制台抽屉（按当前页面）。
                     if (showRightDrawer) {
+                        val isGame = currentRoute == "game"
+                        LaunchedEffect(showRightDrawer, currentProjectId, isGame) {
+                            if (!isGame) projectDirectoryViewModel.load(currentProjectId)
+                        }
                         RightDrawer(
-                            title = if (currentRoute == "game") {
+                            title = if (isGame) {
                                 stringResource(R.string.right_drawer_console)
                             } else {
                                 stringResource(R.string.right_drawer_project)
                             },
                             onDismiss = { showRightDrawer = false },
                         ) {
-                            if (currentRoute == "game") GameConsoleContent() else ProjectDirectoryContent()
+                            if (isGame) {
+                                GameConsoleContent()
+                            } else {
+                                ProjectDirectoryContent(
+                                    state = projectState,
+                                    onToggle = projectDirectoryViewModel::toggle,
+                                    onOpenFile = { path ->
+                                        projectDirectoryViewModel.setSelected(path)
+                                        editorViewModel.openFile(currentProjectId, path)
+                                        showRightDrawer = false
+                                        if (currentRoute != "editor") navController.navigate("editor")
+                                    },
+                                    onRefresh = projectDirectoryViewModel::refresh,
+                                )
+                            }
                         }
                     }
 
