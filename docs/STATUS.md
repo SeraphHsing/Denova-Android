@@ -1,7 +1,7 @@
 # 项目状态
 
 **更新日期：** 2026-10-24  
-**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六个高风险原型均已出真机结论：G4 / G5 判据齐备，G6 通过（范围受限 SD-01）；**G1 / G2 / G3 仍各缺退出条件项**（见「未完成 / 尚未验证」），因此 P1 尚未整体退出。复刻矩阵按「P0–P1 已实现并验证」回写 **10 条 `已完成`**（AUTH-002 / AUTH-003 / AUTH-005 / WRI-004 / WRI-010 / WRI-012 / AGT-002 / WB-004 / WB-007 / WB-009），其余 108 条 `未开始`，口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；**尚未进入 P2**。  
+**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六个高风险原型均已出真机结论：G4 / G5 判据齐备，G6 通过（范围受限 SD-01）；**G1 / G2 / G3 仍各缺退出条件项**（见「未完成 / 尚未验证」），因此 P1 尚未整体退出。复刻矩阵按「P0–P1 已实现并验证」回写 **10 条 `已完成`**（AUTH-002 / AUTH-003 / AUTH-005 / WRI-004 / WRI-010 / WRI-012 / AGT-002 / WB-004 / WB-007 / WB-009），其余 108 条 `未开始`，口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；**已进入 P2（工程基础）**。  
 **产品实现状态：** P1 原型链路可用（连接认证 / 编辑器 / 游戏流 / 写作流 / 终端）；目标形态的公共界面（单 Activity 导航、左右抽屉、DesignTokens、主题与中英文）和业务页面尚未实现。
 
 ## 当前基线
@@ -74,6 +74,7 @@
 - 2026-10-24 G6 第 6 轮（范围决定 SD-01 通过，G6 收口）：用户（Hsing）确认 [SD-01](android-web-parity/07-evidence-and-decisions.md#范围决定scope-decision)——Web 挂载工作台回收所有 `attached=0` 且不在其持久化标签中的会话属固定基线行为，Android 侧不作对抗；Android 保证不静默重建空 PTY、7–25s 内如实提示、只 DELETE 自身会话、被回收后保留最近 64KB 只读历史（B）、进程被杀重启免登录并秒级重挂（C，[ADR-12](android-web-parity/07-evidence-and-decisions.md#3-架构决定)）。范围仅限终端 PTY 生命周期。据此 **G6 记为「通过（范围受限）」**，`05` G6 行与 `07` 均已引用 SD-01。遗留（不阻塞 G6）：多端 resize 冲突协商、R05 远程权限表现（P4-D）。
 
 - 2026-10-24 G2 D03-W 性能实测（真机）与对照语料：`tools/d03w_fixture.py` 生成 21 份文档（中英各 10 章约 51KB + 512KB 压力）并上传测试项目，新增 `EditorPerf` 埋点（`editor-open`/`editor-input-visible`/`editor-save` 含 `draftWindow`）后实测：**输入 → 可见** 标准章 p95 17–35 ms / p99 46–51 ms（n=150）、压力文档 p95 26–27 ms / p99 54 ms（n=100）；**打开** 51KB 35–65 ms、512KB 126–145 ms；**保存** 首次 589 ms / 2,768 ms，稳态 197–249 / 651–702 ms；`draftWindow` 800–1,028 ms；**PSS** 空态 170,505 KB → +22.1 MB（51KB）/ +76.4 MB（512KB）。对照语料验证：预览模式渲染标题/内联样式/两种列表/引用/代码块/GFM 表格/图片全部通过，富文本模式仅隐藏内联标记（块级标记仍显示，已登记缺口）。证据 `docs/evidence/g2-d03w-editor/xiaomi-14-pro/result.md`，数值已回填 [06 §4](android-web-parity/06-development-and-validation.md#d03-性能基准与冻结记录) 并给出建议上限，**待评审**。测量期间发现并登记后端约定：`PUT /files/file` 的 `base_revision` 必填，新建文件须传 `"missing"`（[03 §4.1](android-web-parity/03-api-and-state.md#41-写作-surfaces-已核对契约85ec97c-handler)）。fixture 与语料 22 个文件测完已从服务端删除。本次未改动业务实现。
+- 2026-10-24 **进入 P2（工程基础）第一步**：新增 `NovaraApplication` + `AppContainer`（组合根，集中 ViewModel 工厂，后续 Room/请求退休等共享依赖在此创建），`MainActivity` 改用 `container.viewModelFactory` 构造 6 个 ViewModel；引入 `navigation-compose` 2.10.2，`NavHost` 定义 editor/game/agent/terminal/{projectId} 四个目的地替换原先布尔分支，terminal 用 `navArgument` 传 projectId。本地 `assembleDebug` / `testDebugUnitTest` / `lintDebug` 全绿。剩余 P2：共享顶栏、左右抽屉、DesignTokens、主题与中英文、Room 草稿库、请求退休机制。
 - 2026-10-24 G1 HTTPS/WSS 验证放弃（环境限制，用户决定）：测试服务器无 TLS 端点；曾用 caddy 起 18443 TLS 反代尝试，容器正常启动但 curl 握手 `CODE:000`（疑似 host 网络下 HTTP/3 与 TCP 冲突）。用户决定放弃，容器与临时文件已清理，`AUTH-001` 的 HTTPS 一半与 WSS 按环境限制登记、不通过（不关闭 TLS 校验规避）。
 - 2026-10-24 G1 一次性配对（真机 + 真实服务器）：Denova 在容器内（宿主机 18081→容器 8080），配对链接只能从容器内 loopback 创建；经 SSH + `docker exec denova` 生成 token，`tools/g1_pair_consume.py` 消费同一 token 两次 → **首次 200、二次 401**，一次性语义成立，据此回写 **AUTH-003**。G1 至此仅剩 HTTPS/WSS（缺 TLS 部署）。
 - 2026-10-24 G1 退出等待进行中读取（真机）：新增 `core/network/InFlightTracker`（OkHttp `EventListener` 计数在途 call，`callEnd`/`callFailed` 按 call 幂等减）+ `DenovaClient.logout()` 先 `awaitIdle(3s)` 再清会话。真机：Agent 长提示流式生成中返回编辑器点退出 → `logout drain pending=1 drained=false after=3000ms`。新增 4 个单测。据此回写 **AUTH-005**。同时查明 WebSocket 的 `callEnd` 在升级握手即触发、不参与该计数（终端走自身生命周期，已记录）。备好 `tools/g1_pair_consume.py` 消费侧脚本；pair 与 HTTPS 均因环境（链接仅限服务器本机 / 无 TLS 部署）暂无法完成，指令已写进证据文件。
@@ -112,7 +113,7 @@
 1. **G1 收尾说明：** 受保护图片、退出等待进行中读取、一次性配对均已真机通过（见 `docs/evidence/g1-auth/`）。**HTTPS/WSS 无 TLS 部署、验证已放弃（环境限制）**；迟到 401 并入 P2。G1 除这两项环境限制外其余判据已齐备。
 2. **补 G3 剩余判据：** 真实浏览器与 App 的重叠冲突用例（当前 adb 注入只能构造可合并插入，需能精确选区替换的手段或浏览器端操作）、迟到回包、草稿事务提交前后终止进程。
 3. **P1 退出门槛：** 上述两项通过后，按 [05 §3](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据) 核对每个关卡的录屏/截图证据是否齐备。
-4. **P2 工程基础：** AppContainer、单 Activity 导航、共享顶栏与左右抽屉、DesignTokens、主题与中英文、Room 草稿与命令身份、错误模型与请求退休机制（含迟到 401）；退出验证按 [05 §4](android-web-parity/05-roadmap.md#4-p2工程基础与公共界面)。
+4. **P2 工程基础（进行中）：** AppContainer 与单 Activity 导航骨架已落地（2026-10-24）；剩余共享顶栏、左右抽屉、DesignTokens、主题与中英文、Room 草稿与命令身份、错误模型与请求退休机制（含迟到 401）；退出验证按 [05 §4](android-web-parity/05-roadmap.md#4-p2工程基础与公共界面)。
 5. **P3 起：** 按 [05 §5–§6](android-web-parity/05-roadmap.md#5-p3第一条完整写作链路) 铺开第一条完整写作链路与各业务模块；矩阵中 110 条 `未开始` 随页面实现逐条落地，确认完成后再回写。
 6. **遗留（不阻塞 P1 收口）：** 其余 110 条首批场景仍需在 P2/P3 期间按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
 
