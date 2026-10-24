@@ -61,10 +61,14 @@ data class WorkspaceChangeComment(
     val id: String,
     @SerialName("group_id") val groupId: String = "",
     @SerialName("change_set_id") val changeSetId: String? = null,
+    @SerialName("edit_id") val editId: String? = null,
+    @SerialName("hunk_id") val hunkId: String? = null,
     val body: String = "",
     val author: String? = null,
     @SerialName("created_at") val createdAt: String = "",
     val deleted: Boolean = false,
+    /** 行锚点（服务端原样回传）；整组评论为 null。 */
+    val anchor: ChangeCommentAnchor? = null,
 )
 
 /** 变更分组详情（对齐 Go `workspacechange.ChangeGroup`）。 */
@@ -93,9 +97,57 @@ data class ChangeGroupResponse(
     val group: WorkspaceChangeGroup,
 )
 
-/** `ChangeReviewDecision`：accept / reject。 */
+/**
+ * `ChangeReviewDecision`：accept / reject。
+ * 带 [changeSetId] 表示只裁决这一个变更集（服务端 `ReviewRequest.change_set_id`），
+ * 不带则整组裁决。
+ */
 @Serializable
-data class ReviewChangeRequest(val decision: String)
+data class ReviewChangeRequest(
+    val decision: String,
+    @SerialName("change_set_id") val changeSetId: String? = null,
+)
+
+/**
+ * 评论锚点：`utf8-bytes-v1` 字节区间 + 原文 quote（服务端逐字节校验，必须完全一致）。
+ *
+ * `encoding` 故意不设默认值：客户端 `Json` 未开启 `encodeDefaults`，带默认值的字段会被省略，
+ * 服务端就会以「encoding is invalid」拒绝整个锚点。
+ */
+@Serializable
+data class ChangeCommentAnchor(
+    /** before / after。 */
+    val side: String,
+    val encoding: String,
+    /** 该 side 的 revision（before 用 base_revision，after 用 revision）。 */
+    val revision: String,
+    val start: Int,
+    val end: Int,
+    val quote: String,
+    val kind: String? = null,
+    val prefix: String? = null,
+    val suffix: String? = null,
+) {
+    companion object {
+        const val SIDE_BEFORE = "before"
+        const val SIDE_AFTER = "after"
+        const val ENCODING_UTF8_BYTES = "utf8-bytes-v1"
+    }
+}
+
+@Serializable
+data class ChangeCommentRequest(
+    @SerialName("group_id") val groupId: String,
+    @SerialName("change_set_id") val changeSetId: String? = null,
+    val body: String,
+    val anchor: ChangeCommentAnchor? = null,
+)
+
+@Serializable
+data class ChangeCommentUpdateRequest(val body: String)
+
+@Serializable
+data class ChangeCommentResponse(val comment: WorkspaceChangeComment)
 
 @Serializable
 data class WorkspaceChangeMutationResult(

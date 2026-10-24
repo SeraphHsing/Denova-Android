@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,7 +31,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.core.network.WorkspaceChangeComment
 import com.denova.novara.core.network.WorkspaceChangeGroupSummary
+import com.denova.novara.core.network.WorkspaceChangeSet
 import com.denova.novara.core.project.ProjectFileRow
 import com.denova.novara.feature.changes.ChangeDiff
 import com.denova.novara.feature.changes.ChangeFileDiff
@@ -38,6 +41,7 @@ import com.denova.novara.feature.changes.ChangesUiState
 import com.denova.novara.feature.changes.DiffKind
 import com.denova.novara.feature.changes.DiffLine
 import com.denova.novara.feature.project.ProjectDirectoryUiState
+import com.denova.novara.feature.versions.VersionsUiState
 
 /**
  * 右项目 / 控制台抽屉（01 §3）：从右侧滑出，内容按当前页面提供——
@@ -145,12 +149,19 @@ fun ProjectDirectoryContent(
 @Composable
 fun ChangesContent(
     state: ChangesUiState,
-    onReview: (groupId: String, decision: String) -> Unit,
+    onReview: (groupId: String, decision: String, changeSetId: String?) -> Unit,
     onUndo: (String) -> Unit,
     onRedo: (String) -> Unit,
     onRefresh: () -> Unit,
     onOpen: (String) -> Unit = {},
     onCloseDetail: () -> Unit = {},
+    onSelectLine: (WorkspaceChangeSet, DiffLine) -> Unit = { _, _ -> },
+    onGroupComment: () -> Unit = {},
+    onDraftChange: (String) -> Unit = {},
+    onSubmitComment: () -> Unit = {},
+    onCancelComment: () -> Unit = {},
+    onEditComment: (WorkspaceChangeComment) -> Unit = {},
+    onDeleteComment: (String) -> Unit = {},
 ) {
     val detail = state.detail
     if (detail != null) {
@@ -160,6 +171,13 @@ fun ChangesContent(
             onReview = onReview,
             onUndo = onUndo,
             onRedo = onRedo,
+            onSelectLine = onSelectLine,
+            onGroupComment = onGroupComment,
+            onDraftChange = onDraftChange,
+            onSubmitComment = onSubmitComment,
+            onCancelComment = onCancelComment,
+            onEditComment = onEditComment,
+            onDeleteComment = onDeleteComment,
         )
         return
     }
@@ -201,11 +219,112 @@ fun ChangesContent(
                     ChangeGroupItem(
                         group = group,
                         busy = state.busyGroupId == group.id,
-                        onReview = onReview,
+                        onReview = { gid, decision -> onReview(gid, decision, null) },
                         onUndo = onUndo,
                         onRedo = onRedo,
                         onOpen = onOpen,
                     )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 版本入口（WRI-016 的「版本」部分）：只读 `GET /versions/status` + `GET /versions`。
+ * 创建 / diff / 恢复属 VER-001、VER-002，这里不做写操作，也不放会误导的按钮。
+ */
+@Composable
+fun VersionsContent(state: VersionsUiState, onRefresh: () -> Unit) {
+    val muted = MaterialTheme.colorScheme.outline
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.versions_title), style = MaterialTheme.typography.labelLarge)
+            TextButton(onClick = onRefresh, enabled = !state.loading) {
+                Text(stringResource(R.string.refresh))
+            }
+        }
+        when {
+            state.projectId.isBlank() -> Text(
+                stringResource(R.string.versions_hint), color = muted,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            state.loading && state.status == null -> Text(
+                stringResource(R.string.loading), color = muted,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            state.error != null -> Text(
+                state.error, color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            else -> {
+                val status = state.status
+                if (status != null) {
+                    Text(
+                        if (status.clean) stringResource(R.string.versions_clean) else
+                            stringResource(R.string.versions_dirty, status.changes.size),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (status.clean) muted else MaterialTheme.colorScheme.error,
+                    )
+                    status.latest?.let {
+                        // message 自身已带「自动版本：…」这类来源前缀，不再二次加标签。
+                        Text(
+                            it.message.ifBlank { it.id.take(12) },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                    Text(
+                        if (status.auto.timedEnabled) {
+                            stringResource(R.string.versions_auto_timed, status.auto.timedIntervalMinutes)
+                        } else {
+                            stringResource(R.string.versions_auto_off)
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = muted,
+                    )
+                }
+                if (state.versions.isEmpty()) {
+                    Text(
+                        stringResource(R.string.versions_none), color = muted,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                } else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(state.versions, key = { it.id }) { entry ->
+                            Column(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                            ) {
+                                Text(
+                                    entry.message.ifBlank { entry.id.take(12) },
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Text(
+                                    entry.createdAt + " · " + entry.source + " · " +
+                                        stringResource(R.string.versions_files, entry.fileCount, entry.totalBytes),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = muted,
+                                )
+                            }
+                        }
+                        item(key = "readonly-hint") {
+                            Text(
+                                stringResource(R.string.versions_readonly_hint),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = muted,
+                                modifier = Modifier.padding(vertical = 8.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -220,14 +339,22 @@ fun ChangesContent(
 private fun ChangeGroupDetail(
     state: ChangesUiState,
     onClose: () -> Unit,
-    onReview: (String, String) -> Unit,
+    onReview: (String, String, String?) -> Unit,
     onUndo: (String) -> Unit,
     onRedo: (String) -> Unit,
+    onSelectLine: (WorkspaceChangeSet, DiffLine) -> Unit,
+    onGroupComment: () -> Unit,
+    onDraftChange: (String) -> Unit,
+    onSubmitComment: () -> Unit,
+    onCancelComment: () -> Unit,
+    onEditComment: (WorkspaceChangeComment) -> Unit,
+    onDeleteComment: (String) -> Unit,
 ) {
     val group = state.detail ?: return
     val busy = state.busyGroupId == group.id
     val diffs = remember(group.changeSets) { ChangeDiff.files(group) }
     val muted = MaterialTheme.colorScheme.outline
+    val composerOpen = state.commentTarget != null || state.editingCommentId != null
 
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -252,10 +379,10 @@ private fun ChangeGroupDetail(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (group.reviewStatus == "pending" || group.pendingEditCount > 0) {
-                TextButton(onClick = { onReview(group.id, "accept") }, enabled = !busy) {
+                TextButton(onClick = { onReview(group.id, "accept", null) }, enabled = !busy) {
                     Text(stringResource(R.string.changes_accept))
                 }
-                TextButton(onClick = { onReview(group.id, "reject") }, enabled = !busy) {
+                TextButton(onClick = { onReview(group.id, "reject", null) }, enabled = !busy) {
                     Text(stringResource(R.string.changes_reject))
                 }
             }
@@ -269,17 +396,46 @@ private fun ChangeGroupDetail(
                     Text(stringResource(R.string.changes_redo))
                 }
             }
+            TextButton(onClick = onGroupComment, enabled = !busy) {
+                Text(stringResource(R.string.changes_add_group_comment))
+            }
         }
         state.detailError?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+        if (composerOpen) {
+            CommentComposer(
+                state = state,
+                onChange = onDraftChange,
+                onSubmit = onSubmitComment,
+                onCancel = onCancelComment,
+            )
         }
         LazyColumn(Modifier.fillMaxSize()) {
             // 同一路径可能出现多个变更集（例如拒绝后生成的逆向变更），key 必须带上外层序号，
             // 否则 Compose 会因重复 key 直接崩溃（真机验证时踩到）。
             diffs.forEachIndexed { fileIndex, diff ->
-                item(key = "h-$fileIndex") { ChangeDiffHeader(diff) }
+                val set = group.changeSets.firstOrNull { it.id == diff.changeSetId }
+                item(key = "h-$fileIndex") {
+                    ChangeDiffHeader(
+                        diff = diff,
+                        busy = busy,
+                        onAcceptFile = {
+                            onReview(group.id, "accept", diff.changeSetId)
+                        },
+                        onRejectFile = {
+                            onReview(group.id, "reject", diff.changeSetId)
+                        },
+                    )
+                }
                 itemsIndexed(diff.lines, key = { lineIndex, _ -> "d-$fileIndex-$lineIndex" }) { index, line ->
-                    DiffLineRow(line, index)
+                    DiffLineRow(
+                        line = line,
+                        index = index,
+                        // 空行没有可锚定文本（服务端会拒绝），点它不进入行内评论。
+                        clickable = set != null && line.text.isNotBlank(),
+                        onClick = { if (set != null) onSelectLine(set, line) },
+                    )
                 }
                 if (diff.truncated) {
                     item(key = "t-$fileIndex") {
@@ -297,7 +453,7 @@ private fun ChangeGroupDetail(
                         stringResource(R.string.changes_comments, group.comments.size),
                         style = MaterialTheme.typography.labelLarge,
                     )
-                    if (group.comments.isEmpty()) {
+                    if (group.comments.none { !it.deleted }) {
                         Text(
                             stringResource(R.string.changes_no_comments),
                             style = MaterialTheme.typography.bodySmall,
@@ -305,10 +461,10 @@ private fun ChangeGroupDetail(
                         )
                     } else {
                         group.comments.filterNot { it.deleted }.forEach { comment ->
-                            val author = comment.author?.takeIf { it.isNotBlank() }
-                            Text(
-                                if (author != null) "$author：${comment.body}" else comment.body,
-                                style = MaterialTheme.typography.bodySmall,
+                            CommentRow(
+                                comment = comment,
+                                onEdit = { onEditComment(comment) },
+                                onDelete = { onDeleteComment(comment.id) },
                             )
                         }
                     }
@@ -318,37 +474,138 @@ private fun ChangeGroupDetail(
     }
 }
 
+/** 评论编辑器：行内目标显示行号与原文，编辑既有评论时显示「正在编辑」。 */
 @Composable
-private fun ChangeDiffHeader(diff: ChangeFileDiff) {
-    Row(
+private fun CommentComposer(
+    state: ChangesUiState,
+    onChange: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+            .padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        val title = when {
+            state.editingCommentId != null -> stringResource(R.string.changes_comment_edit_title)
+            state.commentTarget?.anchor != null ->
+                stringResource(R.string.changes_comment_target, state.commentTarget.lineLabel)
+            else -> stringResource(R.string.changes_add_group_comment)
+        }
+        Text(title, style = MaterialTheme.typography.labelMedium)
+        state.commentTarget?.anchor?.let {
+            Text(it.quote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+        }
+        OutlinedTextField(
+            value = state.commentDraft,
+            onValueChange = onChange,
+            placeholder = { Text(stringResource(R.string.changes_comment_hint)) },
+            minLines = 2,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        state.commentError?.let {
+            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            TextButton(onClick = onSubmit, enabled = !state.commentSubmitting && state.commentDraft.isNotBlank()) {
+                Text(stringResource(R.string.changes_comment_save))
+            }
+            TextButton(onClick = onCancel, enabled = !state.commentSubmitting) {
+                Text(stringResource(R.string.changes_comment_cancel))
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommentRow(
+    comment: WorkspaceChangeComment,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            val author = comment.author?.takeIf { it.isNotBlank() }
+            Text(
+                if (author != null) "$author：${comment.body}" else comment.body,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.weight(1f),
+            )
+            if (comment.anchor != null) {
+                Text(
+                    stringResource(R.string.changes_comment_anchored),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+        }
+        Row {
+            TextButton(onClick = onEdit) { Text(stringResource(R.string.changes_comment_edit)) }
+            TextButton(onClick = onDelete) { Text(stringResource(R.string.changes_comment_delete)) }
+        }
+    }
+}
+
+@Composable
+private fun ChangeDiffHeader(
+    diff: ChangeFileDiff,
+    busy: Boolean,
+    onAcceptFile: () -> Unit,
+    onRejectFile: () -> Unit,
+) {
+    Column(
         Modifier
             .fillMaxWidth()
             .padding(top = 8.dp)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
             .padding(6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(
-            buildString {
-                append(diff.path)
-                if (diff.isNew) append(" (" + stringResource(R.string.changes_new_file) + ")")
-                if (diff.isDeleted) append(" (" + stringResource(R.string.changes_deleted_file) + ")")
-            },
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(changesStatusText(diff.reviewStatus), style = MaterialTheme.typography.labelSmall)
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
             Text(
-                "+${diff.stats.additions} -${diff.stats.deletions}",
-                style = MaterialTheme.typography.labelSmall,
+                buildString {
+                    append(diff.path)
+                    if (diff.isNew) append(" (" + stringResource(R.string.changes_new_file) + ")")
+                    if (diff.isDeleted) append(" (" + stringResource(R.string.changes_deleted_file) + ")")
+                },
+                style = MaterialTheme.typography.bodySmall,
             )
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(changesStatusText(diff.reviewStatus), style = MaterialTheme.typography.labelSmall)
+                Text(
+                    "+${diff.stats.additions} -${diff.stats.deletions}",
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+        if (diff.pending) {
+            // 局部审阅：只裁决这一个变更集，服务端 ReviewRequest.change_set_id。
+            Row {
+                TextButton(onClick = onAcceptFile, enabled = !busy) {
+                    Text(stringResource(R.string.changes_accept_file))
+                }
+                TextButton(onClick = onRejectFile, enabled = !busy) {
+                    Text(stringResource(R.string.changes_reject_file))
+                }
+            }
         }
     }
 }
 
-/** 单行 diff：`+` / `-` 前缀 + 行号，颜色区分新增与删除。 */
+/** 单行 diff：`+` / `-` 前缀 + 行号，颜色区分新增与删除；可点击则为行内评论的锚点来源。 */
 @Composable
-private fun DiffLineRow(line: DiffLine, index: Int) {
+private fun DiffLineRow(
+    line: DiffLine,
+    index: Int,
+    clickable: Boolean,
+    onClick: () -> Unit,
+) {
     val color = when (line.kind) {
         DiffKind.ADD -> Color(0xFF1B5E20)
         DiffKind.REMOVE -> Color(0xFFB71C1C)
@@ -373,6 +630,7 @@ private fun DiffLineRow(line: DiffLine, index: Int) {
         modifier = Modifier
             .fillMaxWidth()
             .background(bg)
+            .let { if (clickable) it.clickable(onClick = onClick) else it }
             .padding(horizontal = 4.dp, vertical = 1.dp),
     )
 }

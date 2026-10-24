@@ -4,14 +4,25 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.denova.novara.core.logging.DenovaLog
+import com.denova.novara.core.network.ChangeCommentAnchor
+import com.denova.novara.core.network.ChangeCommentRequest
 import com.denova.novara.core.network.DenovaClient
+import com.denova.novara.core.network.WorkspaceChangeComment
 import com.denova.novara.core.network.WorkspaceChangeGroup
 import com.denova.novara.core.network.WorkspaceChangeGroupSummary
 import com.denova.novara.core.network.WorkspaceChangeMutationResult
+import com.denova.novara.core.network.WorkspaceChangeSet
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+/** 正在写评论的目标：带锚点时是 diff 行，不带锚点时是整组评论。 */
+data class CommentTarget(
+    val changeSetId: String,
+    val lineLabel: String,
+    val anchor: ChangeCommentAnchor?,
+)
 
 data class ChangesUiState(
     val projectId: String = "",
@@ -25,6 +36,12 @@ data class ChangesUiState(
     val detail: WorkspaceChangeGroup? = null,
     val detailLoading: Boolean = false,
     val detailError: String? = null,
+    /** 评论编辑器：目标（可带锚点）、草稿、正在编辑的评论 id。 */
+    val commentTarget: CommentTarget? = null,
+    val commentDraft: String = "",
+    val editingCommentId: String? = null,
+    val commentSubmitting: Boolean = false,
+    val commentError: String? = null,
 )
 
 /**
@@ -88,9 +105,129 @@ class ChangesViewModel(application: Application) : AndroidViewModel(application)
         _state.value = _state.value.copy(detail = null, detailError = null, detailLoading = false)
     }
 
-    /** decision: accept / reject。 */
-    fun review(groupId: String, decision: String) = mutate(groupId) { c, pid ->
-        c.reviewChangeGroup(pid, groupId, decision)
+    /**
+     * decision: accept / reject；[changeSetId] 非空表示只裁决该文件（局部审阅）。
+     * 服务端 `ReviewRequest.change_set_id` 原生支持，界面的「仅此文件」按钮走这条路。
+     */
+    fun review(groupId: String, decision: String, changeSetId: String? = null) = mutate(groupId) { c, pid ->
+        c.reviewChangeGroup(pid, groupId, decision, changeSetId)
+    }
+
+    // ---- 评论（WRI-016）：新增（含 diff 行锚点）/ 编辑 / 删除 ----
+
+    /** 选中一行 diff 作为评论目标；空行没有可锚定文本，退化成整组评论。 */
+    fun selectDiffLine(set: WorkspaceChangeSet, line: DiffLine) {
+        val anchor = ChangeDiff.anchor(set, line)
+        val label = (if (line.kind == DiffKind.REMOVE) line.beforeLine else line.afterLine)
+            ?.let { "第 $it 行" } ?: "该行"
+        _state.value = _state.value.copy(
+            commentTarget = CommentTarget(set.id, label, anchor),
+            editingCommentId = null,
+            commentError = null,
+        )
+    }
+
+    /** 针对整个分组写评论（不锚定具体行）。 */
+    fun startGroupComment() {
+        val group = _state.value.detail ?: return
+        _state.value = _state.value.copy(
+            commentTarget = CommentTarget("", "整组", null),
+            editingCommentId = null,
+            commentError = null,
+            commentDraft = "",
+        )
+        if (group.id.isBlank()) return
+    }
+
+    fun startEditComment(comment: WorkspaceChangeComment) {
+        _state.value = _state.value.copy(
+            editingCommentId = comment.id,
+            commentTarget = null,
+            commentDraft = comment.body,
+            commentError = null,
+        )
+    }
+
+    fun onCommentDraftChange(text: String) {
+        _state.value = _state.value.copy(commentDraft = text, commentError = null)
+    }
+
+    fun cancelComment() {
+        _state.value = _state.value.copy(
+            commentTarget = null,
+            editingCommentId = null,
+            commentDraft = "",
+            commentError = null,
+        )
+    }
+
+    /** 提交草稿：有编辑目标发 PATCH，否则发 POST（带锚点）。成功后重载详情。 */
+    fun submitComment() {
+        val c = client ?: return
+        val s = _state.value
+        val pid = s.projectId
+        val group = s.detail ?: return
+        val body = s.commentDraft.trim()
+        if (pid.isBlank() || body.isEmpty() || s.commentSubmitting) return
+        val editing = s.editingCommentId
+        val target = s.commentTarget
+        if (editing == null && target == null) return
+        viewModelScope.launch {
+            _state.value = s.copy(commentSubmitting = true, commentError = null)
+            try {
+                if (editing != null) {
+                    c.updateChangeComment(pid, editing, body)
+                    DenovaLog.i("Changes", "comment updated id=$editing")
+                } else {
+                    val request = ChangeCommentRequest(
+                        groupId = group.id,
+                        changeSetId = target?.changeSetId?.takeIf { it.isNotBlank() },
+                        body = body,
+                        anchor = target?.anchor,
+                    )
+                    val comment = c.createChangeComment(pid, request)
+                    DenovaLog.i(
+                        "Changes",
+                        "comment created id=${comment.id} anchored=${request.anchor != null}",
+                    )
+                }
+                _state.value = _state.value.copy(
+                    commentSubmitting = false,
+                    commentDraft = "",
+                    commentTarget = null,
+                    editingCommentId = null,
+                    commentError = null,
+                )
+                reloadDetail()
+            } catch (e: Exception) {
+                DenovaLog.w("Changes", "comment submit failed", e)
+                _state.value = _state.value.copy(
+                    commentSubmitting = false,
+                    commentError = e.message ?: "评论提交失败",
+                )
+            }
+        }
+    }
+
+    fun deleteComment(commentId: String) {
+        val c = client ?: return
+        val pid = _state.value.projectId
+        if (pid.isBlank() || commentId.isBlank()) return
+        viewModelScope.launch {
+            try {
+                c.deleteChangeComment(pid, commentId)
+                DenovaLog.i("Changes", "comment deleted id=$commentId")
+                reloadDetail()
+            } catch (e: Exception) {
+                DenovaLog.w("Changes", "comment delete failed id=$commentId", e)
+                _state.value = _state.value.copy(commentError = e.message ?: "删除评论失败")
+            }
+        }
+    }
+
+    private fun reloadDetail() {
+        val groupId = _state.value.detail?.id ?: return
+        if (groupId.isNotBlank()) openGroup(groupId)
     }
 
     fun undo(groupId: String) = mutate(groupId) { c, pid -> c.undoChangeGroup(pid, groupId) }

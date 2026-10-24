@@ -53,12 +53,14 @@ import com.denova.novara.feature.game.GameScreen
 import com.denova.novara.feature.game.GameViewModel
 import com.denova.novara.feature.bookshelf.BookShelfViewModel
 import com.denova.novara.feature.changes.ChangesViewModel
+import com.denova.novara.feature.versions.VersionsViewModel
 import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.shell.AppDrawer
 import com.denova.novara.feature.shell.GameConsoleContent
 import com.denova.novara.feature.shell.PlaceholderScreen
 import com.denova.novara.feature.shell.ChangesContent
+import com.denova.novara.feature.shell.VersionsContent
 import com.denova.novara.feature.shell.ProjectDirectoryContent
 import com.denova.novara.feature.shell.RightDrawer
 import com.denova.novara.feature.shell.appDestinations
@@ -90,11 +92,13 @@ class MainActivity : AppCompatActivity() {
                 val projectDirectoryViewModel: ProjectDirectoryViewModel = viewModel(factory = container.viewModelFactory)
                 val bookShelfViewModel: BookShelfViewModel = viewModel(factory = container.viewModelFactory)
                 val changesViewModel: ChangesViewModel = viewModel(factory = container.viewModelFactory)
+                val versionsViewModel: VersionsViewModel = viewModel(factory = container.viewModelFactory)
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val state by connectionViewModel.state.collectAsState()
                 val projectState by projectDirectoryViewModel.state.collectAsState()
                 val bookState by bookShelfViewModel.state.collectAsState()
                 val changesState by changesViewModel.state.collectAsState()
+                val versionsState by versionsViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
                 var showRightDrawer by remember { mutableStateOf(false) }
                 var rightTab by remember { mutableStateOf(0) }
@@ -121,6 +125,7 @@ class MainActivity : AppCompatActivity() {
                                     bookShelfViewModel.bindClient(client)
                                     bookShelfViewModel.load()
                                     changesViewModel.bindClient(client)
+                versionsViewModel.bindClient(client)
                                 }
                             }
                             ModalNavigationDrawer(
@@ -243,10 +248,10 @@ class MainActivity : AppCompatActivity() {
                         val isGame = currentRoute == "game"
                         LaunchedEffect(showRightDrawer, currentProjectId, isGame, rightTab) {
                             if (!isGame) {
-                                if (rightTab == 0) {
-                                    projectDirectoryViewModel.load(currentProjectId)
-                                } else {
-                                    changesViewModel.load(currentProjectId)
+                                when (rightTab) {
+                                    0 -> projectDirectoryViewModel.load(currentProjectId)
+                                    1 -> changesViewModel.load(currentProjectId)
+                                    else -> versionsViewModel.load(currentProjectId)
                                 }
                             }
                         }
@@ -273,6 +278,9 @@ class MainActivity : AppCompatActivity() {
                                         TextButton(onClick = { rightTab = 1 }) {
                                             Text(stringResource(R.string.changes_title))
                                         }
+                                        TextButton(onClick = { rightTab = 2 }) {
+                                            Text(stringResource(R.string.versions_title))
+                                        }
                                     }
                                     if (rightTab == 0) {
                                         ProjectDirectoryContent(
@@ -286,7 +294,7 @@ class MainActivity : AppCompatActivity() {
                                             },
                                             onRefresh = projectDirectoryViewModel::refresh,
                                         )
-                                    } else {
+                                    } else if (rightTab == 1) {
                                         ChangesContent(
                                             state = changesState,
                                             onReview = changesViewModel::review,
@@ -299,6 +307,22 @@ class MainActivity : AppCompatActivity() {
                                             },
                                             onOpen = changesViewModel::openGroup,
                                             onCloseDetail = changesViewModel::closeDetail,
+                                            onSelectLine = changesViewModel::selectDiffLine,
+                                            onGroupComment = changesViewModel::startGroupComment,
+                                            onDraftChange = changesViewModel::onCommentDraftChange,
+                                            onSubmitComment = changesViewModel::submitComment,
+                                            onCancelComment = changesViewModel::cancelComment,
+                                            onEditComment = changesViewModel::startEditComment,
+                                            onDeleteComment = changesViewModel::deleteComment,
+                                        )
+                                    } else {
+                                        VersionsContent(
+                                            state = versionsState,
+                                            onRefresh = {
+                                                if (currentProjectId.isNotBlank()) {
+                                                    versionsViewModel.load(currentProjectId, force = true)
+                                                }
+                                            },
                                         )
                                     }
                                 }

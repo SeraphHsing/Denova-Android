@@ -1,5 +1,6 @@
 package com.denova.novara.feature.changes
 
+import com.denova.novara.core.network.ChangeCommentAnchor
 import com.denova.novara.core.network.WorkspaceChangeGroup
 import com.denova.novara.core.network.WorkspaceChangeSet
 import com.github.difflib.DiffUtils
@@ -18,6 +19,8 @@ data class DiffStats(val additions: Int, val deletions: Int)
 
 /** 一个文件的审阅投影：diff 行、增删计数、审阅状态与截断标记。 */
 data class ChangeFileDiff(
+    /** 变更集 id：局部审阅与评论锚点都按它定位。 */
+    val changeSetId: String,
     val path: String,
     val beforeExists: Boolean,
     val afterExists: Boolean,
@@ -30,6 +33,9 @@ data class ChangeFileDiff(
     /** 新增 / 删除 / 改写（两侧都存在但内容不同）。 */
     val isNew: Boolean get() = !beforeExists && afterExists
     val isDeleted: Boolean get() = beforeExists && !afterExists
+
+    /** 该变更集是否还等待审阅（据此决定是否给「仅此文件」按钮）。 */
+    val pending: Boolean get() = reviewStatus == "pending"
 }
 
 /**
@@ -49,6 +55,7 @@ object ChangeDiff {
         val all = unified(before, after)
         val lines = if (all.size > MAX_LINES) all.take(MAX_LINES) else all
         return ChangeFileDiff(
+            changeSetId = set.id,
             path = set.path,
             beforeExists = set.beforeExists,
             afterExists = set.afterExists,
@@ -56,6 +63,43 @@ object ChangeDiff {
             lines = lines,
             stats = stats(lines),
             truncated = all.size > MAX_LINES,
+        )
+    }
+
+    /**
+     * 把一行 diff 换算成服务端校验的评论锚点（`utf8-bytes-v1`）。
+     *
+     * 规则来自后端 `validateCommentAnchor`：`side` + 该 side 的 revision + 内容内的字节区间，
+     * 且 `content[start:end]` 必须**一字不差**等于 `quote`。空行没有可锚定的文本，返回 null，
+     * 由界面退化成整组评论，避免伪造一个服务端会拒绝的锚点。
+     */
+    fun anchor(set: WorkspaceChangeSet, line: DiffLine): ChangeCommentAnchor? {
+        val after = line.kind != DiffKind.REMOVE
+        val content = if (after) set.afterContent else set.beforeContent
+        val revision = if (after) set.revision else set.baseRevision
+        val lineNo = (if (after) line.afterLine else line.beforeLine) ?: return null
+        if (revision.isBlank()) return null
+        val lines = splitLines(content)
+        if (lineNo < 1 || lineNo > lines.size) return null
+        val quote = lines[lineNo - 1]
+        if (quote.isBlank()) return null
+        var offset = 0
+        for (i in 0 until lineNo - 1) {
+            offset += lines[i].toByteArray(Charsets.UTF_8).size + 1
+        }
+        val start = offset
+        val end = start + quote.toByteArray(Charsets.UTF_8).size
+        return ChangeCommentAnchor(
+            side = if (after) {
+                ChangeCommentAnchor.SIDE_AFTER
+            } else {
+                ChangeCommentAnchor.SIDE_BEFORE
+            },
+            encoding = ChangeCommentAnchor.ENCODING_UTF8_BYTES,
+            revision = revision,
+            start = start,
+            end = end,
+            quote = quote,
         )
     }
 

@@ -76,6 +76,33 @@
     <string name="changes_apply_prepared">Prepared</string>
     <string name="changes_apply_conflicted">Conflicted</string>
 
+    <!-- 局部审阅（WRI-016） -->
+    <string name="changes_accept_file">Accept this file</string>
+    <string name="changes_reject_file">Reject this file</string>
+
+    <!-- 评论（WRI-016） -->
+    <string name="changes_add_comment">Add comment</string>
+    <string name="changes_add_group_comment">Comment on group</string>
+    <string name="changes_comment_hint">Comment body</string>
+    <string name="changes_comment_save">Save</string>
+    <string name="changes_comment_cancel">Cancel</string>
+    <string name="changes_comment_edit">Edit</string>
+    <string name="changes_comment_delete">Delete</string>
+    <string name="changes_comment_target">Comment on %1$s</string>
+    <string name="changes_comment_edit_title">Editing comment</string>
+    <string name="changes_comment_anchored">Inline</string>
+
+    <!-- 版本入口（WRI-016 / 功能属 VER-001/002） -->
+    <string name="versions_title">Versions</string>
+    <string name="versions_hint">Select a book first</string>
+    <string name="versions_clean">Workspace clean since last version</string>
+    <string name="versions_dirty">%1$d changes since last version</string>
+    <string name="versions_none">No versions yet</string>
+    <string name="versions_auto_timed">Auto every %1$d min</string>
+    <string name="versions_auto_off">Auto versions off</string>
+    <string name="versions_files">%1$d files · %2$d bytes</string>
+    <string name="versions_readonly_hint">Read-only entry — diff and restore ship with VER-001/002</string>
+
     <!-- 文件标签（WRI-003） -->
     <string name="tab_actions">Tab actions</string>
     <string name="tab_move_left">Move left</string>

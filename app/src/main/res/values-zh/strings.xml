@@ -76,6 +76,33 @@
     <string name="changes_apply_prepared">已准备</string>
     <string name="changes_apply_conflicted">有冲突</string>
 
+    <!-- 局部审阅（WRI-016） -->
+    <string name="changes_accept_file">仅接受此文件</string>
+    <string name="changes_reject_file">仅拒绝此文件</string>
+
+    <!-- 评论（WRI-016） -->
+    <string name="changes_add_comment">添加评论</string>
+    <string name="changes_add_group_comment">评论整组</string>
+    <string name="changes_comment_hint">评论内容</string>
+    <string name="changes_comment_save">保存</string>
+    <string name="changes_comment_cancel">取消</string>
+    <string name="changes_comment_edit">编辑</string>
+    <string name="changes_comment_delete">删除</string>
+    <string name="changes_comment_target">评论 %1$s</string>
+    <string name="changes_comment_edit_title">正在编辑评论</string>
+    <string name="changes_comment_anchored">行内</string>
+
+    <!-- 版本入口（WRI-016 / 功能属 VER-001/002） -->
+    <string name="versions_title">版本</string>
+    <string name="versions_hint">先选择书籍</string>
+    <string name="versions_clean">自上个版本以来工作区无改动</string>
+    <string name="versions_dirty">自上个版本以来 %1$d 处改动</string>
+    <string name="versions_none">暂无版本</string>
+    <string name="versions_auto_timed">每 %1$d 分钟自动创建</string>
+    <string name="versions_auto_off">未开启自动版本</string>
+    <string name="versions_files">%1$d 个文件 · %2$d 字节</string>
+    <string name="versions_readonly_hint">本页只读入口，diff 与恢复随 VER-001/002 提供</string>
+
     <!-- 文件标签（WRI-003） -->
     <string name="tab_actions">标签操作</string>
     <string name="tab_move_left">左移</string>

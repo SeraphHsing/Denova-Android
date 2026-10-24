@@ -435,13 +435,112 @@ class DenovaClient(
         }
     }
 
-    /** 审阅变更分组：`POST .../changes/groups/:gid/review` body `{decision}`。 */
-    suspend fun reviewChangeGroup(projectId: String, groupId: String, decision: String): WorkspaceChangeMutationResult =
+    /**
+     * 审阅变更分组：`POST .../changes/groups/:gid/review` body `{decision, change_set_id?}`。
+     * 带 `change_setId` 时只对那一个变更集决策（局部审阅），服务端 `ReviewRequest` 原生支持。
+     */
+    suspend fun reviewChangeGroup(
+        projectId: String,
+        groupId: String,
+        decision: String,
+        changeSetId: String? = null,
+    ): WorkspaceChangeMutationResult =
         postChangeMutation(
             projectId,
             "groups/$groupId/review",
-            json.encodeToString(ReviewChangeRequest.serializer(), ReviewChangeRequest(decision)),
+            json.encodeToString(
+                ReviewChangeRequest.serializer(),
+                ReviewChangeRequest(decision, changeSetId?.takeIf { it.isNotBlank() }),
+            ),
         )
+
+    /** 新增评论：`POST .../changes/comments`（可带 diff 行锚点）。 */
+    suspend fun createChangeComment(projectId: String, request: ChangeCommentRequest): WorkspaceChangeComment {
+        val http = Request.Builder()
+            .url(
+                server.baseUrl.toHttpUrl().newBuilder()
+                    .addPathSegments("api/projects/$projectId/changes/comments")
+                    .build(),
+            )
+            .post(json.encodeToString(ChangeCommentRequest.serializer(), request).toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(http).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(ChangeCommentResponse.serializer(), text).comment
+            }
+        }
+    }
+
+    /** 修改评论正文：`PATCH .../changes/comments/:id`。 */
+    suspend fun updateChangeComment(projectId: String, commentId: String, body: String): WorkspaceChangeComment {
+        val http = Request.Builder()
+            .url(
+                server.baseUrl.toHttpUrl().newBuilder()
+                    .addPathSegments("api/projects/$projectId/changes/comments/$commentId")
+                    .build(),
+            )
+            .patch(
+                json.encodeToString(ChangeCommentUpdateRequest.serializer(), ChangeCommentUpdateRequest(body))
+                    .toRequestBody(jsonMediaType),
+            )
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(http).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(ChangeCommentResponse.serializer(), text).comment
+            }
+        }
+    }
+
+    /** 删除评论：`DELETE .../changes/comments/:id`（服务端软删除，历史读回 `deleted=true`）。 */
+    suspend fun deleteChangeComment(projectId: String, commentId: String) {
+        val http = Request.Builder()
+            .url(
+                server.baseUrl.toHttpUrl().newBuilder()
+                    .addPathSegments("api/projects/$projectId/changes/comments/$commentId")
+                    .build(),
+            )
+            .delete()
+            .build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(http).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+            }
+        }
+    }
+
+    /** 版本状态：`GET .../versions/status`（工作区是否干净、最近版本、自动版本配置）。 */
+    suspend fun versionStatus(projectId: String): VersionStatus {
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/versions/status")
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(VersionStatus.serializer(), text)
+            }
+        }
+    }
+
+    /** 版本历史：`GET .../versions?limit=`（只读列表，diff 与恢复属 VER-001/002）。 */
+    suspend fun versionHistory(projectId: String, limit: Int = 20): List<VersionEntry> {
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/versions")
+            .addQueryParameter("limit", limit.toString())
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(VersionHistoryResponse.serializer(), text).versions
+            }
+        }
+    }
 
     /** 撤销变更分组：`POST .../changes/groups/:gid/undo`。 */
     suspend fun undoChangeGroup(projectId: String, groupId: String): WorkspaceChangeMutationResult =
