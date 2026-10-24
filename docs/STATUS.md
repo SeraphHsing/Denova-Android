@@ -116,13 +116,13 @@
 | API 契约 | 281 条已按 `85ec97c` 重提取；handler→DTO 已按族核对（认证/写作/Agent流/游戏流/设置模型/终端/长尾族） | 逐字段嵌套 DTO 与双端读回验证（P1 按需展开） |
 | G1 认证与网络 | 连接 + status + 登录 + 退出已真机真实往返；DataStore 服务器地址持久化；持久化 Cookie 免登录；**受保护图片读取真机通过**（`/files/asset` 带会话 200、无会话 401）；**退出时等待进行中读取真机通过**（`logout drain pending=1`）；**一次性配对真机通过**（首次 200、二次 401） | HTTPS/WSS（无 TLS 部署，**验证已放弃**，按环境限制登记）；迟到 401 并入 P2 |
 | G2 Markdown 编辑器 | 序列化层（commonmark + GFM 表格，8 测试）+ 源码/富文本/预览三模式 + 标记隐藏与格式化工具栏（4 测试）；真机渲染通过；**D03-W 已实测并于 2026-10-24 评审通过**（含对照语料：预览渲染全部节点；口径按 UTF-8 字节） | 图片/表格编辑、中文 IME 组合态、选区增强 |
-| G3 保存并发 | 三方合并 `ThreeWayMerge` + revision 校验 + `DraftStore` + `FileSaveCoordinator`（含合并结果采纳回归测试）+ `EditorSession` 状态机（快照与当前编辑分离、冲突暂停自动保存、迟到回包 re-apply、草稿恢复）；编辑器 UI 集成；真机单端两次完整保存周期；**双端并发 409 → 合并 → 读回已在真机 + 真实服务器通过**（修复了合并后覆盖对端的缺陷）；**草稿事务提交前后终止进程已真机通过**（提交前不恢复、提交后恢复未提交编辑，见 `docs/evidence/g3-save/xiaomi-14-pro/recovery.md`） | 重叠冲突的真实双端用例、迟到回包端到端（两者 adb 无法精确构造，现由单测覆盖，真机证据留待 Web 端操作或输入法辅助） |
+| G3 保存并发 | 三方合并 `ThreeWayMerge` + revision 校验 + `DraftStore` + `FileSaveCoordinator`（含合并结果采纳回归测试）+ `EditorSession` 状态机（快照与当前编辑分离、冲突暂停自动保存、迟到回包 re-apply、草稿恢复）；编辑器 UI 集成；真机单端两次完整保存周期；**双端并发 409 → 合并 → 读回已在真机 + 真实服务器通过**（修复了合并后覆盖对端的缺陷）；**草稿事务提交前后终止进程已真机通过**（提交前不恢复、提交后恢复未提交编辑，见 `docs/evidence/g3-save/xiaomi-14-pro/recovery.md`） | 重叠冲突的真实双端用例、迟到回包端到端（两者 adb 无法精确构造，现由单测覆盖；**2026-10-24 决定留待 P3 写作链路的浏览器双端对照一并验证**） |
 
 
 ## 下一步顺序
 
 1. **G1 收尾说明：** 受保护图片、退出等待进行中读取、一次性配对均已真机通过（见 `docs/evidence/g1-auth/`）。**HTTPS/WSS 无 TLS 部署、验证已放弃（环境限制）**；迟到 401 并入 P2。G1 除这两项环境限制外其余判据已齐备。
-2. **补 G3 剩余判据：** 草稿事务提交前后终止进程已真机通过（`docs/evidence/g3-save/xiaomi-14-pro/recovery.md`）；剩重叠冲突真实双端用例与迟到回包端到端——两者 adb 无法精确构造（选区替换/保存期间注入编辑），现由 `ThreeWayMergeTest`/`FileSaveCoordinatorTest`/`EditorSessionTest` 单测覆盖，真机证据留待 Web 端操作或输入法辅助。
+2. **补 G3 剩余判据：** 草稿事务提交前后终止进程已真机通过（`docs/evidence/g3-save/xiaomi-14-pro/recovery.md`）；剩重叠冲突真实双端用例与迟到回包端到端——两者 adb 无法精确构造（选区替换/保存期间注入编辑），现由 `ThreeWayMergeTest`/`FileSaveCoordinatorTest`/`EditorSessionTest` 单测覆盖；**2026-10-24 决定留待 P3 写作链路的浏览器双端对照一并验证**。
 3. **P1 退出门槛：** 上述两项通过后，按 [05 §3](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据) 核对每个关卡的录屏/截图证据是否齐备。
 4. **P2 工程基础（收尾中）：** AppContainer、单 Activity 导航、左右抽屉、DesignTokens、深浅主题、中英文、Room 草稿与命令身份、请求退休机制均已落地（2026-10-24）；仅剩「请求世代全 ViewModel 穿透接入 + 迟到 401 端到端构造」留待 P3 按请求密集路径接入；退出验证按 [05 §4](android-web-parity/05-roadmap.md#4-p2工程基础与公共界面)。
 5. **P3 起：** 按 [05 §5–§6](android-web-parity/05-roadmap.md#5-p3第一条完整写作链路) 铺开第一条完整写作链路与各业务模块；矩阵中 108 条 `未开始` 随页面实现逐条落地，确认完成后再回写。
