@@ -15,6 +15,7 @@ import com.denova.novara.core.stream.AgentUiFrame
 import com.denova.novara.core.stream.AgentUiReducer
 import com.denova.novara.core.stream.AgentUiState
 import com.denova.novara.core.stream.GameStreamError
+import com.denova.novara.core.stream.buildAgentHistoryNarrative
 import com.denova.novara.core.stream.collectWithIdleGuard
 import java.util.UUID
 import kotlinx.coroutines.Job
@@ -48,10 +49,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     fun bindClient(client: DenovaClient) {
         this.client = client
-        this.coordinator = AgentStreamRecoveryCoordinator(client) {
-            // canonical 历史（session messages）重建待后续轮次。
-            _state.value = _state.value.copy(ui = AgentUiState())
-        }
+        this.coordinator = AgentStreamRecoveryCoordinator(client, reloadCanonical = ::reloadCanonical)
     }
 
     /** 挂接 session 的活动 Agent 流。 */
@@ -64,6 +62,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         sendJob?.cancel()
         streamJob = viewModelScope.launch {
             try {
+                // 先加载 canonical 历史作为基线，再挂接流补充增量。
+                reloadCanonical()
                 c.recover(sessionId).collect { onFrame(it) }
             } catch (e: Exception) {
                 DenovaLog.w("Agent", "recover failed", e)
@@ -143,6 +143,22 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         sendJob?.cancel()
         sendJob = null
         _state.value = _state.value.copy(connected = false)
+    }
+
+    /** 从 canonical 消息历史重建正文基线（rehydrate 后不丢已持久化内容）。 */
+    private suspend fun reloadCanonical() {
+        val client = client ?: return
+        val sessionId = _state.value.sessionId
+        if (sessionId.isBlank()) return
+        try {
+            val page = client.sessionMessages(sessionId, limit = 50)
+            val history = buildAgentHistoryNarrative(page.messages)
+            _state.value = _state.value.copy(ui = AgentUiState(content = history))
+            DenovaLog.i("Agent", "canonical history loaded len=${history.length}")
+        } catch (e: Exception) {
+            DenovaLog.w("Agent", "load canonical history failed", e)
+            _state.value = _state.value.copy(ui = AgentUiState())
+        }
     }
 
     private fun onFrame(frame: AgentUiFrame) {

@@ -3,6 +3,7 @@ package com.denova.novara.core.network
 import com.denova.novara.core.model.ServerKey
 import com.denova.novara.core.save.FileRemote
 import com.denova.novara.core.stream.AgentActiveView
+import com.denova.novara.core.stream.AgentMessagesPage
 import com.denova.novara.core.stream.AgentRecoveryRequest
 import com.denova.novara.core.stream.AgentStreamTransport
 import com.denova.novara.core.stream.AgentUiFrame
@@ -357,6 +358,18 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
         }
     }.flowOn(Dispatchers.IO)
 
+    /** 读取写作 session 的 canonical 消息历史（rehydrate/挂接后重建基线）。 */
+    suspend fun sessionMessages(sessionId: String, limit: Int): AgentMessagesPage {
+        val request = Request.Builder().url(sessionMessagesUrl(sessionId, limit)).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
+                json.decodeFromString(AgentMessagesPage.serializer(), body)
+            }
+        }
+    }
+
     /** 读取 story 的 canonical 历史（rehydrate 后重建叙事基线）。 */
     suspend fun interactiveHistory(storyId: String, branchId: String, limit: Int): StoryHistoryPage {
         val request = Request.Builder()
@@ -396,6 +409,13 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
 
     private fun interactiveSendUrl(): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/chat").build()
+
+    private fun sessionMessagesUrl(sessionId: String, limit: Int): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/session/messages")
+            .addQueryParameter("session_id", sessionId)
+            .addQueryParameter("limit", limit.toString())
+            .build()
 
     private fun chatSendUrl(): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/chat").build()
