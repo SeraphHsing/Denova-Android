@@ -2,6 +2,7 @@ package com.denova.novara.feature.editor
 
 import com.denova.novara.core.editor.MergeResult
 import com.denova.novara.core.editor.ThreeWayMerge
+import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.persistence.Draft
 import com.denova.novara.core.persistence.DraftStorage
 import com.denova.novara.core.save.FileSaveCoordinator
@@ -217,18 +218,21 @@ class EditorSession(
         var kind = "saved"
         when (val outcome = coordinator.save(s.projectId, s.filePath, s.baseRevision, s.baseContent, snapshot)) {
             is SaveOutcome.Saved -> {
+                DenovaLog.i("Editor", "saved path=${s.filePath} revision=${outcome.revision}")
                 val r = ReceiptPolicy.applySaved(snapshot, outcome.revision, _state.value)
                 _state.value = r.state
                 if (r.reschedule) scheduleSave()
             }
             is SaveOutcome.MergedAndSaved -> {
                 kind = "merged"
+                DenovaLog.i("Editor", "merged+saved path=${s.filePath} revision=${outcome.revision}")
                 val r = ReceiptPolicy.applyMerged(snapshot, outcome, _state.value)
                 _state.value = r.state
                 if (r.reschedule) scheduleSave()
             }
             is SaveOutcome.Conflict -> {
                 kind = "conflict"
+                DenovaLog.w("Editor", "conflict path=${s.filePath} count=${outcome.conflictCount}")
                 _state.value = ReceiptPolicy.applyConflict(outcome, _state.value)
             }
             is SaveOutcome.Error -> {
