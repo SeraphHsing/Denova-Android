@@ -3,16 +3,19 @@ package com.denova.novara.feature.editor
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.denova.novara.NovaraApplication
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
-import com.denova.novara.NovaraApplication
 import com.denova.novara.core.persistence.DraftStore
+import com.denova.novara.core.persistence.EditorTabsStore
 import com.denova.novara.core.save.FileSaveCoordinator
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 enum class SaveStatus { IDLE, SAVING, SAVED, MERGED, CONFLICT, ERROR }
 
@@ -30,22 +33,48 @@ data class EditorUiState(
     val contentEpoch: Int = 0,
 )
 
-/** 编辑器：打开文件 → 编辑（防抖自动保存）→ revision 冲突合并/提示。保存状态机委托给 [EditorSession]。 */
+/**
+ * 编辑器：打开文件 → 编辑（防抖自动保存）→ revision 冲突合并/提示。保存状态机委托给 [EditorSession]。
+ *
+ * WRI-003 起同时持有文件标签栏：每个项目（书籍）一份标签桶，打开文件即入列，
+ * 切换 / 关闭 / 重排都走 [EditorTabs] 的纯变换，并把顺序与激活项持久化到 [EditorTabsStore]，
+ * 供进程重建或切页返回后恢复。服务端仍是文件内容的唯一事实源。
+ */
 class EditorViewModel(application: Application) : AndroidViewModel(application) {
 
     private val drafts = DraftStore((application as NovaraApplication).container.database.draftDao())
+    private val tabsStore = EditorTabsStore(application)
     private var client: DenovaClient? = null
     private var session: EditorSession? = null
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
+    private val _tabs = MutableStateFlow(EditorTabsState())
+    val tabs: StateFlow<EditorTabsState> = _tabs.asStateFlow()
+
     private var collectJob: Job? = null
 
-    /** 登录后绑定当前连接的 client，建立保存编排与状态机。 */
+    /** 当前标签桶所属服务器 origin：切换服务器时标签必须隔离（AGENTS §4）。 */
+    private var serverScope: String = ""
+
+    /** 当前标签桶所属项目；与 [openFile] 的 projectId 不同即需要换桶。 */
+    private var tabsProjectId: String = ""
+
+    private val persistMutex = Mutex()
+
+    /** 登录后绑定当前连接的 client，建立保存编排、状态机，并恢复上次的标签栏。 */
     fun bindClient(client: DenovaClient) {
         DenovaLog.i("Editor", "client bound")
+        val origin = client.serverOrigin
+        if (serverScope.isNotEmpty() && serverScope != origin) {
+            // 换服务器：不继承上一个服务器的标签与文件状态。
+            tabsProjectId = ""
+            _tabs.value = EditorTabsState()
+            session?.clear()
+        }
         this.client = client
+        this.serverScope = origin
         val coordinator = FileSaveCoordinator(client, drafts)
         val s = EditorSession(coordinator, drafts, viewModelScope)
         this.session = s
@@ -53,23 +82,111 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         collectJob = viewModelScope.launch {
             s.state.collect { _uiState.value = it }
         }
+        restoreTabs()
+    }
+
+    /**
+     * 书籍（当前项目）切换：加载该项目的标签桶，并切到它上次激活的文件。
+     *
+     * 必须换掉编辑器状态：否则上一个项目的正文会留在屏上，自动保存还会写回上一个项目
+     * 的文件（标签与正文不属于同一个作用域）。
+     */
+    fun setProject(projectId: String) {
+        val pid = projectId.trim()
+        if (pid.isEmpty() || pid == tabsProjectId) return
+        viewModelScope.launch {
+            loadBucket(pid)
+            val active = _tabs.value.activePath
+            when {
+                active.isNotEmpty() -> openFile(pid, active)
+                _uiState.value.filePath.isNotEmpty() -> session?.clear()
+            }
+        }
     }
 
     fun openFile(projectId: String, path: String) {
+        val pid = projectId.trim()
+        val p = path.trim()
+        if (pid.isEmpty() || p.isEmpty()) return
         val c = client ?: return
         val s = session ?: return
         EditorPerf.beginOpen()
         viewModelScope.launch {
+            loadBucket(pid)
             try {
-                val doc = c.readFile(projectId, path)
-                DenovaLog.i("Editor", "opened project=$projectId path=$path revision=${doc.revision}")
-                s.open(projectId, path, doc.content ?: "", doc.revision)
+                val doc = c.readFile(pid, p)
+                DenovaLog.i("Editor", "opened project=$pid path=$p revision=${doc.revision}")
+                s.open(pid, p, doc.content ?: "", doc.revision)
                 EditorPerf.endOpen((doc.content ?: "").length)
+                val state = _tabs.value
+                _tabs.value = state.copy(paths = EditorTabs.open(state.paths, p), activePath = p)
+                persist()
             } catch (e: Exception) {
-                DenovaLog.w("Editor", "open failed project=$projectId path=$path", e)
+                DenovaLog.w("Editor", "open failed project=$pid path=$p", e)
                 s.failOpen("打开文件失败：${e.message}")
             }
         }
+    }
+
+    /**
+     * 切换标签：先 flush 当前文件（对齐 Web `handleSelectFile`），再打开目标文件。
+     * flush 失败（冲突 / 保存错误）时仍切换：未提交内容已在草稿里，回到该标签会恢复。
+     */
+    fun activateTab(path: String) {
+        val state = _tabs.value
+        if (path !in state.paths) return
+        // 标签已是选中态且正文就是该文件时才无需重新读盘（换项目后可能只有选中态没有正文）。
+        if (path == state.activePath && _uiState.value.filePath == path) return
+        viewModelScope.launch {
+            if (!flush()) DenovaLog.w("Editor", "flush before tab switch failed path=${state.activePath}")
+            // 先切选中态再读文件：读失败时标签仍停在该文件并显示错误，不留半切换态。
+            _tabs.value = state.copy(activePath = path)
+            persist()
+            openFile(state.projectId, path)
+        }
+    }
+
+    /**
+     * 关闭标签。关当前标签前先 flush，失败则中止（对齐 Web `handleCloseTab`）；
+     * 关掉后按右邻居 → 左邻居 → 首个的顺序激活，最后一个关闭则清空编辑器。
+     */
+    fun closeTab(path: String) {
+        val state = _tabs.value
+        if (path !in state.paths) return
+        viewModelScope.launch {
+            val closingActive = path == state.activePath
+            if (closingActive && !flush()) {
+                DenovaLog.w("Editor", "flush before close failed path=$path")
+                return@launch
+            }
+            val remaining = EditorTabs.remove(state.paths, path)
+            if (!closingActive) {
+                _tabs.value = state.copy(paths = remaining)
+                persist()
+                return@launch
+            }
+            val nextActive = EditorTabs.nextActiveAfterClose(state.paths, path)
+            if (nextActive == null) {
+                _tabs.value = state.copy(paths = emptyList(), activePath = "")
+                session?.clear()
+                persist()
+                return@launch
+            }
+            _tabs.value = state.copy(paths = remaining, activePath = nextActive)
+            persist()
+            openFile(state.projectId, nextActive)
+        }
+    }
+
+    /** 激活标签左右移动一位（对齐移动端 Web 标签菜单的「左移 / 右移」）。 */
+    fun moveActiveTab(delta: Int) {
+        val state = _tabs.value
+        val from = state.activeIndex
+        if (from < 0) return
+        val moved = EditorTabs.move(state.paths, from, from + delta)
+        if (moved == state.paths) return
+        _tabs.value = state.copy(paths = moved)
+        persist()
     }
 
     fun updateContent(text: String) {
@@ -88,4 +205,48 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     /** 切换书籍前 flush 编辑器草稿（保存并等待）；false 表示保存失败/冲突，应中止切换。 */
     suspend fun flush(): Boolean = session?.flush() ?: true
+
+    /** 进程重建 / 重新登录后恢复：定位上次项目 → 载入标签桶 → 重新打开上次激活文件。 */
+    private fun restoreTabs() {
+        val origin = serverScope
+        if (origin.isBlank()) return
+        viewModelScope.launch {
+            val projectId = _tabs.value.projectId.ifBlank { tabsStore.lastProject(origin) }
+            if (projectId.isBlank()) return@launch
+            loadBucket(projectId)
+            val state = _tabs.value
+            DenovaLog.i(
+                "Editor",
+                "tabs restored project=$projectId tabs=${state.paths.size} active=${state.activePath}",
+            )
+            if (state.activePath.isNotEmpty() && _uiState.value.filePath != state.activePath) {
+                openFile(projectId, state.activePath)
+            }
+        }
+    }
+
+    /** 载入某个项目的标签桶；同一项目不重复读盘。 */
+    private suspend fun loadBucket(projectId: String) {
+        if (projectId == tabsProjectId) return
+        val (paths, savedActive) = tabsStore.load(scopeKey(projectId))
+        tabsProjectId = projectId
+        val active = if (savedActive in paths) savedActive else paths.firstOrNull().orEmpty()
+        _tabs.value = EditorTabsState(projectId = projectId, paths = paths, activePath = active)
+        DenovaLog.i("Editor", "tabs loaded project=$projectId tabs=${paths.size} active=$active")
+    }
+
+    /** 写入最新标签快照；串行化避免连续开关标签时后写覆盖先写。 */
+    private fun persist() {
+        if (_tabs.value.projectId.isBlank()) return
+        viewModelScope.launch {
+            persistMutex.withLock {
+                val state = _tabs.value
+                if (state.projectId.isBlank()) return@withLock
+                tabsStore.save(scopeKey(state.projectId), state.paths, state.activePath)
+                tabsStore.saveLastProject(serverScope, state.projectId)
+            }
+        }
+    }
+
+    private fun scopeKey(projectId: String): String = "$serverScope|$projectId"
 }

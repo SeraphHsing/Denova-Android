@@ -145,6 +145,8 @@ class MainActivity : AppCompatActivity() {
                                                     // 服务端切换成功后才更新客户端当前项目
                                                     if (bookShelfViewModel.switch(book)) {
                                                         currentProjectId = book.projectId
+                                                        // 每个项目各自一份文件标签桶（WRI-003）。
+                                                        editorViewModel.setProject(book.projectId)
                                                         drawerState.close()
                                                     }
                                                 }

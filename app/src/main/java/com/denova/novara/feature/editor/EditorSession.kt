@@ -189,6 +189,17 @@ class EditorSession(
         _state.value = _state.value.copy(loaded = false, saveStatus = SaveStatus.ERROR, message = message)
     }
 
+    /**
+     * 关闭最后一个标签：取消在途保存、推进世代并清空编辑器（无打开文件）。
+     * 调用方负责先 [flush]，避免丢弃未提交内容。
+     */
+    fun clear() {
+        saveJob?.cancel()
+        saveJob = null
+        openEpoch++
+        _state.value = EditorUiState()
+    }
+
     fun edit(newContent: String) {
         val s = _state.value
         if (!s.loaded) return
