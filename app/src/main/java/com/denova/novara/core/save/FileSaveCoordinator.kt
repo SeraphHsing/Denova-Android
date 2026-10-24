@@ -7,6 +7,7 @@ import com.denova.novara.core.network.ProjectFileDocument
 import com.denova.novara.core.network.SaveFileResponse
 import com.denova.novara.core.persistence.Draft
 import com.denova.novara.core.persistence.DraftStorage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
@@ -66,6 +67,9 @@ class FileSaveCoordinator(
                 val resp = remote.saveFile(projectId, path, content, baseRevision)
                 drafts.clearDraft(key)
                 SaveOutcome.Saved(resp.revision)
+            } catch (e: CancellationException) {
+                // 取消（切换文件 / ViewModel 销毁）必须继续向上传播，不能伪装成保存错误。
+                throw e
             } catch (e: DenovaApiException) {
                 if (e.status == 409) {
                     handleConflict(key, projectId, path, baseContent, content)
@@ -98,6 +102,8 @@ class FileSaveCoordinator(
                     SaveOutcome.Conflict(merged.text, merged.conflictCount, theirs.revision)
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: DenovaApiException) {
             SaveOutcome.Error(e)
         } catch (e: Exception) {

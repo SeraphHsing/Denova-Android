@@ -15,7 +15,10 @@ import com.denova.novara.feature.editor.EditorUiState
 import com.denova.novara.feature.editor.OpenDecision
 import com.denova.novara.feature.editor.ReceiptPolicy
 import com.denova.novara.feature.editor.SaveStatus
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -61,6 +64,32 @@ class EditorSessionTest {
         override suspend fun saveDraft(fileKey: String, draft: Draft) { map[fileKey] = draft }
         override suspend fun loadDraft(fileKey: String): Draft? = map[fileKey]
         override suspend fun clearDraft(fileKey: String) { map.remove(fileKey) }
+    }
+
+    /** 可挂起的远端：保存进入后停在 [gate]，用于构造「回执迟到」的时序。 */
+    private class GatedRemote : FileRemote {
+        private val gate = CompletableDeferred<Unit>()
+        val saveStarted = CompletableDeferred<Unit>()
+        var saveCount = 0
+        val savedPaths = mutableListOf<String>()
+
+        fun release() = gate.complete(Unit)
+
+        override suspend fun readFile(projectId: String, path: String) =
+            ProjectFileDocument(path, "server", "r9")
+
+        override suspend fun saveFile(
+            projectId: String,
+            path: String,
+            content: String,
+            baseRevision: String,
+        ): SaveFileResponse {
+            if (!saveStarted.isCompleted) saveStarted.complete(Unit)
+            gate.await()
+            saveCount++
+            savedPaths += path
+            return SaveFileResponse(projectId, path, "rn$saveCount", true, "saved")
+        }
     }
 
     @Before
@@ -289,5 +318,71 @@ class EditorSessionTest {
         val savesBefore = remote.saveCount()
         assertFalse(session.flush())
         assertEquals(savesBefore, remote.saveCount())
+    }
+
+    // ---- G3-d 切文件：取消在途保存 + 回执作用域校验 ----
+
+    @Test
+    fun `open new file cancels in-flight save`() = runTest {
+        val remote = GatedRemote()
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this, debounceMillis = 50)
+        session.open("p", "a.md", "A0", "rA0")
+        session.edit("A1")
+        advanceTimeBy(60) // 防抖到期，保存进入远端并挂起
+        remote.saveStarted.await()
+
+        session.open("p", "b.md", "B0", "rB0") // 切文件：取消在途保存
+        remote.release()
+        advanceUntilIdle()
+
+        assertEquals("b.md", session.state.value.filePath)
+        assertEquals("B0", session.state.value.content)
+        assertEquals("rB0", session.state.value.baseRevision)
+        assertEquals(SaveStatus.IDLE, session.state.value.saveStatus)
+        assertNull(session.state.value.message) // 取消不伪装成「保存失败」
+        assertEquals(0, remote.saveCount) // 被取消的保存在 gate 处终止
+    }
+
+    @Test
+    fun `late receipt from previous file is discarded`() = runTest {
+        val remote = GatedRemote()
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this, debounceMillis = 50)
+        session.open("p", "a.md", "A0", "rA0")
+        session.edit("A1")
+
+        // flush 直接在本协程里保存，不受 open() 取消 saveJob 影响 → 只能靠作用域校验拦下回执。
+        var flushResult: Boolean? = null
+        val flushJob = launch { flushResult = session.flush() }
+        remote.saveStarted.await()
+
+        session.open("p", "b.md", "B0", "rB0")
+        remote.release()
+        flushJob.join()
+        advanceUntilIdle()
+
+        assertEquals(1, remote.saveCount) // 服务器确实写成功
+        assertEquals(false, flushResult) // 但调用方不能把旧文件结果当成功
+        assertEquals("b.md", session.state.value.filePath)
+        assertEquals("B0", session.state.value.content) // 新文件正文未被旧回执覆盖
+        assertEquals("rB0", session.state.value.baseRevision) // revision 归属未被污染
+        assertEquals(SaveStatus.IDLE, session.state.value.saveStatus)
+        assertNull(session.state.value.message)
+    }
+
+    @Test
+    fun `save after switching file applies to new file`() = runTest {
+        val remote = GatedRemote().apply { release() }
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this, debounceMillis = 50)
+        session.open("p", "a.md", "A0", "rA0")
+        session.open("p", "b.md", "B0", "rB0")
+        session.edit("B1")
+        advanceUntilIdle()
+
+        assertEquals(SaveStatus.SAVED, session.state.value.saveStatus)
+        assertEquals("rn1", session.state.value.baseRevision)
+        assertEquals(listOf("b.md"), remote.savedPaths) // 只写新文件，不带旧文件残留
     }
 }

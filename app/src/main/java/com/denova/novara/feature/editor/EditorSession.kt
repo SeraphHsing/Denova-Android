@@ -9,7 +9,9 @@ import com.denova.novara.core.save.FileSaveCoordinator
 import com.denova.novara.core.save.SaveOutcome
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -142,8 +144,18 @@ class EditorSession(
 
     private var saveJob: Job? = null
 
+    /**
+     * 文件切换世代。每次 [open] 递增；保存回执只在世代与文件 key 都未变时才能落到状态上，
+     * 否则旧文件的 revision / base 会把新文件覆盖成错误归属（G3-d 切文件）。
+     */
+    private var openEpoch = 0L
+
     suspend fun open(projectId: String, path: String, serverContent: String, serverRevision: String) {
         val key = "$projectId\u0000$path"
+        // 切换文件：取消在途保存并推进世代，旧文件的回执不得写进新文件状态（G3-d）。
+        saveJob?.cancel()
+        saveJob = null
+        openEpoch++
         when (val decision = EditorOpen.decide(serverContent, serverRevision, drafts.loadDraft(key))) {
             is OpenDecision.Server -> {
                 drafts.clearDraft(key) // 清理残留草稿（内容已与服务器一致）
@@ -205,8 +217,10 @@ class EditorSession(
         if (s.saveStatus == SaveStatus.CONFLICT) return false
         if (s.content == s.baseContent) return true
         saveJob?.cancel()
-        performSave()
-        return _state.value.saveStatus == SaveStatus.SAVED || _state.value.saveStatus == SaveStatus.MERGED
+        val applied = performSave()
+        // 保存期间文件被换掉时回执已丢弃，不能用新文件的状态冒充「已保存」。
+        return applied && (_state.value.saveStatus == SaveStatus.SAVED ||
+            _state.value.saveStatus == SaveStatus.MERGED)
     }
 
     fun resolveConflict() {
@@ -222,15 +236,27 @@ class EditorSession(
         }
     }
 
-    private suspend fun performSave() {
+    /** 返回回执是否落到当前文件；保存期间切换文件时回执被丢弃并返回 false。 */
+    private suspend fun performSave(): Boolean {
         val s = _state.value
-        if (!s.loaded || s.saveStatus == SaveStatus.CONFLICT) return
+        if (!s.loaded || s.saveStatus == SaveStatus.CONFLICT) return false
+        val epoch = openEpoch
+        val key = fileKey(s)
         val startedAt = System.currentTimeMillis()
         val draftWindow = EditorPerf.pendingEditMillis()
         val snapshot = s.content
         _state.value = s.copy(saveStatus = SaveStatus.SAVING)
+        val outcome = coordinator.save(s.projectId, s.filePath, s.baseRevision, s.baseContent, snapshot)
+        // 作用域校验：回执必须属于发起保存的文件，否则丢弃（不写 revision / base / 冲突材料）。
+        if (openEpoch != epoch || fileKey(_state.value) != key) {
+            DenovaLog.w("Editor", "save receipt discarded path=${s.filePath} reason=file changed")
+            EditorPerf.markDraftPersisted()
+            EditorPerf.endSave("discarded", System.currentTimeMillis() - startedAt, draftWindow)
+            return false
+        }
+        currentCoroutineContext().ensureActive()
         var kind = "saved"
-        when (val outcome = coordinator.save(s.projectId, s.filePath, s.baseRevision, s.baseContent, snapshot)) {
+        when (outcome) {
             is SaveOutcome.Saved -> {
                 DenovaLog.i("Editor", "saved path=${s.filePath} revision=${outcome.revision}")
                 val r = ReceiptPolicy.applySaved(snapshot, outcome.revision, _state.value)
@@ -256,5 +282,8 @@ class EditorSession(
         }
         EditorPerf.markDraftPersisted()
         EditorPerf.endSave(kind, System.currentTimeMillis() - startedAt, draftWindow)
+        return true
     }
+
+    private fun fileKey(s: EditorUiState): String = "${s.projectId}\u0000${s.filePath}"
 }
