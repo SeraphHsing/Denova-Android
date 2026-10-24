@@ -109,7 +109,13 @@ fun EditorScreen(
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             IconButton(onClick = onOpenDrawer) { Text("☰") }
             Text(stringResource(R.string.editor_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-            TextButton(onClick = { viewModel.save() }) { Text(stringResource(R.string.save)) }
+            // 手动保存（WRI-011）：未打开 / 保存中 / 冲突未解决时禁用；冲突走「已解决，保存」。
+            TextButton(
+                onClick = { viewModel.save() },
+                enabled = uiState.loaded &&
+                    uiState.saveStatus != SaveStatus.SAVING &&
+                    uiState.saveStatus != SaveStatus.CONFLICT,
+            ) { Text(stringResource(R.string.save)) }
             TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text(stringResource(R.string.terminal_title)) }
             TextButton(
                 onClick = { onOpenAgent(projectId.trim(), filePath.trim()) },
@@ -169,13 +175,20 @@ fun EditorScreen(
             )
         }
         if (uiState.saveStatus == SaveStatus.CONFLICT) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            // 冲突态暂停自动保存，必须由用户改完标记后显式放行一次（对齐 Web 的「解决后保存」）。
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    "发现冲突，请在下方编辑解决冲突标记",
+                    stringResource(R.string.conflict_hint),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(vertical = 8.dp),
+                    modifier = Modifier.weight(1f).padding(vertical = 8.dp),
                 )
+                OutlinedButton(onClick = { viewModel.resolveConflict() }) {
+                    Text(stringResource(R.string.save_resolved))
+                }
             }
         }
 

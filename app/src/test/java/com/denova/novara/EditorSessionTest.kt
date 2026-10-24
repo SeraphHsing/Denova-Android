@@ -385,4 +385,126 @@ class EditorSessionTest {
         assertEquals("rn1", session.state.value.baseRevision)
         assertEquals(listOf("b.md"), remote.savedPaths) // 只写新文件，不带旧文件残留
     }
+
+    @Test
+    fun `reopening same file bumps content epoch so the editor rebuilds its text`() = runTest {
+        val remote = FakeRemote()
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this)
+        session.open("p", "f.md", "old", "r0")
+        val firstEpoch = session.state.value.contentEpoch
+        remote.serverContent = "new from server"
+        remote.serverRevision = "r9"
+        session.open("p", "f.md", "new from server", "r9")
+        assertEquals("new from server", session.state.value.content)
+        assertTrue(session.state.value.contentEpoch > firstEpoch) // 界面据此重置输入框
+    }
+
+    // ---- WRI-011 手动保存入口 ----
+
+    @Test
+    fun `manual save bypasses debounce and does not save twice`() = runTest {
+        val remote = FakeRemote()
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this)
+        session.open("p", "f.md", "base", "r0")
+        session.edit("base edited")
+        session.saveNow()
+        advanceTimeBy(10) // 远小于 800ms 防抖
+        assertEquals(1, remote.saveCount())
+        assertEquals("base edited", remote.serverContent)
+        assertEquals(SaveStatus.SAVED, session.state.value.saveStatus)
+
+        advanceUntilIdle() // 防抖计时器这段时间本会到期
+        assertEquals(1, remote.saveCount()) // 没有重复 PUT
+    }
+
+    @Test
+    fun `manual save on clean file does not write`() = runTest {
+        val remote = FakeRemote()
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this)
+        session.open("p", "f.md", "base", "r0")
+        session.saveNow()
+        advanceUntilIdle()
+        assertEquals(0, remote.saveCount())
+        assertEquals(SaveStatus.SAVED, session.state.value.saveStatus) // 仍给出「已保存」反馈
+    }
+
+    @Test
+    fun `edits during in-flight save stay dirty and the latest text is saved`() = runTest {
+        val remote = GatedRemote()
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this, debounceMillis = 50)
+        session.open("p", "a.md", "A0", "rA0")
+        session.edit("A1")
+        session.saveNow()
+        remote.saveStarted.await()
+
+        // 保存仍在途时继续输入：不得中断在途请求，回执只确认快照 A1
+        session.edit("A12")
+        remote.release()
+        advanceUntilIdle()
+
+        assertEquals(2, remote.saveCount) // 回执后重新排一次，把最新内容写掉
+        assertEquals("A12", session.state.value.content)
+        assertEquals("rn2", session.state.value.baseRevision)
+        assertEquals(SaveStatus.SAVED, session.state.value.saveStatus)
+    }
+
+    @Test
+    fun `conflict rebases onto server content so resolved save writes`() = runTest {
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二服务器\n段落三\n结尾"
+            serverRevision = "r2"
+        }
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this)
+        session.open("p", "f.md", "标题\n段落一\n段落二\n段落三\n结尾", "r0")
+        session.edit("标题\n段落一\n段落二本地\n段落三\n结尾")
+        advanceUntilIdle()
+
+        assertEquals(SaveStatus.CONFLICT, session.state.value.saveStatus)
+        assertTrue(session.state.value.content.contains("<<<<<<<"))
+        // base 必须是服务器内容，不能用带标记的合并结果冒充（否则解决后保存会被当成无改动跳过）
+        assertEquals("标题\n段落一\n段落二服务器\n段落三\n结尾", session.state.value.baseContent)
+        assertEquals("r2", session.state.value.baseRevision)
+
+        session.edit("标题\n段落一\n双方合并结果\n段落三\n结尾")
+        session.resolveConflict()
+        advanceUntilIdle()
+
+        assertEquals("标题\n段落一\n双方合并结果\n段落三\n结尾", remote.serverContent)
+        assertEquals(SaveStatus.SAVED, session.state.value.saveStatus)
+    }
+
+    @Test
+    fun `manual save during conflict waits for resolution`() = runTest {
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二服务器\n段落三\n结尾"
+            serverRevision = "r2"
+        }
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this)
+        session.open("p", "f.md", "标题\n段落一\n段落二\n段落三\n结尾", "r0")
+        session.edit("标题\n段落一\n段落二本地\n段落三\n结尾")
+        advanceUntilIdle()
+        assertEquals(SaveStatus.CONFLICT, session.state.value.saveStatus)
+        val savesAfterConflict = remote.saveCount()
+
+        // 冲突态下编辑只改内容，不自动保存
+        session.edit("标题\n段落一\n段落二本地已解决\n段落三\n结尾")
+        advanceUntilIdle()
+        assertEquals(savesAfterConflict, remote.saveCount())
+        session.saveNow()
+        advanceUntilIdle()
+        assertEquals(savesAfterConflict, remote.saveCount()) // 冲突未解决不落盘
+
+        session.resolveConflict()
+        advanceUntilIdle()
+        assertTrue(remote.saveCount() > savesAfterConflict)
+        assertEquals("标题\n段落一\n段落二本地已解决\n段落三\n结尾", remote.serverContent)
+    }
 }

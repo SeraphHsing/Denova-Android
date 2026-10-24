@@ -121,4 +121,8 @@
     <string name="approval_reason_browser_network">The browser action reaches the network</string>
     <string name="approval_reason_external_fs">The call reads outside the workspace</string>
     <string name="approval_reason_generic">This tool call needs your confirmation</string>
+
+    <!-- 手动保存与冲突解决（WRI-011） -->
+    <string name="save_resolved">Resolved — save</string>
+    <string name="conflict_hint">Conflict: edit the markers below, then tap "Resolved — save"</string>
 </resources>

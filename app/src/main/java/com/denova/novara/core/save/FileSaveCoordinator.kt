@@ -35,8 +35,19 @@ sealed interface SaveOutcome {
      */
     data class MergedAndSaved(val revision: String, val mergedText: String) : SaveOutcome
 
-    /** 发生冲突且无法自动合并，返回含冲突标记的文本。 */
-    data class Conflict(val mergedText: String, val conflictCount: Int, val serverRevision: String) : SaveOutcome
+    /**
+     * 发生冲突且无法自动合并，返回含冲突标记的文本。
+     *
+     * [serverContent] 是合并所用的服务器当前内容：调用方必须把它记为新的 base，
+     * 否则「解决冲突后保存」会拿带标记的合并结果当 base，既不等于服务器内容，
+     * 也会让下一次三方合并算错（WRI-011）。
+     */
+    data class Conflict(
+        val mergedText: String,
+        val conflictCount: Int,
+        val serverRevision: String,
+        val serverContent: String,
+    ) : SaveOutcome
 
     /** 非冲突错误（网络/权限等）。 */
     data class Error(val exception: DenovaApiException) : SaveOutcome
@@ -99,7 +110,7 @@ class FileSaveCoordinator(
                     SaveOutcome.MergedAndSaved(resp.revision, merged.text)
                 }
                 is MergeResult.Conflicts -> {
-                    SaveOutcome.Conflict(merged.text, merged.conflictCount, theirs.revision)
+                    SaveOutcome.Conflict(merged.text, merged.conflictCount, theirs.revision, serverContent)
                 }
             }
         } catch (e: CancellationException) {
