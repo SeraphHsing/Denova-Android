@@ -16,6 +16,7 @@ import com.denova.novara.core.stream.GameStageReducer
 import com.denova.novara.core.stream.GameStageState
 import com.denova.novara.core.stream.GameStreamError
 import com.denova.novara.core.stream.GameStreamEvent
+import com.denova.novara.core.stream.DrawLatencyMeter
 import com.denova.novara.core.stream.GameStreamRecoveryCoordinator
 import com.denova.novara.core.stream.NarrativeBuilder
 import com.denova.novara.core.stream.RehydrateRequest
@@ -72,6 +73,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val narrative = NarrativeBuilder()
     private val pendingChunks = StringBuilder()
     private var flushJob: Job? = null
+
+    // 「事件接收 → 投影可见」延迟采样（gfxinfo 在本机不可用，改用直接埋点）。
+    private val drawLatency = DrawLatencyMeter()
+    @Volatile
+    private var lastEventNanos = 0L
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -143,6 +149,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         perfMaxNanos = 0
         perfFlushCount = 0
         perfCharsPerFlush = 0
+        drawLatency.reset()
+        lastEventNanos = 0
         sendJob = viewModelScope.launch {
             commands.save(record) // 本地事务先落盘
             try {
@@ -229,6 +237,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             else -> _uiState.value = current.copy(stage = stage, connected = true, error = null)
         }
 
+        lastEventNanos = System.nanoTime()
+
         val costNanos = System.nanoTime() - startNanos
         perfEventCount++
         perfTotalNanos += costNanos
@@ -270,6 +280,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** 叙事面板完成一次绘制：结算「最近事件接收 → 可见」的延迟。 */
+    fun onNarrativeDrawn() {
+        val last = lastEventNanos
+        if (last == 0L) return
+        lastEventNanos = 0L
+        drawLatency.add((System.nanoTime() - last) / 1_000_000)
+        if (drawLatency.size % 64 == 0) {
+            DenovaLog.i("GamePerf", "latency ${drawLatency.summary()}")
+        }
+    }
+
     /** 丢弃未发布的 chunk（checkpoint/rehydrate 会整段重建，避免旧增量串进新基线）。 */
     private fun dropPendingChunks() {
         flushJob?.cancel()
@@ -280,6 +301,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     /** 流结束：若仍停在运行中，说明没收到 terminal 事件（流异常中断），标记断开。 */
     private fun finishStream() {
         flushPendingChunks()
+        // 结束时无条件落一次延迟汇总，避免仅依赖周期性打点而丢失指标。
+        DenovaLog.i("GamePerf", "latency(final) ${drawLatency.summary() ?: "n=0"}")
         val current = _uiState.value
         val stage = if (current.stage.phase == GamePhase.RUNNING) {
             current.stage.copy(phase = GamePhase.ERROR, activity = GameActivity.IDLE, streamFailed = true)

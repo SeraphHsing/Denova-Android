@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -132,6 +133,9 @@ private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifie
         return
     }
     // reverseLayout：新块追加后视图天然锚定底部，无需每次 flush 调 scrollToItem。
+    // 每次成功重组后结算「事件接收 → 投影可见」延迟（D03 指标埋点）。
+    // 用 SideEffect 而非 drawWithContent：LazyColumn 增量追加时整节点不一定重绘。
+    SideEffect { viewModel.onNarrativeDrawn() }
     LazyColumn(
         reverseLayout = true,
         modifier = modifier
