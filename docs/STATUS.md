@@ -1,7 +1,7 @@
 # 项目状态
 
 **更新日期：** 2026-10-24  
-**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六个高风险原型均已出真机结论：G4 / G5 判据齐备，G6 通过（范围受限 SD-01）；**G1 / G2 / G3 仍各缺退出条件项**（见「未完成 / 尚未验证」），因此 P1 尚未整体退出。复刻矩阵 118 条**全部保持 `未开始`**——按 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准) 的回写时机，只有确认完成实现的行才登记；**尚未进入 P2**。  
+**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六个高风险原型均已出真机结论：G4 / G5 判据齐备，G6 通过（范围受限 SD-01）；**G1 / G2 / G3 仍各缺退出条件项**（见「未完成 / 尚未验证」），因此 P1 尚未整体退出。复刻矩阵按「P0–P1 已实现并验证」回写 **6 条 `已完成`**（WRI-004 / WRI-010 / AGT-002 / WB-004 / WB-007 / WB-009），其余 112 条 `未开始`，口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；**尚未进入 P2**。  
 **产品实现状态：** P1 原型链路可用（连接认证 / 编辑器 / 游戏流 / 写作流 / 终端）；目标形态的公共界面（单 Activity 导航、左右抽屉、DesignTokens、主题与中英文）和业务页面尚未实现。
 
 ## 当前基线
@@ -73,25 +73,31 @@
 
 - 2026-10-24 G6 第 6 轮（范围决定 SD-01 通过，G6 收口）：用户（Hsing）确认 [SD-01](android-web-parity/07-evidence-and-decisions.md#范围决定scope-decision)——Web 挂载工作台回收所有 `attached=0` 且不在其持久化标签中的会话属固定基线行为，Android 侧不作对抗；Android 保证不静默重建空 PTY、7–25s 内如实提示、只 DELETE 自身会话、被回收后保留最近 64KB 只读历史（B）、进程被杀重启免登录并秒级重挂（C，[ADR-12](android-web-parity/07-evidence-and-decisions.md#3-架构决定)）。范围仅限终端 PTY 生命周期。据此 **G6 记为「通过（范围受限）」**，`05` G6 行与 `07` 均已引用 SD-01。遗留（不阻塞 G6）：多端 resize 冲突协商、R05 远程权限表现（P4-D）。
 
-- 2026-10-24 状态文档校正（纯文档）：把首行阶段描述改为「G4/G5 判据齐备、G6 范围受限通过、G1/G2/G3 仍缺退出条件项、尚未进入 P2」，重写「下一步顺序」，修正 `README.md` 项目状态段，消除与实现进度矛盾的说法。**矩阵未回写**：曾按 P1 原型覆盖度登记 33 行「部分实现」，按「矩阵只在确认完成实现时回写」的裁定（[01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)）已全部撤销，118 条恢复 `未开始`；P1 的进展只保留在本节记录里。
+- 2026-10-24 状态文档校正与矩阵回写（纯文档）：把首行阶段描述改为「G4/G5 判据齐备、G6 范围受限通过、G1/G2/G3 仍缺退出条件项、尚未进入 P2」，重写「下一步顺序」，修正 `README.md` 项目状态段，并把「未完成 / 尚未验证」表里混入的已通过项（G5 / G6 / 工程 / CI）移入已完成表。矩阵按「P0–P1 已实现并验证」回写 **6 条 `已完成`**（WRI-004 富文本源码往返、WRI-010 自动保存、AGT-002 发送与回执、WB-004 文件打开编辑保存、WB-007 终端创建与屏幕、WB-009 终端关闭与共存），每行写入实现位置、证据与范围说明；其余 112 条保持 `未开始`。此前按原型覆盖度登记 33 行「部分实现」的做法已撤销（[01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)）。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
+## 已完成（退出条件满足）
+
+| 项目 | 结论 | 证据 / 遗留 |
+|---|---|---|
+| Android 工程 | 已创建；固定 JDK17、AGP 9.3.0（内置 Kotlin）、Gradle Wrapper 9.5.1、Compose 编译器插件 2.4.21、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26 | 本地 `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿（APK 11MB） |
+| CI 与 APK | GitHub Actions 全绿，APK 工件 `novara-debug-apk` 上传成功 | 运行构建、测试、Lint 并保存报告与工件 |
+| G4 Agent / Game 流恢复 | 两套流均真机端到端通过（发送→流→done→断线/后台恢复）；命令持久化与发送边界、流空闲兜底、canonical 历史重建已接入；D03 预算 2026-10-24 评审通过（评审人 Hsing） | 遗留：跨包（升级安装）维度未单独验证。过程记录见本文「已完成」历次条目，证据 `docs/evidence/g4-d03-performance/` |
+| G5 原生终端 | 真机端到端通过（创建/复用、输入、中文、ANSI、全屏、Ctrl-C、resize、回看、重连同一 PTY、exit、关闭释放）；D03-P 预算 2026-10-24 评审通过（评审人 Hsing） | 证据 `docs/evidence/g5-terminal/`、`docs/evidence/g5-d03p-performance/` |
+| G6 远程与双端共存 | 通过（范围受限 [SD-01](android-web-parity/07-evidence-and-decisions.md#范围决定scope-decision)，决定人 Hsing）：不静默重建空 PTY、7–25s 如实提示、只释放自身会话、被回收后保留 64KB 只读历史、进程被杀免登录重挂 | 证据 `docs/evidence/g6-dual-client/`；遗留：多端 resize 冲突协商、R05 远程权限表现（P4-D） |
+
 ## 未完成 / 尚未验证
 
-| 项目 | 当前状态 | 退出条件 |
+| 项目 | 已达成（P0 或 P1 原型） | 缺口（退出条件） |
 |---|---|---|
-| Web 与服务端运行基线 | 部分完成：已登记 `http://192.168.2.102:18081`、版本 0.6.3、commit `85ec97c`、隔离账号（本地保存）；Web 基线已升级至 `85ec97c`（与服务端一致） | 补数据快照与复现步骤 |
-| 全量页面与字段盘点 | 部分完成；118 条为首批场景 | 展开每个页面、控件、字段、状态、权限与条件入口并冻结范围 |
-| API 契约 | 281 条已按 85ec97c 重提取；handler→DTO 契约已按族核对（认证/写作/Agent流/游戏流/设置模型/终端/长尾族） | 逐字段嵌套 DTO 与双端读回验证在 P1 按需展开 |
-| Android 工程 | 已创建；本地 + CI `testDebugUnitTest`/`lintDebug`/`assembleDebug` 全绿（APK 11MB） | 固定 JDK17、AGP 9.3.0（内置 Kotlin）、Gradle Wrapper 9.5.1、Compose 编译器插件 2.4.21、Compose BOM 2026.09.00、compileSdk/targetSdk 37、minSdk 26；CI 构建通过 |
-| G1 认证与网络 | 完成：连接 + status + 登录 + 退出 已真机真实往返通过；DataStore 服务器地址持久化完成 | 配对、受保护图片、SSE、WS、HTTPS/WSS、迟到 401 完成真实往返 |
-| G2 Markdown 编辑器 | 两轮完成：序列化层（commonmark 0.30.0 + GFM 表格，8 测试）+ 源码/富文本/预览三模式；富文本 = 标记隐藏(零宽替换) + 内联样式 + 格式化工具栏，纯逻辑层 4 测试；本地 + CI 全绿；真机验证富文本渲染 | 图片/表格编辑、中文 IME、选区增强、D03 性能预算 |
-| G3 保存并发 | 三轮完成：三方合并 `ThreeWayMerge`（diff3，5 测试）+ 文件读写 revision 校验 + 本地草稿 `DraftStore` + 保存编排 `FileSaveCoordinator`（Mutex 串行，3 测试）+ 编辑器 UI 集成（`EditorViewModel` 打开文件/防抖自动保存/冲突提示 + `EditorScreen` 项目ID/路径输入 + 保存状态）；本地 26 测试 + CI 全绿；真机两次完整保存周期（插入空格→已保存→revision 递增→删除→再保存→恢复） | 真机并发（双端编辑触发 409→合并）、迟到回包、进程恢复实测 |
-| G4 Agent / Game 流恢复 | **两套流均真机端到端通过**：Game 发送→流→done→断线恢复；Agent 写作发送→流式累积→done。命令持久化、流空闲兜底、Agent canonical 历史重建均已接入。流式渲染已改造（增量分块 + 60ms 合批 + 重组隔离 + reverseLayout）；D03 预算**已冻结并回填 [06 §4](android-web-parity/06-development-and-validation.md#d03-性能基准与冻结记录)**：可见延迟 p95 ≤ 50ms / p99 ≤ 80ms、投影 ≤ 2ms、PSS 增量 ≤ 60MB、恢复至可操作 ≤ 1000ms、全量历史就绪 ≤ 4000ms。实测：真机 p95 24ms / **恢复至可操作 488ms** / 全量 2878ms、Web 基线 10ms、模拟器 12ms；**后台恢复用例通过**（HOME 30s 保留内容、活跃流 40s 后回前台自动重挂）。**D03 预算已于 2026-10-24 评审通过（评审人 Hsing）**，Web harness 与模拟器软渲染仅作参照、不入判据。G4 三条判据（双流恢复 / 命令持久化与发送边界 / D03 预算）均已具备证据；仅「跨包（升级安装）」维度未单独验证 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
-| G5 原生终端 | 四轮完成，**真机端到端通过**（小米 14 Pro）：终端内核（`TerminalScreen` + `AnsiParser`，16 测试）、连接层（`TerminalConnection` + 四端点 + 尺寸时序 + owner 复用）、WS 生命周期（心跳 25s / 空闲看门狗 45s / `exit` 收尾 / 指数退避重挂同一 PTY）与渲染（SGR run 归并 + 光标 + 滚动回看 + 回到底部）。真机验证：真实 shell 提示符、`echo` 回显、`cat` 中文正文正确、`stty size` 与画布一致、Ctrl-C、回看 +30/629 行、断网重连同一 session 回放历史、`exit` 不重连、关闭会话服务端释放。证据 `docs/evidence/g5-terminal/xiaomi-14-pro/result.md`。**D03-P 已实测并冻结**（第 4 轮：6 轮 × 300s，输出 p95 39ms / 输入最大 57ms / 丢帧 0 / PSS +21.3MB），证据 `docs/evidence/g5-d03p-performance/xiaomi-14-pro/result.md`；本地 181 测试 + Lint + Debug 全绿。**G5 判据齐备**（D03-P 预算 2026-10-24 评审通过｜评审人 Hsing） | G6 跨客户端 owner 共存 |
-| G6 远程权限与双端共存 | **通过（范围受限 SD-01，2026-10-24 决定人 Hsing）**：契约已按后端源码固定；Android 侧 3 场景通过（双端共享输出 `attached`1→2、另一端 DELETE 后 7–9s 如实提示且不静默重建、ownerConflict 立即停手）并修复 3 项问题；但**真实 Chrome 挂载「工作台」时会 DELETE 所有 `attached=0` 且不在其持久化标签里的会话，不区分 owner/项目**，实测直接删掉了 `owner=android-main` 的 Android PTY（07 R06 由推测转为确认）。证据 `docs/evidence/g6-dual-client/xiaomi-14-pro/result.md`。**时序排查（第 3 轮）**：切页回编辑器 `attached` 保持 1（0 窗口）、回前台 2s 内自动重挂；但 HOME 后 30s 即 `attached=0`（进程被冻结，客户端无任何日志），后台窗口随时长线性变长，进程被杀后窗口更长（Cookie 仅在内存，重启需重新登录）。即「靠时序绕开」的上限已探明。**第 5 轮已按决定落地 B+C**（`CookieStore` 持久化登录 Cookie：force-stop 重启免登录直接进编辑器；`TerminalHistory` 64KB 历史快照 + 「查看历史」只读回放：会话被对端删除后仍能看到 `echo B_SNAPSHOT_OK` 与输出），196 测试全绿 | 收口依据 [SD-01](android-web-parity/07-evidence-and-decisions.md#范围决定scope-decision)：Web 挂载工作台回收 `attached=0` 会话属基线行为、Android 不作对抗，改以只读历史（B）+ 免登录秒级重挂（C）降低损失；B+C 不改变基线行为，故按范围受限记通过。遗留：多端 resize 冲突处理、R05 远程权限表现（P4-D） |
-| CI 与 APK | 已配置并通过（GitHub Actions 全绿，APK 工件 `novara-debug-apk` 上传成功） | GitHub Actions 运行构建、测试、Lint 并保存报告与 APK 工件 |
+| Web 与服务端运行基线 | 已登记 `http://192.168.2.102:18081`、版本 0.6.3、commit `85ec97c`、隔离账号（本地保存）；Web 基线已升级并与之对齐 | 补数据快照与复现步骤 |
+| 全量页面与字段盘点 | 118 条首批场景、14 个顶层表面（08） | 展开每页控件、字段、状态、权限与条件入口并冻结范围 |
+| API 契约 | 281 条已按 `85ec97c` 重提取；handler→DTO 已按族核对（认证/写作/Agent流/游戏流/设置模型/终端/长尾族） | 逐字段嵌套 DTO 与双端读回验证（P1 按需展开） |
+| G1 认证与网络 | 连接 + status + 登录 + 退出已真机真实往返；DataStore 服务器地址持久化；持久化 Cookie 免登录 | 配对不重复消费、受保护图片、HTTPS/WSS、迟到 401 不顶掉新登录、退出时保留进行中读取 |
+| G2 Markdown 编辑器 | 序列化层（commonmark + GFM 表格，8 测试）+ 源码/富文本/预览三模式 + 标记隐藏与格式化工具栏（4 测试）；真机渲染通过 | 图片/表格编辑、中文 IME 组合态、选区增强、D03-W 编辑器性能预算实测 |
+| G3 保存并发 | 三方合并 `ThreeWayMerge`（5 测试）+ revision 校验 + `DraftStore` + `FileSaveCoordinator`（3 测试）+ 编辑器 UI 集成；真机单端两次完整保存周期 | 双端 409 并发实测、迟到回包、草稿事务提交前后终止进程 |
+
 
 ## 下一步顺序
 
@@ -100,8 +106,8 @@
 3. **补 G1 判据：** pair 不重复消费、受保护图片资源读取（需先补图片加载实现）、迟到 401 不顶掉新登录（需请求世代/退休机制，与 P2 的请求基础设施一并做）、HTTPS / WSS 真实往返（需具备 TLS 的服务端部署）。
 4. **P1 退出门槛：** 上述三项通过后，按 [05 §3](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据) 补齐每个关卡的录屏/截图证据（目前 G1–G3 只在 `STATUS.md` 有文字记录，无 `docs/evidence/` 目录）。
 5. **P2 工程基础：** AppContainer、单 Activity 导航、共享顶栏与左右抽屉、DesignTokens、主题与中英文、Room 草稿与命令身份、错误模型与请求退休机制；退出验证按 [05 §4](android-web-parity/05-roadmap.md#4-p2工程基础与公共界面)。
-6. **P3 起：** 按 [05 §5–§6](android-web-parity/05-roadmap.md#5-p3第一条完整写作链路) 铺开第一条完整写作链路与各业务模块；矩阵中 93 条 `未开始` 随页面实现逐条落地。
-7. **遗留（不阻塞 P1 收口）：** 矩阵中 118 条首批场景仍需在 P2/P3 期间按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
+6. **P3 起：** 按 [05 §5–§6](android-web-parity/05-roadmap.md#5-p3第一条完整写作链路) 铺开第一条完整写作链路与各业务模块；矩阵中 112 条 `未开始` 随页面实现逐条落地，确认完成后再回写。
+7. **遗留（不阻塞 P1 收口）：** 其余 112 条首批场景仍需在 P2/P3 期间按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
 
 ## 状态记录规则
 
