@@ -49,13 +49,19 @@ fun EditorScreen(
     onOpenRightDrawer: () -> Unit,
     onOpenTerminal: (String) -> Unit,
     onLogout: () -> Unit,
+    currentProjectId: String = "",
     onProjectIdChange: (String) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var mode by remember { mutableStateOf(EditorMode.SOURCE) }
-    var projectId by remember { mutableStateOf("") }
+    var projectId by remember { mutableStateOf(currentProjectId) }
     var filePath by remember { mutableStateOf("") }
     var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
+
+    // 书籍切换（当前项目切换）后同步项目 ID 到输入框。
+    LaunchedEffect(currentProjectId) {
+        if (currentProjectId.isNotEmpty()) projectId = currentProjectId
+    }
 
     // D03-W 埋点：本组合已提交绘制，结算「最后一次按键 → 可见」延迟。
     SideEffect { EditorPerf.markDraw() }

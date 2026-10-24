@@ -46,6 +46,7 @@ import com.denova.novara.feature.editor.EditorScreen
 import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.feature.game.GameScreen
 import com.denova.novara.feature.game.GameViewModel
+import com.denova.novara.feature.bookshelf.BookShelfViewModel
 import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.shell.AppDrawer
@@ -80,12 +81,14 @@ class MainActivity : AppCompatActivity() {
                 val agentViewModel: AgentViewModel = viewModel(factory = container.viewModelFactory)
                 val terminalViewModel: TerminalViewModel = viewModel(factory = container.viewModelFactory)
                 val projectDirectoryViewModel: ProjectDirectoryViewModel = viewModel(factory = container.viewModelFactory)
+                val bookShelfViewModel: BookShelfViewModel = viewModel(factory = container.viewModelFactory)
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val state by connectionViewModel.state.collectAsState()
                 val projectState by projectDirectoryViewModel.state.collectAsState()
+                val bookState by bookShelfViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
                 var showRightDrawer by remember { mutableStateOf(false) }
-                // 当前编辑项目：编辑器输入框同步，供右抽屉项目目录加载。
+                // 当前编辑项目：书籍切换或编辑器输入框同步，供右抽屉项目目录加载。
                 var currentProjectId by remember { mutableStateOf("") }
                 val navController = rememberNavController()
                 val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -103,6 +106,8 @@ class MainActivity : AppCompatActivity() {
                                     agentViewModel.bindClient(client)
                                     terminalViewModel.bindClient(client)
                                     projectDirectoryViewModel.bindClient(client)
+                                    bookShelfViewModel.bindClient(client)
+                                    bookShelfViewModel.load()
                                 }
                             }
                             ModalNavigationDrawer(
@@ -115,6 +120,13 @@ class MainActivity : AppCompatActivity() {
                                             onToggleDarkTheme = { settingsViewModel.toggleDarkTheme() },
                                             language = language,
                                             onSelectLanguage = { settingsViewModel.setLanguage(it) },
+                                            books = bookState.books,
+                                            currentProjectId = currentProjectId.ifBlank { null },
+                                            onSelectBook = { book ->
+                                                currentProjectId = book.projectId
+                                                bookShelfViewModel.select(book)
+                                                scope.launch { drawerState.close() }
+                                            },
                                         ) { destination ->
                                             scope.launch { drawerState.close() }
                                             navController.navigate(destination.route) {
@@ -139,6 +151,7 @@ class MainActivity : AppCompatActivity() {
                                                 navController.navigate("terminal/$projectId")
                                             },
                                             onLogout = { connectionViewModel.logout() },
+                                            currentProjectId = currentProjectId,
                                             onProjectIdChange = { currentProjectId = it },
                                         )
                                     }

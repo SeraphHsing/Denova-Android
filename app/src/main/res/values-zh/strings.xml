@@ -43,4 +43,8 @@
     <string name="loading">加载中…</string>
     <string name="project_directory_hint">先在编辑器输入项目 ID</string>
     <string name="project_directory_empty">目录为空</string>
+
+    <!-- 书籍切换（P3） -->
+    <string name="current_book">当前书籍</string>
+    <string name="book_empty">暂无书籍</string>
 </resources>

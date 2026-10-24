@@ -43,4 +43,8 @@
     <string name="loading">Loading…</string>
     <string name="project_directory_hint">Enter a project ID in the editor first</string>
     <string name="project_directory_empty">No files</string>
+
+    <!-- 书籍切换（P3） -->
+    <string name="current_book">Current book</string>
+    <string name="book_empty">No books</string>
 </resources>

@@ -299,6 +299,18 @@ class DenovaClient(
         }
     }
 
+    /** 书架（书籍 == 工作区）：`GET /api/books`。 */
+    suspend fun bookshelf(): BookshelfResponse {
+        val request = Request.Builder().url(server.baseUrl + "/api/books").get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, body)
+                json.decodeFromString(BookshelfResponse.serializer(), body)
+            }
+        }
+    }
+
     override suspend fun active(storyId: String, branchId: String): GameActiveView {
         val request = Request.Builder().url(interactiveActiveUrl(storyId, branchId)).get().build()
         return withContext(Dispatchers.IO) {

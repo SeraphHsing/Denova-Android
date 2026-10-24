@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.core.network.BookRecord
 
 /** 一级目的地（对齐 01 §3 导航顺序；写作/游戏并排入口，设置位于末尾）。 */
 data class AppDestination(
@@ -57,6 +58,9 @@ fun AppDrawer(
     onToggleDarkTheme: () -> Unit,
     language: String,
     onSelectLanguage: (String) -> Unit,
+    books: List<BookRecord>,
+    currentProjectId: String?,
+    onSelectBook: (BookRecord) -> Unit,
     onNavigate: (AppDestination) -> Unit,
 ) {
     Column(
@@ -70,6 +74,36 @@ fun AppDrawer(
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp),
         )
+        HorizontalDivider()
+        // 当前书籍切换（P3 链路起点）：选择后作为编辑器 / 项目目录的工作区。
+        Text(
+            stringResource(R.string.current_book),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        )
+        if (books.isEmpty()) {
+            Text(
+                stringResource(R.string.book_empty),
+                color = MaterialTheme.colorScheme.outline,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        } else {
+            books.forEach { book ->
+                val selected = book.projectId == currentProjectId
+                TextButton(onClick = { onSelectBook(book) }, modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            book.name,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                        )
+                        if (selected) Text("✓", color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
         HorizontalDivider()
         appDestinations.forEach { destination ->
             val selected = destination.route == currentRoute
