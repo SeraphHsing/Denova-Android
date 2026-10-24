@@ -123,9 +123,18 @@ class MainActivity : AppCompatActivity() {
                                             books = bookState.books,
                                             currentProjectId = currentProjectId.ifBlank { null },
                                             onSelectBook = { book ->
-                                                currentProjectId = book.projectId
-                                                bookShelfViewModel.select(book)
-                                                scope.launch { drawerState.close() }
+                                                scope.launch {
+                                                    // 对齐 Web onBeforeWorkspaceSwitch：先 flush 编辑器草稿
+                                                    if (!editorViewModel.flush()) {
+                                                        DenovaLog.w("BookShelf", "flush failed, abort switch")
+                                                        return@launch
+                                                    }
+                                                    // 服务端切换成功后才更新客户端当前项目
+                                                    if (bookShelfViewModel.switch(book)) {
+                                                        currentProjectId = book.projectId
+                                                        drawerState.close()
+                                                    }
+                                                }
                                             },
                                         ) { destination ->
                                             scope.launch { drawerState.close() }

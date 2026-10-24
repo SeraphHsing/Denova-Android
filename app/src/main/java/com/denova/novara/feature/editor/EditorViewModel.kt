@@ -85,4 +85,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun resolveConflict() {
         session?.resolveConflict()
     }
+
+    /** 切换书籍前 flush 编辑器草稿（保存并等待）；false 表示保存失败/冲突，应中止切换。 */
+    suspend fun flush(): Boolean = session?.flush() ?: true
 }

@@ -246,4 +246,48 @@ class EditorSessionTest {
         assertNotNull(r.state.conflictText)
         assertTrue(r.state.content.contains("<<<<<<< 本地修改"))
     }
+
+    // ---- flush（切换书籍 / 导航前保存草稿） ----
+
+    @Test
+    fun `flush without edits returns true and skips save`() = runTest {
+        val remote = FakeRemote()
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this)
+        session.open("p", "f.md", "base", "r0")
+        assertTrue(session.flush())
+        assertEquals(0, remote.saveCount())
+    }
+
+    @Test
+    fun `flush with edits saves and returns true`() = runTest {
+        val remote = FakeRemote()
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this)
+        session.open("p", "f.md", "base", "r0")
+        session.edit("base edited")
+        assertTrue(session.flush())
+        assertEquals("base edited", remote.serverContent)
+        assertEquals(SaveStatus.SAVED, session.state.value.saveStatus)
+    }
+
+    @Test
+    fun `flush during conflict returns false and does not resave`() = runTest {
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二服务器\n段落三\n结尾"
+            serverRevision = "r2"
+        }
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this)
+        val base = "标题\n段落一\n段落二\n段落三\n结尾"
+        val ours = "标题\n段落一\n段落二本地\n段落三\n结尾"
+        session.open("p", "f.md", base, "r0")
+        session.edit(ours)
+        advanceUntilIdle()
+        assertEquals(SaveStatus.CONFLICT, session.state.value.saveStatus)
+        val savesBefore = remote.saveCount()
+        assertFalse(session.flush())
+        assertEquals(savesBefore, remote.saveCount())
+    }
 }

@@ -22,3 +22,13 @@ data class BookshelfResponse(
     val books: List<BookRecord> = emptyList(),
     @SerialName("sort_mode") val sortMode: String = "recent",
 )
+
+/** 切换服务端当前工作区：`POST /api/workspace/switch` body `{path}`。 */
+@Serializable
+data class WorkspaceSwitchRequest(val path: String)
+
+@Serializable
+data class WorkspaceSwitchResponse(
+    val workspace: String = "",
+    val message: String = "",
+)

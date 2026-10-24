@@ -195,6 +195,20 @@ class EditorSession(
         saveJob = scope.launch { performSave() }
     }
 
+    /**
+     * 切换书籍 / 导航前 flush：保存当前未提交编辑并等待完成。
+     * 返回 false 表示保存失败或冲突未解决，调用方应中止切换，避免丢数据。
+     */
+    suspend fun flush(): Boolean {
+        val s = _state.value
+        if (!s.loaded) return true
+        if (s.saveStatus == SaveStatus.CONFLICT) return false
+        if (s.content == s.baseContent) return true
+        saveJob?.cancel()
+        performSave()
+        return _state.value.saveStatus == SaveStatus.SAVED || _state.value.saveStatus == SaveStatus.MERGED
+    }
+
     fun resolveConflict() {
         _state.value = _state.value.copy(conflictText = null, saveStatus = SaveStatus.IDLE)
         saveNow()

@@ -51,11 +51,26 @@ class BookShelfViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun select(book: BookRecord) {
-        _state.value = _state.value.copy(
-            currentProjectId = book.projectId,
-            currentBookName = book.name,
-        )
-        DenovaLog.i("BookShelf", "selected name=${book.name} project=${book.projectId}")
+    /**
+     * 切换书籍：先调服务端 `POST /api/workspace/switch`，成功后再更新客户端当前书籍。
+     * 返回 false 表示服务端切换失败（客户端保持原状态，不假装已切换）。
+     */
+    suspend fun switch(book: BookRecord): Boolean {
+        val c = client ?: return false
+        return try {
+            val resp = c.switchWorkspace(book.path)
+            val nextWorkspace = resp.workspace.ifBlank { book.path }
+            _state.value = _state.value.copy(
+                currentProjectId = book.projectId,
+                currentBookName = book.name,
+                error = null,
+            )
+            DenovaLog.i("BookShelf", "switched name=${book.name} project=${book.projectId} workspace=$nextWorkspace")
+            true
+        } catch (e: Exception) {
+            DenovaLog.w("BookShelf", "switch failed name=${book.name}", e)
+            _state.value = _state.value.copy(error = e.message ?: "切换失败")
+            false
+        }
     }
 }

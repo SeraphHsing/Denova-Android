@@ -311,6 +311,25 @@ class DenovaClient(
         }
     }
 
+    /**
+     * 切换服务端当前工作区（书籍切换的前置）：`POST /api/workspace/switch`。
+     * 对齐 Web `handleQuickWorkspaceSwitch`——客户端状态更新前必须先让服务端切到目标 workspace。
+     */
+    suspend fun switchWorkspace(path: String): WorkspaceSwitchResponse {
+        val body = json.encodeToString(WorkspaceSwitchRequest.serializer(), WorkspaceSwitchRequest(path))
+        val request = Request.Builder()
+            .url(server.baseUrl + "/api/workspace/switch")
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(WorkspaceSwitchResponse.serializer(), text)
+            }
+        }
+    }
+
     override suspend fun active(storyId: String, branchId: String): GameActiveView {
         val request = Request.Builder().url(interactiveActiveUrl(storyId, branchId)).get().build()
         return withContext(Dispatchers.IO) {
