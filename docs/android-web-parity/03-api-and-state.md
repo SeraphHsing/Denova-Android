@@ -143,6 +143,7 @@ Content-Type: application/json
 **项目文件 `files/*`**
 - `GET /files/file?path=&optional=`：缺 `path` → `400 pathMissing`；`optional=true` 且文件不存在 → `200 {project_id, path, found:false}`；存在 → `{project_id, path, found:true, document}`；否则返回 document。
 - `PUT /files/file`：body `{path, content, base_revision}`；空 path → `400 pathContentRequired`；成功 `{project_id, path, revision, changed, message}`。
+  - `base_revision` **必填**：空串 → `400 invalid_edit`（`field=base_revision`，`base_revision is required`）。**新建文件时传字面量 `"missing"`**（否则 `409 revision_conflict`，`details.actual_revision="missing"`）；覆盖已有文件传 `GET ?optional=true` 返回的 `document.revision`（形如 `sha256:<hex>`，即内容哈希）。2026-10-24 实测确认。
 - `GET /files/asset?path=`：二进制 + Range（`206`）；响应头 `Cache-Control: no-cache`、`X-Content-Type-Options: nosniff`、`Accept-Ranges: bytes`。
 - `POST /files/resolve`：body `{targets}`；空 targets → `400 resolveTargetsRequired`。
 - `POST /files/operations`：body `{operations}`；成功 `{project_id, results:[{id,kind,ok,path,code?,error?}]}`；空 → `400 operationsRequired`。
