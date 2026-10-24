@@ -121,6 +121,14 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * SSE 长连接专用客户端：不设读超时（LLM 生成期间可能长时间无字节），
+     * 复用同一连接池与 Cookie 会话。普通请求仍用 [okHttpClient]（30s 读超时）。
+     */
+    private val streamHttpClient: OkHttpClient by lazy {
+        okHttpClient.newBuilder().readTimeout(0, TimeUnit.SECONDS).build()
+    }
+
     suspend fun status(): AuthStatusResponse {
         val request = Request.Builder().url(server.baseUrl + "/api/auth/status").get().build()
         return withContext(Dispatchers.IO) {
@@ -227,7 +235,7 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
             .url(interactiveStreamUrl(storyId, branchId, taskId, after))
             .get()
             .build()
-        okHttpClient.newCall(request).execute().use { resp ->
+        streamHttpClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) {
                 throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
             }
@@ -266,7 +274,7 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
             .url(interactiveSendUrl())
             .post(body.toRequestBody(jsonMediaType))
             .build()
-        okHttpClient.newCall(req).execute().use { resp ->
+        streamHttpClient.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful) {
                 throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
             }
@@ -283,7 +291,7 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
      */
     fun agentStream(taskId: String, after: String?): Flow<AgentUiFrame> = flow {
         val request = Request.Builder().url(agentStreamUrl(taskId, after)).get().build()
-        okHttpClient.newCall(request).execute().use { resp ->
+        streamHttpClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) {
                 throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
             }

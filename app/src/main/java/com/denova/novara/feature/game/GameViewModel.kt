@@ -10,6 +10,7 @@ import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.SendInteractiveChatRequest
 import com.denova.novara.core.stream.GameEventType
+import com.denova.novara.core.stream.GamePhase
 import com.denova.novara.core.stream.GameStageReducer
 import com.denova.novara.core.stream.GameStageState
 import com.denova.novara.core.stream.GameStreamError
@@ -80,7 +81,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             c.recover(storyId, branchId).collect { event ->
                 onEvent(event)
             }
-            _uiState.value = _uiState.value.copy(connected = false)
+            finishStream()
         }
     }
 
@@ -125,15 +126,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     commands.updateStatus(commandId, CommandStatus.ACCEPTED)
                     _uiState.value = _uiState.value.copy(sending = false)
                 }
+                finishStream()
             } catch (e: GameStreamError) {
                 val rejected = e.status in 400..499 && e.code != null && e.code != "agent_runtime.stream_attached"
                 commands.updateStatus(commandId, if (rejected) CommandStatus.REJECTED else CommandStatus.UNCERTAIN)
                 DenovaLog.w("Game", "send failed code=${e.code} status=${e.status}")
-                _uiState.value = _uiState.value.copy(sending = false, error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.message)
+                finishStream()
             } catch (e: Exception) {
                 commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
                 DenovaLog.w("Game", "send uncertain", e)
-                _uiState.value = _uiState.value.copy(sending = false, error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.message)
+                finishStream()
             }
         }
     }
@@ -162,6 +166,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _uiState.value = current.copy(stage = stage, narrative = narrative, connected = true, error = null)
+    }
+
+    /** 流结束：若仍停在运行中，说明没收到 terminal 事件（流异常中断），标记断开。 */
+    private fun finishStream() {
+        val current = _uiState.value
+        val stage = if (current.stage.phase == GamePhase.RUNNING) {
+            current.stage.copy(phase = GamePhase.ERROR, streamFailed = true)
+        } else {
+            current.stage
+        }
+        _uiState.value = current.copy(stage = stage, connected = false, sending = false)
     }
 
     private suspend fun loadBaseline(storyId: String, branchId: String) {
