@@ -420,6 +420,21 @@ class DenovaClient(
         }
     }
 
+    /** 变更分组详情（含每个文件的 before/after 正文与评论）：`GET .../changes/groups/:id`。 */
+    suspend fun changeGroup(projectId: String, groupId: String): WorkspaceChangeGroup {
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/changes/groups/$groupId")
+            .build()
+        val request = Request.Builder().url(url).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(ChangeGroupResponse.serializer(), text).group
+            }
+        }
+    }
+
     /** 审阅变更分组：`POST .../changes/groups/:gid/review` body `{decision}`。 */
     suspend fun reviewChangeGroup(projectId: String, groupId: String, decision: String): WorkspaceChangeMutationResult =
         postChangeMutation(

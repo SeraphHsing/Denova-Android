@@ -297,6 +297,8 @@ class MainActivity : AppCompatActivity() {
                                                     changesViewModel.load(currentProjectId, force = true)
                                                 }
                                             },
+                                            onOpen = changesViewModel::openGroup,
+                                            onCloseDetail = changesViewModel::closeDetail,
                                         )
                                     }
                                 }
