@@ -47,7 +47,7 @@
 |---|---|---|---|---|---|
 | G1 认证与网络 | 通过（降级：HTTP / WS 与配对已闭环，HTTPS/WSS 环境受限、迟到 401 留待 P3） | 2 | 1 | 1 | [G1 证据](../evidence/g1-auth/xiaomi-14-pro/result.md) |
 | G2 Markdown | 通过（编辑往返、对照语料、D03-W 预算齐备；全节点支持留待 P3） | 3 | 0 | 1 | [模式往返](../evidence/g2-editor/xiaomi-14-pro/result.md)、[D03-W](../evidence/g2-d03w-editor/xiaomi-14-pro/result.md) |
-| G3 保存并发 | 通过（P1 核心判据通过；G3-d 切文件已于 2026-10-25 在 P3 补测通过，剩 2 项留待 P3） | 3 | 0 | 2 | [自动保存](../evidence/g3-save/xiaomi-14-pro/result.md)、[双端并发](../evidence/g3-save/xiaomi-14-pro/dual-client.md)、[进程终止](../evidence/g3-save/xiaomi-14-pro/recovery.md)、[切文件](../evidence/g3-d/xiaomi-14-pro/result.md) |
+| G3 保存并发 | 通过（P1 核心判据通过；G3-b/c/d 已于 2026-10-25 在 P3 全部补测通过，无留项） | 5 | 0 | 0 | [自动保存](../evidence/g3-save/xiaomi-14-pro/result.md)、[双端并发](../evidence/g3-save/xiaomi-14-pro/dual-client.md)、[进程终止](../evidence/g3-save/xiaomi-14-pro/recovery.md)、[切文件](../evidence/g3-d/xiaomi-14-pro/result.md)、[手动保存/重叠冲突/迟到回包](../evidence/wri-011/xiaomi-14-pro/result.md) |
 | G4 双流恢复 | 通过（双流发送 / 重连 / 后台 / 进程恢复、命令边界、D03 预算齐备；跨包留待 P3） | 5 | 0 | 1 | [G4 性能](../evidence/g4-d03-performance/xiaomi-14-pro/result.md)、[发送与回执](../evidence/g4-agent-send/xiaomi-14-pro/result.md) |
 | G5 原生终端 | 通过（判据全部满足，无遗留项） | 4 | 0 | 0 | [终端](../evidence/g5-terminal/xiaomi-14-pro/result.md)、[D03-P](../evidence/g5-d03p-performance/xiaomi-14-pro/result.md) |
 | G6 远程与共存 | 通过（范围受限 [SD-01](07-evidence-and-decisions.md#范围决定scope-decision)） | 1 | 1 | 1 | [双端共存](../evidence/g6-dual-client/xiaomi-14-pro/result.md) |
@@ -65,8 +65,8 @@
 | G2-c | 实际支持全部基线节点 | 留待 P3 | 图片 / 表格编辑、中文 IME 组合态、选区增强未实现，随 P3 写作链路补齐 |
 | G2-d | D03 编辑器性能预算实测通过 | 通过 | D03-W 四项上限 2026-10-24 评审通过（[06 §4](06-development-and-validation.md#d03-性能基准与冻结记录)） |
 | G3-a | Web / App 并发案例 | 通过 | 无重叠并发 409 → 三方合并 → 读回两端修改同时保留，并修复「合并结果未采纳导致下次保存覆盖对端」缺陷 |
-| G3-b | 重叠冲突真实双端用例 | 留待 P3 | `adb` 无法在编辑器内构造精确选区替换，三种构造方式均判可合并；现由 `ThreeWayMergeTest` / `FileSaveCoordinatorTest` / `EditorSessionTest` 单测覆盖 |
-| G3-c | 迟到回包端到端 | 留待 P3 | 需在保存进行中注入第二次编辑，真机无法稳定构造；由 `ReceiptPolicy` 单测覆盖 |
+| G3-b | 重叠冲突真实双端用例 | 通过（2026-10-25 补测） | 用 `tools/g3_dual_editor.py --heading` 让脚本改写标题行、App 在标题行插入字符，得到真实重叠冲突：`W Editor: conflict count=1`，正文出现 `<<<<<<< 本地修改 / ======= / >>>>>>> 服务器修改`，冲突态「保存」禁用、新增「已解决，保存」放行后写入成功。**同轮修复**：`applyConflict` 之前把带标记的合并结果当 base，导致解决后保存被当成无改动而静默跳过（[证据](../evidence/wri-011/xiaomi-14-pro/result.md)） |
+| G3-c | 迟到回包端到端 | 通过（2026-10-25 补测） | 用 `tools/g3d_slow_proxy.py`（PUT 延后 3s）构造：输入 `1` → 自动保存进入在途 → 输入 `2` → 旧快照回执返回后状态不置「已保存」而是重新排队。日志两条 `saved`（`draftWindow=805ms` 与 `0ms`），服务端最终内容为 `…12`。**同轮修复**：保存改为 `Mutex` 串行，新编辑不再取消在途请求（否则回执永远到不了） |
 | G3-d | 切文件用例 | 通过（2026-10-25 补测） | 已修：`open()` 取消在途 `saveJob` 并推进 `openEpoch`，`performSave()` 回执按 `openEpoch` + `projectId\0path` 校验、不匹配即丢弃，`flush()` 以回执是否落定判定。真机用延迟注入代理（`tools/g3d_slow_proxy.py`，只延后保存 PUT 3s）构造「保存仍在途时切文件」：`opened g3d-b.md` 前无 `saved g3d-a.md`，B 的正文 / revision / base 未被污染，随后 B 的保存无 409；服务端读回两侧内容各自正确（[证据](../evidence/g3-d/xiaomi-14-pro/result.md)）。`late receipt discarded` 分支由 `EditorSessionTest` 覆盖 |
 | G3-e | 草稿事务提交前后终止进程 | 通过 | 提交前 `force-stop` 恢复服务器内容、提交后恢复「已恢复未保存的编辑」（Room 草稿 72 字符） |
 | G4-a | 重连恢复 | 通过 | 两套流断线后按游标 / `stream_cursor` 重挂，身份与结果一致 |
@@ -87,7 +87,7 @@
 
 **P1 退出结论（2026-10-24，项目负责人 Hsing 决定）：P1 退出。** 六关卡均有代码与真机 / 真实服务器往返证据；未满足项 9 条已全部定性（环境受限 2 条：G1-b、G6-a；留待 P3 7 条：G1-d、G2-c、G3-b/c/d、G4-d、G6-b），无未定性缺口，因此不再作为 P1 阻塞。这些条目在补齐前不得在复刻矩阵中标记完成；复核位置：G1-d / G2-c / G3-b·c·d / G4-d 在 P3，G6-b 随 P4-D，G4-d 最终在 P6 发布候选复核。
 
-**P3 回补记录：** 2026-10-25 G3-d 已在 P3 修复并真机补测通过（见上表与 [证据](../evidence/g3-d/xiaomi-14-pro/result.md)），留待 P3 条目剩 6 条（G1-d、G2-c、G3-b、G3-c、G4-d、G6-b）。
+**P3 回补记录：** 2026-10-25 G3-d 已在 P3 修复并真机补测通过（见上表与 [证据](../evidence/g3-d/xiaomi-14-pro/result.md)）；同日 G3-b、G3-c 随 WRI-011 补测通过（[证据](../evidence/wri-011/xiaomi-14-pro/result.md)），G3 关卡已无留项。留待 P3 条目剩 4 条（G1-d、G2-c、G4-d、G6-b）。
 
 ## 4. P2：工程基础与公共界面
 
