@@ -2,6 +2,7 @@ package com.denova.novara.core.network
 
 import com.denova.novara.core.model.ServerKey
 import com.denova.novara.core.save.FileRemote
+import com.denova.novara.core.stream.AgentUiFrame
 import com.denova.novara.core.stream.GameActiveView
 import com.denova.novara.core.stream.GameStreamError
 import com.denova.novara.core.stream.GameStreamEvent
@@ -246,6 +247,23 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
         }
     }
 
+    /**
+     * 写作 Agent UI message 流：`GET /api/chat/stream?task_id=&after=`。
+     * 响应为 AI SDK UI message stream（`x-vercel-ai-ui-message-stream: v1`），
+     * 不依赖 Last-Event-ID，重连游标通过 `after=` 显式传递。
+     */
+    fun agentStream(taskId: String, after: String?): Flow<AgentUiFrame> = flow {
+        val request = Request.Builder().url(agentStreamUrl(taskId, after)).get().build()
+        okHttpClient.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
+            }
+            val source = resp.body?.source()
+                ?: throw GameStreamError(resp.code, null, "empty agent stream body")
+            emitAll(agentFramesFromSource(source))
+        }
+    }.flowOn(Dispatchers.IO)
+
     /** 读取 story 的 canonical 历史（rehydrate 后重建叙事基线）。 */
     suspend fun interactiveHistory(storyId: String, branchId: String, limit: Int): StoryHistoryPage {
         val request = Request.Builder()
@@ -279,6 +297,13 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
         interactiveChatUrl("stream").newBuilder()
             .addQueryParameter("story_id", storyId)
             .addQueryParameter("branch", branchId)
+            .addQueryParameter("task_id", taskId)
+            .apply { if (after != null) addQueryParameter("after", after) }
+            .build()
+
+    private fun agentStreamUrl(taskId: String, after: String?): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/chat/stream")
             .addQueryParameter("task_id", taskId)
             .apply { if (after != null) addQueryParameter("after", after) }
             .build()
