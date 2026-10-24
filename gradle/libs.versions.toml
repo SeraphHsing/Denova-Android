@@ -10,6 +10,7 @@ kotlinxCoroutines = "1.9.0"
 datastorePreferences = "1.1.1"
 commonmark = "0.30.0"
 javaDiffUtils = "4.15"
+coil = "3.6.3"
 junit = "4.13.2"
 
 [libraries]
@@ -28,6 +29,8 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 commonmark = { group = "org.commonmark", name = "commonmark", version.ref = "commonmark" }
 commonmark-gfm-tables = { group = "org.commonmark", name = "commonmark-ext-gfm-tables", version.ref = "commonmark" }
 java-diff-utils = { group = "io.github.java-diff-utils", name = "java-diff-utils", version.ref = "javaDiffUtils" }
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

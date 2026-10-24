@@ -133,6 +133,7 @@ class MainActivity : ComponentActivity() {
                     if (showDebug) {
                         DebugPanelScreen(
                             viewModel = debugViewModel,
+                            client = connectionViewModel.client,
                             onClose = { showDebug = false },
                         )
                     }

@@ -52,6 +52,8 @@ dependencies {
     implementation(libs.commonmark)
     implementation(libs.commonmark.gfm.tables)
     implementation(libs.java.diff.utils)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.android)

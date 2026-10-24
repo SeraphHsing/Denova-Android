@@ -580,6 +580,16 @@ class DenovaClient(
             .addQueryParameter("path", path)
             .build()
 
+    /**
+     * 受保护资源 URL：`GET /api/projects/:id/files/asset?path=`，返回原始字节与 Content-Type。
+     * 需要用 [okHttpClient] 发起（会话 Cookie），供图片加载器直接使用。
+     */
+    fun projectAssetUrl(projectId: String, path: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/files/asset")
+            .addQueryParameter("path", path)
+            .build()
+
     private fun toException(status: Int, body: String): DenovaApiException {
         val parsed = runCatching { json.decodeFromString(ApiErrorBody.serializer(), body) }.getOrNull()
         return DenovaApiException(status, parsed?.code, parsed?.error ?: body.ifBlank { null })
