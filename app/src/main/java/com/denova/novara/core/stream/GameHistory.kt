@@ -25,7 +25,9 @@ data class TurnEvent(
 fun buildCanonicalNarrative(turns: List<TurnEvent>): String =
     turns.mapNotNull { turn ->
         buildString {
-            if (!turn.user.isNullOrBlank()) append("> ").append(turn.user.trim())
+            // 跳过内部提示（如 `[Source: story opening configuration...]`），不展示给用户。
+            val user = turn.user?.takeIf { it.isNotBlank() && !it.trimStart().startsWith("[Source:") }
+            if (user != null) append("> ").append(user.trim())
             if (!turn.narrative.isNullOrBlank()) {
                 if (isNotEmpty()) append("\n\n")
                 append(turn.narrative.trim())

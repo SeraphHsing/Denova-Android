@@ -41,4 +41,16 @@ class GameHistoryTest {
         )
         assertEquals("有效", buildCanonicalNarrative(turns))
     }
+
+    @Test
+    fun `skips internal source prompt but keeps narrative`() {
+        val turns = listOf(
+            TurnEvent(
+                id = "1",
+                user = "[Source: story opening configuration; purpose: generate the first playable turn]\n\nStory premise: ...",
+                narrative = "开场叙事",
+            ),
+        )
+        assertEquals("开场叙事", buildCanonicalNarrative(turns))
+    }
 }
