@@ -37,6 +37,56 @@
 
 退出条件：每个关卡都有代码、fixture、原生录屏和真实往返结果。G2 / G4 / G5 还必须提供与 P0 冻结的 D03 数据、设备、测量口径及数值预算对应的结果，缺少任一项不能判为通过。失败项列出节点 / 事件 / 操作，不能只写“待优化”。终端实测出现误删或内容丢失时G6不通过，须在现有边界内解决或取得明确的范围决定；记录限制本身不构成通过。影响整体原生路线的缺口在大规模页面开发前决定。
 
+### 3.1 P1 证据台账（2026-10-24 核对）
+
+状态只取三种：**通过**（已有真机 / 真实服务器往返证据且满足判据）、**环境受限**（当前部署或固定基线约束下无法达成，已取得范围决定或经项目负责人明确放弃，且不以客户端对抗或关闭校验规避）、**留待 P3**（证据或实现尚不完整，转由后续阶段在真实双端场景补齐；补齐前不得据本台账宣称对应行为已完成）。台账逐条登记 §3 全部判据的状态，只对不满足项给出定性依据，不改变上表通过条件。
+
+**关卡结论**
+
+| 关卡 | 结论 | 通过 | 环境受限 | 留待 P3 | 判定依据 |
+|---|---|---|---|---|---|
+| G1 认证与网络 | 通过（降级：HTTP / WS 与配对已闭环，HTTPS/WSS 环境受限、迟到 401 留待 P3） | 2 | 1 | 1 | [G1 证据](../evidence/g1-auth/xiaomi-14-pro/result.md) |
+| G2 Markdown | 通过（编辑往返、对照语料、D03-W 预算齐备；全节点支持留待 P3） | 3 | 0 | 1 | [模式往返](../evidence/g2-editor/xiaomi-14-pro/result.md)、[D03-W](../evidence/g2-d03w-editor/xiaomi-14-pro/result.md) |
+| G3 保存并发 | 核心判据通过（并发合并读回、草稿事务提交前后终止进程）；3 项留待 P3 | 2 | 0 | 3 | [自动保存](../evidence/g3-save/xiaomi-14-pro/result.md)、[双端并发](../evidence/g3-save/xiaomi-14-pro/dual-client.md)、[进程终止](../evidence/g3-save/xiaomi-14-pro/recovery.md) |
+| G4 双流恢复 | 通过（双流发送 / 重连 / 后台 / 进程恢复、命令边界、D03 预算齐备；跨包留待 P3） | 5 | 0 | 1 | [G4 性能](../evidence/g4-d03-performance/xiaomi-14-pro/result.md)、[发送与回执](../evidence/g4-agent-send/xiaomi-14-pro/result.md) |
+| G5 原生终端 | 通过（判据全部满足，无遗留项） | 4 | 0 | 0 | [终端](../evidence/g5-terminal/xiaomi-14-pro/result.md)、[D03-P](../evidence/g5-d03p-performance/xiaomi-14-pro/result.md) |
+| G6 远程与共存 | 通过（范围受限 [SD-01](07-evidence-and-decisions.md#范围决定scope-decision)） | 1 | 1 | 1 | [双端共存](../evidence/g6-dual-client/xiaomi-14-pro/result.md) |
+
+**逐条判据**
+
+| 编号 | 判据（源自 §3 通过条件） | 状态 | 证据 / 说明 |
+|---|---|---|---|
+| G1-a | HTTP 与 WS 真实往返 | 通过 | 连接 / status / 登录 / 退出对 `http://192.168.2.102:18081` 真实往返；WS 由 G5 终端 attach 真实往返 |
+| G1-b | HTTPS / WSS 真实往返 | 环境受限 | 测试服务器 443 属 NAS nginx、无 Denova TLS 端点；自建 caddy 反代握手失败，2026-10-24 项目负责人决定放弃，不关闭 TLS 校验规避（[证据 §4](../evidence/g1-auth/xiaomi-14-pro/result.md)） |
+| G1-c | pair 不重复 | 通过 | 容器内 loopback 建 token，`pair first=200 second=401` |
+| G1-d | 401 不误退新登录 | 留待 P3 | 请求世代 `RequestGeneration` 已在 P2 落地（`logout` 退休）；端到端需双会话 + 延迟注入，按请求密集路径在 P3 接入 |
+| G2-a | 无编辑往返（源码 / 富文本 / 预览） | 通过 | 三模式切换，返回源码内容与打开时一致 |
+| G2-b | 修改后对照语料 | 通过 | 21 份 fixture + `corpus.md`：预览节点（标题 / 内联 / 两种列表 / 引用 / 代码块 / GFM 表格 / 图片）全部渲染；限定：富文本仅隐藏内联标记，块级标记仍显原文 |
+| G2-c | 实际支持全部基线节点 | 留待 P3 | 图片 / 表格编辑、中文 IME 组合态、选区增强未实现，随 P3 写作链路补齐 |
+| G2-d | D03 编辑器性能预算实测通过 | 通过 | D03-W 四项上限 2026-10-24 评审通过（[06 §4](06-development-and-validation.md#d03-性能基准与冻结记录)） |
+| G3-a | Web / App 并发案例 | 通过 | 无重叠并发 409 → 三方合并 → 读回两端修改同时保留，并修复「合并结果未采纳导致下次保存覆盖对端」缺陷 |
+| G3-b | 重叠冲突真实双端用例 | 留待 P3 | `adb` 无法在编辑器内构造精确选区替换，三种构造方式均判可合并；现由 `ThreeWayMergeTest` / `FileSaveCoordinatorTest` / `EditorSessionTest` 单测覆盖 |
+| G3-c | 迟到回包端到端 | 留待 P3 | 需在保存进行中注入第二次编辑，真机无法稳定构造；由 `ReceiptPolicy` 单测覆盖 |
+| G3-d | 切文件用例 | 留待 P3 | **实现缺口 + 无用例**：`EditorSession.open()` 未取消在途 `saveJob`，切换文件后到达的回执会按新文件状态应用（revision / base 归属错乱风险），需先补取消或作用域校验并加用例 |
+| G3-e | 草稿事务提交前后终止进程 | 通过 | 提交前 `force-stop` 恢复服务器内容、提交后恢复「已恢复未保存的编辑」（Room 草稿 72 字符） |
+| G4-a | 重连恢复 | 通过 | 两套流断线后按游标 / `stream_cursor` 重挂，身份与结果一致 |
+| G4-b | 后台恢复 | 通过 | HOME 40s 后回前台自动重挂，服务端 turn 仍 `done` |
+| G4-c | 进程恢复 | 通过 | `force-stop` 重启重登重挂，canonical 基线重建（含持久化 Cookie 免登录） |
+| G4-d | 跨包（升级安装） | 留待 P3 | 未单独验证；随 P3 首个可覆盖安装的构建执行，P6 发布候选复核 |
+| G4-e | 命令持久化与发送边界 | 通过 | 先落 `SUBMITTING` 本地事务再发送，ACCEPTED / REJECTED（409 busy）/ UNCERTAIN 分支真机验证 |
+| G4-f | D03 流与恢复性能预算 | 通过 | 可见延迟、投影耗时、PSS、恢复至可操作 / 全量就绪四项 2026-10-24 评审通过 |
+| G5-a | 完整输入与屏幕结果对应 | 通过 | 提示符、回显、中文 UTF-8 / 宽字、`stty size` 与画布一致、ANSI 16 / 256 / truecolor、全屏、Ctrl-C、回看 |
+| G5-b | 切页不删 PTY | 通过 | 切页回编辑器 +10s `attached` 保持 1（终端 ViewModel 保活），无回收窗口 |
+| G5-c | 关闭释放 | 通过 | `closeAndRelease` 后服务端 `sessions:[]`；被对端释放时 7–25s 如实提示且不静默重建（缓解措施见 G6-a） |
+| G5-d | D03 终端性能预算 | 通过 | 62.5 KiB/s × 300s 真机 6 轮，输出 / 输入延迟、丢帧、resize、PSS 全部达标，2026-10-24 评审通过 |
+| G6-a | 双端操作不误删对方 PTY / 不丢失会话内容 | 环境受限 | 真实 Chrome 实测：Web 挂载工作台回收所有 `attached=0` 且不在其持久化标签中的会话，不区分 owner / 项目；属固定基线行为，按 [SD-01](07-evidence-and-decisions.md#范围决定scope-decision) 不作对抗，以「不静默重建 + 7–25s 如实提示 + 只删自身 + 64KB 只读历史 + 免登录秒级重挂」降低损失 |
+| G6-b | 权限表现一致 | 留待 P3 | 终端相关契约（token 即权限、owner 冲突、DELETE 无 owner 校验）已对齐；14 个设置 section 的权限分层随 P4-D 验证 |
+| G6-c | owner 归属与冲突 | 通过 | 同 owner 跨项目 409 `ownerConflict` 中文提示且立即停手，释放后恢复正常 |
+
+**证据形态缺口（登记，不改变逐条结论）**：本条 §3 退出条件要求各关卡提供原生录屏，六关卡实际取证形态为截图 + `logcat` / 请求日志 + 可复现脚本；含私人正文的截图按 `AGENTS.md` §5 只留本地不入库。若评审要求录屏，按 `docs/evidence/` 目录补录后回填本节。
+
+**P1 退出结论（2026-10-24，项目负责人 Hsing 决定）：P1 退出。** 六关卡均有代码与真机 / 真实服务器往返证据；未满足项 9 条已全部定性（环境受限 2 条：G1-b、G6-a；留待 P3 7 条：G1-d、G2-c、G3-b/c/d、G4-d、G6-b），无未定性缺口，因此不再作为 P1 阻塞。这些条目在补齐前不得在复刻矩阵中标记完成；复核位置：G1-d / G2-c / G3-b·c·d / G4-d 在 P3，G6-b 随 P4-D，G4-d 最终在 P6 发布候选复核。
+
 ## 4. P2：工程基础与公共界面
 
 建立单 Activity、AppContainer、环境配置、导航、共享顶栏、左右抽屉、浮层、DesignTokens、中英文、主题与字号。接入 Room / DataStore、错误模型、作用域与请求退休机制。完成公共控件的全部状态。
