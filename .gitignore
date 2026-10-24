@@ -1,4 +1,5 @@
 *.iml
+
 .gradle/
 local.properties
 .idea/
@@ -11,3 +12,10 @@ captures/
 *.aab
 *.jks
 *.keystore
+
+# 本地工具/编辑器状态（不参与构建，不入库）
+.codebuddy/
+.vscode/
+
+# 证据截图含用户正文时只留本地，不入库
+docs/evidence/g5-terminal/xiaomi-14-pro/06-cat-cjk.png

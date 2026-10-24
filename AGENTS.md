@@ -11,6 +11,40 @@
 
 不要只根据 README 摘要、旧对话或函数名实现功能。业务实现任务确认矩阵 ID；立项、工程准备和规划任务可使用 P0任务 ID 或 ADR编号；纯文档维护注明修改的规格章节。随后核对 Web 基线、相关调用路径和当前状态。
 
+## 1.1 技能路由（兜底规则）
+
+技能只有 `name` + `description` 会自动进入上下文，正文必须靠显式 `use_skill` 加载。因此下列路由是硬规则：命中左列场景时，第一次工具调用必须是 `use_skill`，不要先凭记忆动手，也不要询问是否加载。一个任务命中多条时按"专用优于通用"只加载最贴合的一条，最多两条。
+
+| 场景（不论用户怎么措辞） | 必须调用 |
+|---|---|
+| 新增或修改 `*.kt`；写 ViewModel / Repository / UseCase；Compose 状态提升；协程取消、调度器、StateFlow / Flow 操作符；组件间数据流 | `kotlin-patterns`；涉及并发或 Flow 再加 `kotlin-coroutines-flows` |
+| 分层结构、模块依赖方向、data / domain / presentation 边界、UseCase 归属 | `android-clean-architecture` |
+| 写或修 JVM 单元测试、MockK、Kotest、协程测试、覆盖率 | `kotlin-testing` |
+| 端口抽象、依赖倒置、把领域逻辑从 I/O 中剥离 | `hexagonal-architecture` |
+| 查符号定义、谁调用了它、实现类在哪、重构影响面、文件结构概览 | `lsp-code-analysis` |
+| 产出或读取 `.docx` / `.pdf` / `.pptx` / `.xlsx` | 对应 `docx` / `pdf` / `pptx` / `xlsx`，先加载再动手 |
+| 打开网页、点击、截图、抓取渲染后内容、验证 webui 行为 | `agent-browser`；需要可复用流程脚本时 `playwright-cli` |
+| 跨会话记忆，或要沉淀决策、偏好、约定 | `memmy-memory` |
+| 新建或更新技能本身 | `skill-creator`；不确定有没有现成技能时 `find-skills` |
+| 生成图片、视频、3D 资产 | `多模态内容生成` |
+
+
+
+### 词面召回映射
+
+用户原话与技能 `description` 措辞不一致时按下列等价词直接映射，不要因字面不匹配就跳过加载：
+
+| 技能 | 等价触发词 |
+|---|---|
+| `kotlin-patterns` | 空安全、`!!`、协程、数据类、作用域函数、密封类、扩展函数、惯用法、Kotlin 怎么写、代码风格 |
+| `kotlin-coroutines-flows` | 挂起、调度器、结构化并发、背压、`collect`、`StateFlow`、`SharedFlow`、泄漏、结构化取消 |
+| `kotlin-testing` | 单测、断言、mock、fake、覆盖率、测试怎么写 |
+| `android-clean-architecture` | 分层、依赖方向、UseCase、仓库放哪层、包怎么分 |
+| `hexagonal-architecture` | 端口、适配器、隔离 I/O、可测试边界 |
+| `lsp-code-analysis` | 找定义、谁在用、实现在哪、影响面、重构前检查、代码结构 |
+| `docx` / `pdf` / `pptx` / `xlsx` | Word、文档、报告、幻灯片、deck、表格、Excel、导出 |
+| `agent-browser` | 打开网页、点一下、截图、看看渲染、页面长什么样 |
+
 ## 2. 项目目标与不可越过的边界
 
 - 目标是对固定基线中的全部手机 Web 页面、子页面、条件入口、操作流程、状态和权限表现进行原生 Android 对应实现。
