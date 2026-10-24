@@ -15,6 +15,7 @@ import com.denova.novara.core.stream.AgentUiFrame
 import com.denova.novara.core.stream.AgentUiReducer
 import com.denova.novara.core.stream.AgentUiState
 import com.denova.novara.core.stream.GameStreamError
+import com.denova.novara.core.stream.collectWithIdleGuard
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -95,17 +96,32 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             commands.save(record)
             try {
                 var accepted = false
-                client.postChat(request).collect { frame ->
-                    if (!accepted) {
-                        accepted = true
-                        commands.updateStatus(commandId, CommandStatus.ACCEPTED)
-                        _state.value = _state.value.copy(sending = false)
-                    }
-                    onFrame(frame)
-                }
+                val idleTerminated = client.postChat(request).collectWithIdleGuard(
+                    isTaskFinished = {
+                        try {
+                            !client.agentActive(sessionId).active
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            true
+                        }
+                    },
+                    onEvent = { frame ->
+                        if (!accepted) {
+                            accepted = true
+                            commands.updateStatus(commandId, CommandStatus.ACCEPTED)
+                            _state.value = _state.value.copy(sending = false)
+                        }
+                        onFrame(frame)
+                    },
+                )
                 if (!accepted) {
                     commands.updateStatus(commandId, CommandStatus.ACCEPTED)
                     _state.value = _state.value.copy(sending = false)
+                }
+                if (idleTerminated) {
+                    DenovaLog.w("Agent", "stream idle timeout; task finished")
+                    _state.value = _state.value.copy(error = "流空闲超时，任务可能已结束")
                 }
             } catch (e: GameStreamError) {
                 val rejected = e.status in 400..499 && e.code != null && e.code != "agent_runtime.stream_attached"

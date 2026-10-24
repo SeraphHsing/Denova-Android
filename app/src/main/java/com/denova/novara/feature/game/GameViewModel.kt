@@ -18,6 +18,7 @@ import com.denova.novara.core.stream.GameStreamEvent
 import com.denova.novara.core.stream.GameStreamRecoveryCoordinator
 import com.denova.novara.core.stream.RehydrateRequest
 import com.denova.novara.core.stream.buildCanonicalNarrative
+import com.denova.novara.core.stream.collectWithIdleGuard
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -114,17 +115,32 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             commands.save(record) // 本地事务先落盘
             try {
                 var accepted = false
-                client.postInteractiveChat(request).collect { event ->
-                    if (!accepted) {
-                        accepted = true
-                        commands.updateStatus(commandId, CommandStatus.ACCEPTED)
-                        _uiState.value = _uiState.value.copy(sending = false)
-                    }
-                    onEvent(event)
-                }
+                val idleTerminated = client.postInteractiveChat(request).collectWithIdleGuard(
+                    isTaskFinished = {
+                        try {
+                            !client.active(storyId, branchId).active
+                        } catch (e: kotlinx.coroutines.CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            true
+                        }
+                    },
+                    onEvent = { event ->
+                        if (!accepted) {
+                            accepted = true
+                            commands.updateStatus(commandId, CommandStatus.ACCEPTED)
+                            _uiState.value = _uiState.value.copy(sending = false)
+                        }
+                        onEvent(event)
+                    },
+                )
                 if (!accepted) {
                     commands.updateStatus(commandId, CommandStatus.ACCEPTED)
                     _uiState.value = _uiState.value.copy(sending = false)
+                }
+                if (idleTerminated) {
+                    DenovaLog.w("Game", "stream idle timeout; task finished")
+                    _uiState.value = _uiState.value.copy(error = "流空闲超时，任务可能已结束")
                 }
                 finishStream()
             } catch (e: GameStreamError) {
