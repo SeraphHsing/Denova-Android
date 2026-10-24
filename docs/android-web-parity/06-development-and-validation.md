@@ -77,10 +77,9 @@ PowerShell，在新 Android 仓库根目录执行：
 
 **可重现输入（冻结的数据规模）**
 
-- 文档 D03-W：中英文各 1 本、每本 10 章；标准章 ~50KB UTF-8（每章含 1 表格 + 1 图片 + 1 代码块）；压力文档 1 个 ~500KB（单章大文本）。fixture 标识 `d03-writing-{zh,en}-ch01..ch10`、`d03-large-500k`。
-  - **口径修正（2026-10-24）**：字节数按 UTF-8 计。原「约 2.5 万字符」只对英文成立（英文 ~51KB ≈ 5.2 万字符的 ASCII 文本量级，中文 ~51KB ≈ 1.7 万字符），因此**以字节数为准**，字符数仅作参考，不再作为冻结条件。
-  - 生成方法：`tools/d03w_fixture.py gen`，固定词表 + 确定性伪随机序列，重复执行逐字节一致。实测产物：中文 10 章各 **51,324 B / 17,372 字符**，英文 10 章 **51,669–51,734 B / 51,629–51,694 字符**，压力文档 **512,336 B / 171,928 字符**。
-  - SHA-256 清单已落地：[`docs/evidence/g2-d03w-editor/fixtures.json`](../evidence/g2-d03w-editor/fixtures.json)（21 条，`tools/d03w_fixture.py gen --json` 可复算）。
+- 文档 D03-W：中英文各 1 本、每本 10 章；标准章 ~50KB UTF-8（约 2.5 万字符，含 1 表格 + 1 图片 + 1 代码块）；压力文档 1 个 ~500KB（单章大文本）。fixture 标识 `d03-writing-{zh,en}-ch01..ch10`、`d03-large-500k`；生成方法：脚本生成；SHA-256 校验值待落地后回填。
+  - **待裁定（2026-10-24）**：本条原文的「~50KB」与「约 2.5 万字符」在中文下不自洽（UTF-8 中文 1.7 万字符即达 50KB），冻结口径究竟按字节还是按字符，需由评审人（Hsing）裁定后再生成正式 fixture。
+  - 现状：`tools/d03w_fixture.py` 按**字节口径**生成过一版样品（中文 10 章各 51,324 B / 17,372 字符，英文各 ~51.7KB，压力文档 512,336 B），SHA-256 见 [`docs/evidence/g2-d03w-editor/fixtures.json`](../evidence/g2-d03w-editor/fixtures.json)。若裁定按字符口径，重新执行即可覆盖，清单同步重算。
   - 上传到测试服务器：`DENOVA_USER=… DENOVA_PASS=… python tools/d03w_fixture.py upload <project_id>`（凭证只走环境变量）。
 - 消息 D03-A：Agent 会话 200 条消息、50 个工具结果（每个 ~10KB）。fixture `d03-agent-200`。
 - 流 D03-S：固定分块 1KB、速率 100 块/s、持续 60s；录制真实响应后重放。
