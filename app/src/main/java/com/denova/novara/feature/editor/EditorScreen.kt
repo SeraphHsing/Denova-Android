@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +52,9 @@ fun EditorScreen(
     var projectId by remember { mutableStateOf("") }
     var filePath by remember { mutableStateOf("") }
     var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
+
+    // D03-W 埋点：本组合已提交绘制，结算「最后一次按键 → 可见」延迟。
+    SideEffect { EditorPerf.markDraw() }
 
     // 外部内容变化（打开文件/冲突合并）时重置本地编辑态。
     LaunchedEffect(uiState.loaded, uiState.filePath, uiState.conflictText) {
@@ -142,13 +146,13 @@ fun EditorScreen(
         when (mode) {
             EditorMode.SOURCE -> BasicTextField(
                 value = textFieldValue,
-                onValueChange = { textFieldValue = it; viewModel.updateContent(it.text) },
+                onValueChange = { textFieldValue = it; EditorPerf.markEditStart(); viewModel.updateContent(it.text) },
                 textStyle = TextStyle(fontSize = 16.sp),
                 modifier = Modifier.fillMaxSize().padding(12.dp),
             )
             EditorMode.RICH -> BasicTextField(
                 value = textFieldValue,
-                onValueChange = { textFieldValue = it; viewModel.updateContent(it.text) },
+                onValueChange = { textFieldValue = it; EditorPerf.markEditStart(); viewModel.updateContent(it.text) },
                 visualTransformation = MarkdownVisualTransformation(),
                 textStyle = TextStyle(fontSize = 16.sp),
                 modifier = Modifier.fillMaxSize().padding(12.dp),

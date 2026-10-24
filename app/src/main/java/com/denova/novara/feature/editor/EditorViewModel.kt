@@ -32,6 +32,11 @@ data class EditorUiState(
 /** 编辑器：打开文件 → 编辑（防抖自动保存）→ revision 冲突合并/提示。 */
 class EditorViewModel(application: Application) : AndroidViewModel(application) {
 
+    companion object {
+        /** 自动保存防抖；也是「最后一次编辑 → 草稿落盘」的固定下限（G2 指标口径）。 */
+        const val AUTOSAVE_DEBOUNCE_MILLIS = 800L
+    }
+
     private val drafts = DraftStore(application)
     private var client: DenovaClient? = null
     private var coordinator: FileSaveCoordinator? = null
@@ -50,6 +55,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun openFile(projectId: String, path: String) {
         val c = client ?: return
+        EditorPerf.beginOpen()
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(loaded = false, saveStatus = SaveStatus.SAVING, message = null)
             try {
@@ -64,6 +70,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                     loaded = true,
                     saveStatus = SaveStatus.IDLE,
                 )
+                EditorPerf.endOpen((doc.content ?: "").length)
             } catch (e: Exception) {
                 DenovaLog.w("Editor", "open failed project=$projectId path=$path", e)
                 _uiState.value = _uiState.value.copy(
@@ -78,10 +85,11 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun updateContent(text: String) {
         val current = _uiState.value
         if (!current.loaded) return
+        EditorPerf.markEditStart()
         _uiState.value = current.copy(content = text, saveStatus = SaveStatus.IDLE)
         saveJob?.cancel()
         saveJob = viewModelScope.launch {
-            delay(800)
+            delay(AUTOSAVE_DEBOUNCE_MILLIS)
             save()
         }
     }
@@ -90,8 +98,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val c = coordinator ?: return
         val s = _uiState.value
         if (!s.loaded) return
+        val startedAt = System.currentTimeMillis()
+        // 草稿在保存事务开始即落盘，因此这个窗口就是「最后一次编辑 → 草稿落盘」的上限。
+        val draftWindow = EditorPerf.pendingEditMillis()
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(saveStatus = SaveStatus.SAVING)
+            var kind = "saved"
             when (val outcome = c.save(s.projectId, s.filePath, s.baseRevision, s.baseContent, s.content)) {
                 is SaveOutcome.Saved -> {
                     DenovaLog.i("Editor", "saved path=${s.filePath} revision=${outcome.revision}")
@@ -104,6 +116,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 is SaveOutcome.MergedAndSaved -> {
                     DenovaLog.i("Editor", "merged+saved path=${s.filePath} revision=${outcome.revision}")
+                    kind = "merged"
                     _uiState.value = _uiState.value.copy(
                         baseRevision = outcome.revision,
                         baseContent = s.content,
@@ -113,6 +126,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 is SaveOutcome.Conflict -> {
                     DenovaLog.w("Editor", "conflict path=${s.filePath} count=${outcome.conflictCount}")
+                    kind = "conflict"
                     _uiState.value = _uiState.value.copy(
                         content = outcome.mergedText,
                         baseRevision = outcome.serverRevision,
@@ -124,12 +138,15 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 is SaveOutcome.Error -> {
                     DenovaLog.w("Editor", "save failed path=${s.filePath}", outcome.exception)
+                    kind = "error"
                     _uiState.value = _uiState.value.copy(
                         saveStatus = SaveStatus.ERROR,
                         message = "保存失败：${outcome.exception.message}",
                     )
                 }
             }
+            EditorPerf.markDraftPersisted()
+            EditorPerf.endSave(kind, System.currentTimeMillis() - startedAt, draftWindow)
         }
     }
 
