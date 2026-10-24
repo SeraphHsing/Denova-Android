@@ -1,0 +1,149 @@
+[
+  {
+    "fixture": "d03-writing-zh-ch01",
+    "file": "zh/ch01.md",
+    "bytes": 51324,
+    "chars": 17372,
+    "sha256": "73ecb520535643ae2b0ce03bd20319b4b428c0ae25a3fdb2c7bb6731a892013f"
+  },
+  {
+    "fixture": "d03-writing-zh-ch02",
+    "file": "zh/ch02.md",
+    "bytes": 51324,
+    "chars": 17372,
+    "sha256": "d88598b63489bb29445470f54ade47051ad52654007ba4653550d78114a55733"
+  },
+  {
+    "fixture": "d03-writing-zh-ch03",
+    "file": "zh/ch03.md",
+    "bytes": 51324,
+    "chars": 17372,
+    "sha256": "a3528f22770ccfa07ca64263cdbb77c70446abfe59ec94b675cad313ccc08a81"
+  },
+  {
+    "fixture": "d03-writing-zh-ch04",
+    "file": "zh/ch04.md",
+    "bytes": 51324,
+    "chars": 17372,
+    "sha256": "30ead2d602b14a076249929722a54662b0547b45387f5c072b0a297264ab5382"
+  },
+  {
+    "fixture": "d03-writing-zh-ch05",
+    "file": "zh/ch05.md",
+    "bytes": 51324,
+    "chars": 17372,
+    "sha256": "e51626834cbcc8fae71d2db77831d5961042e634be7b9d72aa63f0e938fc9a74"
+  },
+  {
+    "fixture": "d03-writing-zh-ch06",
+    "file": "zh/ch06.md",
+    "bytes": 51324,
+    "chars": 17372,
+    "sha256": "7b556c9386fbc82a0e2985ca7416b00575cc62ac249024b65058180b48bceec3"
+  },
+  {
+    "fixture": "d03-writing-zh-ch07",
+    "file": "zh/ch07.md",
+    "bytes": 51324,
+    "chars": 17372,
+    "sha256": "32e70b5d68dd55a7d6068d736014dbde5da419163395ccb7a23499e8f4fd0967"
+  },
+  {
+    "fixture": "d03-writing-zh-ch08",
+    "file": "zh/ch08.md",
+    "bytes": 51324,
+    "chars": 17372,
+    "sha256": "068d6140f1d78f0c233fa248dc031db3e16e8b54da6e8dbc6731495758a837f3"
+  },
+  {
+    "fixture": "d03-writing-zh-ch09",
+    "file": "zh/ch09.md",
+    "bytes": 51324,
+    "chars": 17372,
+    "sha256": "e4d9f2f6dbed243afe5e1dc01dc95f2c3eec51c6cca90df44929c3f2c4f3ced3"
+  },
+  {
+    "fixture": "d03-writing-zh-ch10",
+    "file": "zh/ch10.md",
+    "bytes": 51325,
+    "chars": 17373,
+    "sha256": "488ecf3ff23a38b8ac45c9de8dddbfcd5d3d54aed9007fdc1f892a4ad7158368"
+  },
+  {
+    "fixture": "d03-writing-en-ch01",
+    "file": "en/ch01.md",
+    "bytes": 51781,
+    "chars": 51741,
+    "sha256": "86a716ee48c165143a4dd44f536553c9ce13e11c5feb9617aa23bba0bb33decd"
+  },
+  {
+    "fixture": "d03-writing-en-ch02",
+    "file": "en/ch02.md",
+    "bytes": 51759,
+    "chars": 51719,
+    "sha256": "2293288c92663ab77461b22daa86dc9265340e3c0a12e9c5b98161f29c1a3de1"
+  },
+  {
+    "fixture": "d03-writing-en-ch03",
+    "file": "en/ch03.md",
+    "bytes": 51677,
+    "chars": 51637,
+    "sha256": "62309d74f5f8cdacd2ab08e55f392eb7c6b005e56b3732ba55f1c8c909dc4ab9"
+  },
+  {
+    "fixture": "d03-writing-en-ch04",
+    "file": "en/ch04.md",
+    "bytes": 51632,
+    "chars": 51592,
+    "sha256": "1dddcfe0a2b8f095f0fbf396a054a3974a7fea596ee3ad49482700cfc18940ad"
+  },
+  {
+    "fixture": "d03-writing-en-ch05",
+    "file": "en/ch05.md",
+    "bytes": 51737,
+    "chars": 51697,
+    "sha256": "049f3262a4627b8fbb14fa025d61ac2c18a6431a7162d3df2d1b33fdbd56cee4"
+  },
+  {
+    "fixture": "d03-writing-en-ch06",
+    "file": "en/ch06.md",
+    "bytes": 51607,
+    "chars": 51567,
+    "sha256": "15a3bc23babdd0f915dfea6fa4a519c3c916f49c99cf830181f82657ddaa98c3"
+  },
+  {
+    "fixture": "d03-writing-en-ch07",
+    "file": "en/ch07.md",
+    "bytes": 51708,
+    "chars": 51668,
+    "sha256": "75d101de352090430468043b00a8b2fb13ddb06ad2133e566377b44f1e6841c3"
+  },
+  {
+    "fixture": "d03-writing-en-ch08",
+    "file": "en/ch08.md",
+    "bytes": 51669,
+    "chars": 51629,
+    "sha256": "dd04295be70f26e314878191826804d9791eb4e98d186918a9b48bf9b642a644"
+  },
+  {
+    "fixture": "d03-writing-en-ch09",
+    "file": "en/ch09.md",
+    "bytes": 51732,
+    "chars": 51692,
+    "sha256": "02445815622c62b342c4ccd0bd81a17f7fb2b2d0f0817d86d83516c606b72270"
+  },
+  {
+    "fixture": "d03-writing-en-ch10",
+    "file": "en/ch10.md",
+    "bytes": 51734,
+    "chars": 51694,
+    "sha256": "3308437fa015abc4228c82e812bd67c352fbaad4afd28cef2603c154a6846035"
+  },
+  {
+    "fixture": "d03-large-500k",
+    "file": "zh/d03-large-500k.md",
+    "bytes": 512336,
+    "chars": 171928,
+    "sha256": "d2911d2e157b3ea9e747c4e68eb04136bd84a2ad9d86d361837002cd489ae2f8"
+  }
+]
