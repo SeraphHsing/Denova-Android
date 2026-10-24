@@ -80,4 +80,45 @@
     <string name="ask_submit">Answer</string>
     <string name="ask_submitting">Submitting…</string>
     <string name="ask_cancel">Cancel</string>
+
+    <!-- 工具调用审批（AGT-003） -->
+    <string name="approval_title">Tool call approval</string>
+    <string name="approval_label_tool">Tool</string>
+    <string name="approval_label_mode">Mode</string>
+    <string name="approval_label_cwd">Directory</string>
+    <string name="approval_reason_label">Reason</string>
+    <string name="approval_deny">Deny</string>
+    <string name="approval_allow_once">Allow once</string>
+    <string name="approval_allow_workspace">Always allow (workspace)</string>
+    <string name="approval_scope">Adds a workspace rule after approval: %1$s</string>
+    <string name="approval_state_waiting">Approval needed</string>
+    <string name="approval_state_allowed">Allowed (once)</string>
+    <string name="approval_state_allowed_workspace">Allowed (workspace rule)</string>
+    <string name="approval_state_denied">Denied</string>
+    <string name="approval_state_cancelled">Cancelled</string>
+    <string name="approval_risk_low">Low risk</string>
+    <string name="approval_risk_medium">Medium risk</string>
+    <string name="approval_risk_high">High risk</string>
+    <string name="approval_risk_critical">Critical risk</string>
+    <string name="approval_risk_unknown">Risk unknown</string>
+    <string name="approval_mode_ask">Ask</string>
+    <string name="approval_mode_write">Write</string>
+    <string name="approval_mode_full">Full access</string>
+    <string name="approval_mode_unknown">Unknown</string>
+    <string name="approval_reason_workspace_unavailable">No workspace boundary is available for this call</string>
+    <string name="approval_reason_invalid_boundary">The workspace boundary is invalid for this call</string>
+    <string name="approval_reason_bash_parse_failed">The shell command could not be parsed</string>
+    <string name="approval_reason_bash_dynamic">The shell command uses dynamic syntax</string>
+    <string name="approval_reason_bash_unlisted">The shell command is not on the allow list</string>
+    <string name="approval_reason_bash_unclassified">The shell command could not be classified</string>
+    <string name="approval_reason_pwsh_dynamic">The PowerShell command uses dynamic syntax</string>
+    <string name="approval_reason_pwsh_parse_failed">The PowerShell command could not be parsed</string>
+    <string name="approval_reason_pwsh_unlisted">The PowerShell command is not on the allow list</string>
+    <string name="approval_reason_browser_args">The browser arguments are unknown</string>
+    <string name="approval_reason_browser_mutation">The browser action mutates a remote page</string>
+    <string name="approval_reason_browser_command">The browser command is unknown</string>
+    <string name="approval_reason_browser_action">The browser action is unknown</string>
+    <string name="approval_reason_browser_network">The browser action reaches the network</string>
+    <string name="approval_reason_external_fs">The call reads outside the workspace</string>
+    <string name="approval_reason_generic">This tool call needs your confirmation</string>
 </resources>

@@ -3,6 +3,7 @@ package com.denova.novara.feature.agent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -33,11 +34,174 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.core.stream.AgentApprovalLogic
+import com.denova.novara.core.stream.ApprovalMode
+import com.denova.novara.core.stream.ApprovalReason
+import com.denova.novara.core.stream.ApprovalRisk
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.stream.AgentAskQuestion
 import com.denova.novara.core.stream.AgentPhase
+import com.denova.novara.core.stream.ApprovalOption
+import com.denova.novara.core.stream.ApprovalState
 import com.denova.novara.feature.editor.TextSelectionQuote
+
+/** 审批结果态文案（AGT-003）。 */
+@Composable
+private fun approvalStateText(state: ApprovalState): String = stringResource(
+    when (state) {
+        ApprovalState.WAITING -> R.string.approval_state_waiting
+        ApprovalState.ALLOWED -> R.string.approval_state_allowed
+        ApprovalState.ALLOWED_WORKSPACE -> R.string.approval_state_allowed_workspace
+        ApprovalState.DENIED -> R.string.approval_state_denied
+        ApprovalState.CANCELLED -> R.string.approval_state_cancelled
+    },
+)
+
+/** 审批原因文案：未知 rule_id 一律用通用文案，不猜测具体原因。 */
+@Composable
+private fun approvalReasonText(reason: ApprovalReason): String = stringResource(
+    when (reason) {
+        ApprovalReason.WORKSPACE_UNAVAILABLE -> R.string.approval_reason_workspace_unavailable
+        ApprovalReason.INVALID_WORKSPACE_BOUNDARY -> R.string.approval_reason_invalid_boundary
+        ApprovalReason.BASH_PARSE_FAILED -> R.string.approval_reason_bash_parse_failed
+        ApprovalReason.BASH_DYNAMIC_SYNTAX -> R.string.approval_reason_bash_dynamic
+        ApprovalReason.BASH_UNLISTED_COMMAND -> R.string.approval_reason_bash_unlisted
+        ApprovalReason.BASH_UNCLASSIFIED -> R.string.approval_reason_bash_unclassified
+        ApprovalReason.PWSH_DYNAMIC_SYNTAX -> R.string.approval_reason_pwsh_dynamic
+        ApprovalReason.PWSH_PARSE_FAILED -> R.string.approval_reason_pwsh_parse_failed
+        ApprovalReason.PWSH_UNLISTED_COMMAND -> R.string.approval_reason_pwsh_unlisted
+        ApprovalReason.BROWSER_ARGUMENTS_UNKNOWN -> R.string.approval_reason_browser_args
+        ApprovalReason.BROWSER_REMOTE_MUTATION -> R.string.approval_reason_browser_mutation
+        ApprovalReason.BROWSER_COMMAND_UNKNOWN -> R.string.approval_reason_browser_command
+        ApprovalReason.BROWSER_ACTION_UNKNOWN -> R.string.approval_reason_browser_action
+        ApprovalReason.BROWSER_NETWORK_ACCESS -> R.string.approval_reason_browser_network
+        ApprovalReason.EXTERNAL_FILESYSTEM_READ -> R.string.approval_reason_external_fs
+        ApprovalReason.GENERIC -> R.string.approval_reason_generic
+    },
+)
+
+@Composable
+private fun approvalRiskText(risk: ApprovalRisk): String = stringResource(
+    when (risk) {
+        ApprovalRisk.LOW -> R.string.approval_risk_low
+        ApprovalRisk.MEDIUM -> R.string.approval_risk_medium
+        ApprovalRisk.HIGH -> R.string.approval_risk_high
+        ApprovalRisk.CRITICAL -> R.string.approval_risk_critical
+        ApprovalRisk.UNKNOWN -> R.string.approval_risk_unknown
+    },
+)
+
+@Composable
+private fun approvalModeText(mode: ApprovalMode): String = stringResource(
+    when (mode) {
+        ApprovalMode.ASK -> R.string.approval_mode_ask
+        ApprovalMode.WRITE -> R.string.approval_mode_write
+        ApprovalMode.FULL_ACCESS -> R.string.approval_mode_full
+        ApprovalMode.UNKNOWN -> R.string.approval_mode_unknown
+    },
+)
+
+/**
+ * 工具调用审批卡片（AGT-003）：展示审批内容（工具 / 模式 / 风险 / 目录 / 命令 / 原因），
+ * 「始终允许」只在服务端 `can_remember` 且给出作用域时出现，作用域原文照抄服务端
+ * `rule_display_pattern`，本地不构造规则。
+ */
+@Composable
+private fun AgentApprovalCard(
+    ask: AgentAskInteraction,
+    submitting: Boolean,
+    onDecide: (ApprovalOption) -> Unit,
+    onCancel: () -> Unit,
+) {
+    val approval = ask.approval ?: return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+            .padding(10.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.approval_title),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                approvalStateText(AgentApprovalLogic.state(ask.status, null)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                stringResource(R.string.approval_label_tool) + "：" + approval.toolName,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                stringResource(R.string.approval_label_mode) + "：" + approvalModeText(AgentApprovalLogic.mode(approval.mode)),
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Text(
+                approvalRiskText(AgentApprovalLogic.risk(approval.risk)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+        approval.cwd?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                stringResource(R.string.approval_label_cwd) + "：$it",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
+        AgentApprovalLogic.body(approval)?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(4.dp))
+                    .padding(6.dp),
+            )
+        }
+        Text(
+            stringResource(R.string.approval_reason_label) + "：" + approvalReasonText(AgentApprovalLogic.reason(approval.ruleId)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        if (AgentApprovalLogic.canAlwaysAllow(approval)) {
+            Text(
+                stringResource(R.string.approval_scope, approval.ruleDisplayPattern),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = { onDecide(ApprovalOption.DENY) }, enabled = !submitting) {
+                Text(stringResource(R.string.approval_deny))
+            }
+            if (AgentApprovalLogic.canAlwaysAllow(approval)) {
+                OutlinedButton(
+                    onClick = { onDecide(ApprovalOption.ALLOW_WORKSPACE) },
+                    enabled = !submitting,
+                    modifier = Modifier.padding(start = 8.dp),
+                ) { Text(stringResource(R.string.approval_allow_workspace)) }
+            }
+            OutlinedButton(
+                onClick = { onDecide(ApprovalOption.ALLOW_ONCE) },
+                enabled = !submitting,
+                modifier = Modifier.padding(start = 8.dp),
+            ) { Text(stringResource(R.string.approval_allow_once)) }
+            TextButton(onClick = onCancel, enabled = !submitting) {
+                Text(stringResource(R.string.ask_cancel))
+            }
+        }
+    }
+}
 
 /**
  * 提问卡片（AGT-004）：逐题列出服务端选项，选中才能提交；取消按固定原因上报。
@@ -213,14 +377,23 @@ fun AgentScreen(
 
         // 提问交互（AGT-004）：待答卡片 + 已解决状态。选项与答案来自服务端问句，本地只记录选择。
         state.pendingAsks.forEach { ask ->
-            AgentAskCard(
-                ask = ask,
-                selected = askSelections[ask.id].orEmpty(),
-                submitting = state.askSubmitting,
-                onToggle = { question, optionId -> viewModel.toggleAskOption(ask.id, question, optionId) },
-                onSubmit = { viewModel.answerAsk(ask.id) },
-                onCancel = { viewModel.cancelAsk(ask.id) },
-            )
+            if (ask.isToolApproval) {
+                AgentApprovalCard(
+                    ask = ask,
+                    submitting = state.askSubmitting,
+                    onDecide = { option -> viewModel.approveAsk(ask.id, option) },
+                    onCancel = { viewModel.cancelAsk(ask.id) },
+                )
+            } else {
+                AgentAskCard(
+                    ask = ask,
+                    selected = askSelections[ask.id].orEmpty(),
+                    submitting = state.askSubmitting,
+                    onToggle = { question, optionId -> viewModel.toggleAskOption(ask.id, question, optionId) },
+                    onSubmit = { viewModel.answerAsk(ask.id) },
+                    onCancel = { viewModel.cancelAsk(ask.id) },
+                )
+            }
         }
         state.askError?.let {
             Text(
@@ -231,8 +404,18 @@ fun AgentScreen(
             )
         }
         state.resolvedAsks.forEach { ask ->
+            val text = if (ask.isToolApproval) {
+                approvalStateText(
+                    AgentApprovalLogic.state(
+                        ask.status,
+                        ask.answers.firstOrNull()?.selectedOptions?.firstOrNull()?.id,
+                    ),
+                )
+            } else {
+                AgentAskLogic.statusText(ask)
+            }
             Text(
-                AgentAskLogic.statusText(ask),
+                text,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 modifier = Modifier.padding(horizontal = 12.dp),

@@ -61,10 +61,15 @@ data class AgentAskInteraction(
     val status: String = AgentAskLogic.STATUS_PENDING,
     val questions: List<AgentAskQuestion> = emptyList(),
     @SerialName("allow_other") val allowOther: Boolean = false,
+    /** 工具审批类提问（`kind=tool_approval`）携带的决策信息；提问类为空。 */
+    val approval: AgentToolApproval? = null,
     val answers: List<AgentAskAnswerResult> = emptyList(),
     @SerialName("cancel_reason") val cancelReason: String? = null,
 ) {
     val isPending: Boolean get() = status == AgentAskLogic.STATUS_PENDING
+
+    /** 是否为工具审批（`questions` 为空、决策在 [approval]）。 */
+    val isToolApproval: Boolean get() = kind == AgentApprovalLogic.KIND_TOOL_APPROVAL && approval != null
 }
 
 /** 回答 / 取消接口的返回：`status`、答案与取消原因。 */

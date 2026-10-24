@@ -15,11 +15,13 @@ import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.SendChatRequest
 import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
+import com.denova.novara.core.stream.AgentApprovalLogic
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.stream.AgentAskQuestion
 import com.denova.novara.core.stream.AgentAskResolution
 import com.denova.novara.core.stream.AgentUiChunk
+import com.denova.novara.core.stream.ApprovalOption
 import com.denova.novara.core.stream.AgentPhase
 import com.denova.novara.core.stream.AgentStreamRecoveryCoordinator
 import com.denova.novara.core.stream.AgentUiFrame
@@ -357,6 +359,51 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             this[question.id] = AgentAskLogic.toggle(question, current[question.id].orEmpty(), optionId)
         }
         _askSelections.value = _askSelections.value + (askId to updated)
+    }
+
+    /**
+     * 审批工具调用（AGT-003）：`allow-once` / `allow-workspace` / `deny` 走同一个 answer 端点，
+     * 答案体固定 `question_id=tool-approval`。选择「始终允许」时服务端会落一条工作区规则，
+     * 客户端不自行记忆、不改写规则内容。
+     */
+    fun approveAsk(askId: String, option: ApprovalOption) {
+        val client = client ?: return
+        val sessionId = _state.value.sessionId.trim()
+        val ask = _state.value.pendingAsks.firstOrNull { it.id == askId } ?: return
+        if (!ask.isToolApproval) {
+            DenovaLog.w("Agent", "approve ignored: not a tool approval id=$askId kind=${ask.kind}")
+            return
+        }
+        if (sessionId.isBlank() || _state.value.askSubmitting) return
+        if (option == ApprovalOption.ALLOW_WORKSPACE && !AgentApprovalLogic.canAlwaysAllow(ask.approval)) {
+            // 服务端没有允许记忆时不发这个选项，避免请求被拒后状态不明。
+            DenovaLog.w("Agent", "approve ignored: workspace scope not allowed id=$askId")
+            _state.value = _state.value.copy(askError = "服务端未允许记住该规则")
+            return
+        }
+        _state.value = _state.value.copy(askSubmitting = true, askError = null)
+        viewModelScope.launch {
+            try {
+                val answers = listOf(AgentApprovalLogic.answer(option))
+                val resolution = client.answerSessionAsk(sessionId, askId, answers)
+                DenovaLog.i(
+                    "Agent",
+                    "approval resolved id=$askId option=${option.wireId} status=${resolution.status}",
+                )
+                applyAskResolution(ask, resolution)
+            } catch (e: DenovaApiException) {
+                DenovaLog.w("Agent", "approval failed id=$askId code=${e.code} status=${e.status}")
+                _state.value = _state.value.copy(askError = AgentAskLogic.askError(e.code, e.message))
+                if (AgentAskLogic.needsRefresh(e.code)) refreshActive()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Agent", "approval uncertain id=$askId", e)
+                _state.value = _state.value.copy(askError = e.message ?: "审批提交失败")
+            } finally {
+                _state.value = _state.value.copy(askSubmitting = false)
+            }
+        }
     }
 
     /** 回答提问：答案体只包含已选问题，成功后用服务端返回的 resolution 落状态并刷新投影。 */

@@ -80,4 +80,45 @@
     <string name="ask_submit">提交</string>
     <string name="ask_submitting">提交中…</string>
     <string name="ask_cancel">取消</string>
+
+    <!-- 工具调用审批（AGT-003） -->
+    <string name="approval_title">工具调用审批</string>
+    <string name="approval_label_tool">工具</string>
+    <string name="approval_label_mode">模式</string>
+    <string name="approval_label_cwd">目录</string>
+    <string name="approval_reason_label">原因</string>
+    <string name="approval_deny">拒绝</string>
+    <string name="approval_allow_once">允许本次</string>
+    <string name="approval_allow_workspace">始终允许（工作区）</string>
+    <string name="approval_scope">批准后写入工作区规则：%1$s</string>
+    <string name="approval_state_waiting">等待批准</string>
+    <string name="approval_state_allowed">已允许（本次）</string>
+    <string name="approval_state_allowed_workspace">已允许（工作区规则）</string>
+    <string name="approval_state_denied">已拒绝</string>
+    <string name="approval_state_cancelled">已取消</string>
+    <string name="approval_risk_low">低风险</string>
+    <string name="approval_risk_medium">中风险</string>
+    <string name="approval_risk_high">高风险</string>
+    <string name="approval_risk_critical">极高风险</string>
+    <string name="approval_risk_unknown">风险未知</string>
+    <string name="approval_mode_ask">逐次询问</string>
+    <string name="approval_mode_write">写入自动批准</string>
+    <string name="approval_mode_full">完全放行</string>
+    <string name="approval_mode_unknown">未知模式</string>
+    <string name="approval_reason_workspace_unavailable">本次调用没有可用的工作区边界</string>
+    <string name="approval_reason_invalid_boundary">本次调用的工作区边界不合法</string>
+    <string name="approval_reason_bash_parse_failed">无法解析该 shell 命令</string>
+    <string name="approval_reason_bash_dynamic">该 shell 命令包含动态语法</string>
+    <string name="approval_reason_bash_unlisted">该 shell 命令不在允许列表内</string>
+    <string name="approval_reason_bash_unclassified">无法归类该 shell 命令</string>
+    <string name="approval_reason_pwsh_dynamic">该 PowerShell 命令包含动态语法</string>
+    <string name="approval_reason_pwsh_parse_failed">无法解析该 PowerShell 命令</string>
+    <string name="approval_reason_pwsh_unlisted">该 PowerShell 命令不在允许列表内</string>
+    <string name="approval_reason_browser_args">浏览器参数无法识别</string>
+    <string name="approval_reason_browser_mutation">该浏览器操作会修改远端页面</string>
+    <string name="approval_reason_browser_command">无法识别该浏览器命令</string>
+    <string name="approval_reason_browser_action">无法识别该浏览器动作</string>
+    <string name="approval_reason_browser_network">该浏览器操作会访问网络</string>
+    <string name="approval_reason_external_fs">该调用会读取工作区外的文件</string>
+    <string name="approval_reason_generic">该工具调用需要你确认</string>
 </resources>
