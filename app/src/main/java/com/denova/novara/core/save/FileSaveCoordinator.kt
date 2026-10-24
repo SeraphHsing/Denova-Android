@@ -26,8 +26,13 @@ sealed interface SaveOutcome {
     /** 无冲突，直接保存成功。 */
     data class Saved(val revision: String) : SaveOutcome
 
-    /** 发生冲突但三方合并干净，已用服务器最新 revision 重存成功。 */
-    data class MergedAndSaved(val revision: String) : SaveOutcome
+    /**
+     * 发生冲突但三方合并干净，已用服务器最新 revision 重存成功。
+     *
+     * [mergedText] 是实际写回服务端的合并结果：调用方必须用它替换本地正文，
+     * 否则下一次以 `baseRevision` 保存时会用「本地旧内容」覆盖掉对端修改（静默数据丢失）。
+     */
+    data class MergedAndSaved(val revision: String, val mergedText: String) : SaveOutcome
 
     /** 发生冲突且无法自动合并，返回含冲突标记的文本。 */
     data class Conflict(val mergedText: String, val conflictCount: Int, val serverRevision: String) : SaveOutcome
@@ -87,7 +92,7 @@ class FileSaveCoordinator(
                 is MergeResult.Clean -> {
                     val resp = remote.saveFile(projectId, path, merged.text, theirs.revision)
                     drafts.clearDraft(key)
-                    SaveOutcome.MergedAndSaved(resp.revision)
+                    SaveOutcome.MergedAndSaved(resp.revision, merged.text)
                 }
                 is MergeResult.Conflicts -> {
                     SaveOutcome.Conflict(merged.text, merged.conflictCount, theirs.revision)

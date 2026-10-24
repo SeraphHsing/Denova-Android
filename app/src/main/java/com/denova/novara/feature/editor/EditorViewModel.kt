@@ -27,6 +27,8 @@ data class EditorUiState(
     val saveStatus: SaveStatus = SaveStatus.IDLE,
     val message: String? = null,
     val conflictText: String? = null,
+    /** 外部改写正文（合并结果）时递增，用于让界面重建编辑态。 */
+    val contentEpoch: Int = 0,
 )
 
 /** 编辑器：打开文件 → 编辑（防抖自动保存）→ revision 冲突合并/提示。 */
@@ -117,11 +119,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 is SaveOutcome.MergedAndSaved -> {
                     DenovaLog.i("Editor", "merged+saved path=${s.filePath} revision=${outcome.revision}")
                     kind = "merged"
+                    // 必须采纳合并结果；否则下一次保存会用本地旧内容覆盖对端修改。
                     _uiState.value = _uiState.value.copy(
+                        content = outcome.mergedText,
                         baseRevision = outcome.revision,
-                        baseContent = s.content,
+                        baseContent = outcome.mergedText,
                         saveStatus = SaveStatus.MERGED,
                         message = "已自动合并并保存",
+                        contentEpoch = _uiState.value.contentEpoch + 1,
                     )
                 }
                 is SaveOutcome.Conflict -> {

@@ -72,6 +72,30 @@ class FileSaveCoordinatorTest {
         val outcome = coordinator.save("p", "chapter.md", "r0", base, ours)
         assertTrue(outcome is SaveOutcome.MergedAndSaved)
         assertEquals(2, remote.saveCount)
+        // 合并结果必须回传：两端修改都在，且与写回服务端的内容一致。
+        val merged = (outcome as SaveOutcome.MergedAndSaved).mergedText
+        assertTrue(merged.contains("段落二本地改"))
+        assertTrue(merged.contains("段落三服务器改"))
+        assertEquals(merged, remote.serverContent)
+    }
+
+    @Test
+    fun `clean merge result must be adopted so the next save keeps remote edits`() = runBlocking {
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二\n段落三服务器改\n结尾"
+            serverRevision = "r2"
+        }
+        val drafts = FakeDrafts()
+        val coordinator = FileSaveCoordinator(remote, drafts)
+        val base = "标题\n段落一\n段落二\n段落三\n结尾"
+        val ours = "标题\n段落一\n段落二本地改\n段落三\n结尾"
+        val first = coordinator.save("p", "chapter.md", "r0", base, ours) as SaveOutcome.MergedAndSaved
+
+        // 模拟界面采纳合并结果后的再次保存：服务端内容不应被本地旧文本覆盖。
+        coordinator.save("p", "chapter.md", first.revision, first.mergedText, first.mergedText)
+        assertTrue(remote.serverContent.contains("段落三服务器改"))
+        assertTrue(remote.serverContent.contains("段落二本地改"))
     }
 
     @Test

@@ -56,8 +56,8 @@ fun EditorScreen(
     // D03-W 埋点：本组合已提交绘制，结算「最后一次按键 → 可见」延迟。
     SideEffect { EditorPerf.markDraw() }
 
-    // 外部内容变化（打开文件/冲突合并）时重置本地编辑态。
-    LaunchedEffect(uiState.loaded, uiState.filePath, uiState.conflictText) {
+    // 外部内容变化（打开文件/合并结果/冲突材料）时重置本地编辑态。
+    LaunchedEffect(uiState.loaded, uiState.filePath, uiState.conflictText, uiState.contentEpoch) {
         android.util.Log.d("EditorScreen", "sync: loaded=${uiState.loaded} contentLen=${uiState.content.length}")
         textFieldValue = TextFieldValue(uiState.content)
     }
