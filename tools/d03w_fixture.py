@@ -150,16 +150,26 @@ def upload(records: list[dict], base: str, project_id: str, prefix: str) -> None
         target = f"{prefix.rstrip('/')}/{rel}" if prefix else rel
         with open(rec["path"], "rb") as f:
             content = f.read().decode("utf-8")
-        body = json.dumps({"path": target, "content": content, "base_revision": ""}).encode("utf-8")
+        # 后端要求每次保存都带 base_revision：已存在用当前 revision，不存在时必须传 "missing"。
+        rev = _current_revision(opener, base, project_id, target)
+        body = json.dumps({"path": target, "content": content, "base_revision": rev}).encode("utf-8")
         req = urllib.request.Request(f"{base}/api/projects/{project_id}/files/file", data=body,
                                      method="PUT", headers={"Content-Type": "application/json"})
         try:
             with opener.open(req, timeout=60) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
-            print(f"uploaded {target} revision={payload.get('revision')}")
+            print(f"uploaded {target} revision={payload.get('revision')} (base={rev})")
         except urllib.error.HTTPError as exc:
             print(f"FAILED {target} {exc.code} {exc.read().decode('utf-8', 'replace')[:200]}")
             raise SystemExit(1)
+
+
+def _current_revision(opener, base: str, project_id: str, path: str) -> str:
+    url = f"{base}/api/projects/{project_id}/files/file?path={path}&optional=true"
+    with opener.open(url, timeout=30) as resp:
+        payload = json.loads(resp.read().decode("utf-8"))
+    document = payload.get("document") or {}
+    return document.get("revision") or "missing"
 
 
 def main() -> None:
