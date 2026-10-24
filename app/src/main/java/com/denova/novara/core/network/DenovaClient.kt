@@ -151,6 +151,9 @@ class DenovaClient(
     /** 在途请求计数：退出登录时据此等待进行中的读取/流收尾。 */
     val inFlight = InFlightTracker()
 
+    /** 请求世代：logout / 重新连接时退休，使迟到响应作废（AUTH-004）。 */
+    val generation = RequestGeneration()
+
     /** 共享 OkHttpClient（含会话 CookieJar）：受保护图片、SSE、WS 都复用此实例，保证会话一致。 */
     val okHttpClient: OkHttpClient = OkHttpClient.Builder()
         .cookieJar(cookieJar)
@@ -205,6 +208,8 @@ class DenovaClient(
                 "logout drain pending=$pending drained=$drained after=${LOGOUT_DRAIN_MILLIS}ms",
             )
         }
+        // 退休世代：即使 drain 未等完（超时），残余在途响应也一律作废。
+        generation.retire()
         val request = Request.Builder()
             .url(server.baseUrl + "/api/auth/logout")
             .post("".toRequestBody(null))
