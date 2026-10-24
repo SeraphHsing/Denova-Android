@@ -40,6 +40,13 @@ private data class ChunkData(val content: String? = null, val subagent: Boolean?
 /** chunk 合批发布间隔：约 16 次/秒，兼顾流式观感与主线程负载。 */
 private const val CHUNK_FLUSH_INTERVAL_MS = 60L
 
+/**
+ * 渐进式恢复：首屏只取最近若干轮，让「恢复可操作」不必等全量历史；
+ * 全量随后台任务补全（history 耗时随 limit 近似线性：3 轮 ≈0.22s，50 轮 ≈2.1s）。
+ */
+private const val FAST_BASELINE_TURNS = 3
+private const val FULL_BASELINE_TURNS = 50
+
 /** 游戏 UI 状态：投影阶段 + 累积叙事 + 连接态。 */
 data class GameUiState(
     val storyId: String = "",
@@ -72,6 +79,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     // 叙事增量分块 + chunk 合批（60ms 发布一次，避免每个 chunk 触发重组）。
     private val narrative = NarrativeBuilder()
     private val pendingChunks = StringBuilder()
+
+    /** 本次挂接后由流追加的正文；全量基线到达时用它重建，避免覆盖流增量。 */
+    private val streamTail = StringBuilder()
     private var flushJob: Job? = null
 
     // 「事件接收 → 投影可见」延迟采样（gfxinfo 在本机不可用，改用直接埋点）。
@@ -104,19 +114,41 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         DenovaLog.i("Game", "start story=$storyId branch=$branchId")
         dropPendingChunks()
         narrative.reset("")
+        streamTail.setLength(0)
         _blocks.value = emptyList()
         resetPerfCounters()
         _uiState.value = GameUiState(storyId = storyId, branchId = branchId)
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
-            // 先加载 canonical 历史作为叙事基线，再挂接流补充增量，
-            // 否则 checkpoint 回放只能重建当前轮，历史叙事会缺失。
-            loadBaseline(storyId, branchId)
+            // 渐进恢复：先加载最近 FAST_BASELINE_TURNS 轮让界面立刻可操作，
+            // 全量历史在后台补全（不阻塞挂接与首屏）。
+            loadBaseline(storyId, branchId, FAST_BASELINE_TURNS, stage = "fast")
+            launch {
+                loadBaseline(
+                    storyId,
+                    branchId,
+                    FULL_BASELINE_TURNS,
+                    stage = "full",
+                    mergeStreamTail = true,
+                )
+            }
             c.recover(storyId, branchId).collect { event ->
                 onEvent(event)
             }
             finishStream()
         }
+    }
+
+    /**
+     * 回前台：若上一轮流因系统中断（后台被掐连接）而异常结束，自动重挂恢复。
+     * 正常 done/settle 不触发（[GameStageState.streamFailed] 为 false）。
+     */
+    fun onForeground() {
+        val state = _uiState.value
+        if (state.storyId.isBlank() || state.sending) return
+        if (!state.stage.streamFailed) return
+        DenovaLog.i("Game", "foreground re-attach after stream failure")
+        start(state.storyId, state.branchId)
     }
 
     /** 发送玩家输入：先落本地事务（SUBMITTING）再 POST，流正常结束即 ACCEPTED。 */
@@ -227,6 +259,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             GameEventType.TASK_CHECKPOINT,
             GameEventType.TASK_REHYDRATE_REQUIRED -> {
                 dropPendingChunks()
+                streamTail.setLength(0)
                 narrative.reset(current.baseline)
                 _blocks.value = narrative.snapshot
                 _uiState.value = current.copy(stage = stage, connected = true, error = null)
@@ -266,6 +299,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val text = pendingChunks.toString()
         pendingChunks.setLength(0)
         narrative.append(text)
+        streamTail.append(text)
         _blocks.value = narrative.snapshot
 
         perfFlushCount++
@@ -321,18 +355,31 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = current.copy(stage = stage, connected = false, sending = false)
     }
 
-    private suspend fun loadBaseline(storyId: String, branchId: String) {
+    private suspend fun loadBaseline(
+        storyId: String,
+        branchId: String,
+        limit: Int = FULL_BASELINE_TURNS,
+        stage: String = "full",
+        mergeStreamTail: Boolean = false,
+    ) {
         val client = client ?: return
         if (storyId.isBlank()) return
+        val startedAt = System.nanoTime()
         try {
-            val page = client.interactiveHistory(storyId, branchId, limit = 50)
+            val page = client.interactiveHistory(storyId, branchId, limit = limit)
             val baseline = buildCanonicalNarrative(page.turns)
+            val tail = if (mergeStreamTail) streamTail.toString() else ""
             narrative.reset(baseline)
+            if (tail.isNotEmpty()) narrative.append(tail)
             _blocks.value = narrative.snapshot
             _uiState.value = _uiState.value.copy(baseline = baseline)
-            DenovaLog.i("Game", "canonical baseline loaded len=${baseline.length}")
+            DenovaLog.i(
+                "Game",
+                "canonical baseline loaded stage=$stage turns=${page.turns.size} len=${baseline.length}",
+            )
+            DenovaLog.i("Perf", "baseline-$stage=${(System.nanoTime() - startedAt) / 1_000_000}ms")
         } catch (e: Exception) {
-            DenovaLog.w("Game", "load canonical baseline failed", e)
+            DenovaLog.w("Game", "load canonical baseline failed stage=$stage", e)
         }
     }
 
@@ -343,7 +390,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         DenovaLog.w("Game", "rehydrate required task=${request?.taskId} cursor=${request?.cursor}; reload canonical history")
         val baseline = if (client != null && storyId.isNotBlank()) {
             try {
-                val page = client.interactiveHistory(storyId, branchId, limit = 50)
+                val page = client.interactiveHistory(storyId, branchId, limit = FULL_BASELINE_TURNS)
                 buildCanonicalNarrative(page.turns)
             } catch (e: Exception) {
                 DenovaLog.w("Game", "reload canonical history failed", e)
@@ -353,6 +400,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value.baseline
         }
         dropPendingChunks()
+        streamTail.setLength(0)
         narrative.reset(baseline)
         _blocks.value = narrative.snapshot
         _uiState.value = _uiState.value.copy(baseline = baseline, stage = GameStageState())

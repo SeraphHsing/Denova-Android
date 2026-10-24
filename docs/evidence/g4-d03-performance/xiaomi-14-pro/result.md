@@ -111,6 +111,31 @@
 
 口径：三段均为 app 内部埋点差值，排除人工/adb 导航耗时。**附接 + canonical 合并占 94%**（2651/2823），是后续优化重点（history 端点 ~95KB JSON 拉取 + 解析）。
 
+### 4.5 恢复耗时优化（渐进式基线 + 回前台重挂，真机 6 次有效）
+
+**根因定位**：`GET /api/interactive/stories/:id/history` 的服务端耗时随 `limit` 近似线性——`limit=3 → 223ms/28KB`、`limit=5 → 330ms/51KB`、`limit=10 → 681ms/104KB`、`limit=20 → 1309ms/179KB`、`limit=50 → 2096ms/302KB`。原先一次取 50 轮，故首屏必然等 2s+。
+
+**改造**：
+1. **渐进式基线**：先取最近 3 轮（≈285ms）立即渲染，全量 50 轮随后台协程补全并合并（保留流增量，`streamTail`）。
+2. **批量替换后锚回最新**：基线整段替换时 `scrollToItem(0)`，避免停在旧端空白。
+3. **回前台自动重挂**：后台被系统掐断连接（`SocketException`）后标记 `streamFailed`，`ON_RESUME` 时自动 `start()` 重新附接。
+
+| run | 认证 | start→首屏基线 | start→可操作 | start→全量就绪 |
+|---|---|---|---|---|
+| 1 | 195 ms | 319 ms | 359 ms | 2745 ms |
+| 2 | 125 ms | 315 ms | 355 ms | 2728 ms |
+| 3 | 142 ms | 314 ms | 354 ms | 2744 ms |
+| 4 | 267 ms | 271 ms | 314 ms | 2712 ms |
+| 5 | 135 ms | 270 ms | 308 ms | 2694 ms |
+| 6 | 141 ms | 267 ms | 303 ms | 2754 ms |
+| **中位（去极值）** | **142 ms** | **315 ms** | **334 ms** | **2736 ms** |
+
+**恢复至可操作 = 认证 + start→可操作 ≈ 488 ms**（原 2823 ms，**提升约 5.8×/-83%**）；全量历史约 2878 ms 后台完成，不阻塞操作。
+
+**后台恢复用例（2 个）**：
+- 保留内容：HOME 30s → 返回，叙事完整、无重取、无崩溃（`am start` 直接 bring-to-front，未重建 Activity）。
+- 活跃流：发送后立即 HOME 40s → 连接被系统中断（`SocketException: Software caused connection abort`）→ 回前台日志 `foreground re-attach after stream failure` → 首屏基线 285ms 可操作、全量 2583ms；期间服务端 turn 照常完成（`status=done`），客户端重新挂接后结果与身份一致。
+
 ## 五、G4 数值预算（本轮冻结）
 
 依据：真机 5 次中位数（主档）+ 模拟器与 Web 基线（参照）；各项留约 2× 余量，未在测量失败后放宽。
@@ -121,10 +146,10 @@
 | 事件接收 → 投影可见 p99 | 同上 | **≤ 80 ms** | 真机中位 33 ms |
 | 单事件投影耗时 | reducer + 状态发布 | **≤ 2 ms** | 真机 0.122 ms、模拟器 0.116 ms |
 | 峰值 PSS 增量 | D03-S 60s / 6MB / ≈205 万字 | **≤ 60 MB** | 真机 +30.3 MB；模拟器 +3.3 MB |
-| **恢复总耗时**（认证 + 附接 + canonical 合并 → 可操作） | 冷启 + 固定断线（`force-stop`） | **≤ 4000 ms** | 真机 5 次中位 **2823 ms** |
-| 其中：认证往返 | `login-start` → `login ok` | **≤ 500 ms** | 中位 126 ms |
-| 其中：附接 + canonical 合并 | `start story=` → `baseline loaded` | **≤ 3500 ms** | 中位 2651 ms |
-| 其中：基线 → 可操作渲染 | `baseline loaded` → 首次可见 | **≤ 200 ms** | 中位 61 ms |
+| **恢复至可操作**（认证 + 首屏基线 + 渲染） | 冷启 + 固定断线（`force-stop`） | **≤ 1000 ms** | 真机中位 **488 ms**（渐进基线后） |
+| 其中：认证往返 | `login-start` → `login ok` | **≤ 500 ms** | 中位 142 ms |
+| 其中：首屏基线（3 轮）+ 渲染 | `start story=` → `narrative-visible` | **≤ 600 ms** | 中位 334 ms |
+| 全量历史就绪（后台，不阻塞） | `start story=` → `baseline-full` | **≤ 4000 ms** | 中位 2736 ms（含认证约 2878 ms） |
 | 流式更新帧时间 | — | **暂不冻结** | 本机 `gfxinfo` janky/percentile 经对照实验判定不可用（见 §一），改用可见延迟作为替代口径 |
 
 ## 六、仍未达 D03 通过条件

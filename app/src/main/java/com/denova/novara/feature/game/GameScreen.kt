@@ -11,20 +11,27 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GamePhase
@@ -36,6 +43,17 @@ import com.denova.novara.core.stream.GamePhase
 @Composable
 fun GameScreen(viewModel: GameViewModel, onBack: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
+
+    // 后台被系统掐断连接后，回前台自动重挂（身份/结果仍对应）。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.onForeground()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     var storyId by remember { mutableStateOf("") }
     var branchId by remember { mutableStateOf("") }
     var input by remember { mutableStateOf("") }
@@ -147,7 +165,18 @@ private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifie
     // 每次成功重组后结算「事件接收 → 投影可见」延迟（D03 指标埋点）。
     // 用 SideEffect 而非 drawWithContent：LazyColumn 增量追加时整节点不一定重绘。
     SideEffect { viewModel.onNarrativeDrawn() }
+
+    // 渐进恢复会先放少量基线、再整段替换为全量；此时需锚回最新内容，
+    // 否则列表会停在旧端（空白）。只在「批量变更」时滚动，避免流式追加时逐帧重排。
+    val listState = rememberLazyListState()
+    var lastBlockCount by remember { mutableIntStateOf(0) }
+    LaunchedEffect(blocks.size) {
+        if (blocks.size > lastBlockCount + 20) listState.scrollToItem(0)
+        lastBlockCount = blocks.size
+    }
+
     LazyColumn(
+        state = listState,
         reverseLayout = true,
         modifier = modifier
             .fillMaxWidth()
