@@ -94,6 +94,7 @@
 - 2026-10-24 已验收项复核与证据补齐：118 条按每行 `steps` 逐条复核后确认 **6 条**满足「已实现 + 验收通过」，其余 112 条因缺行内步骤保持 `未开始`（典型：AUTH-001 缺 HTTPS、AUTH-002 缺受保护图片、AUTH-005 缺退出等待进行中读取、WRI-005 缺语料对照、GAM-004 Enter 行为不符、GAM-014 缺二次中断、WB-008 缺设备旋转、SYS-002 缺编辑器长章节）。原 4 条回写行的 `evidence_path` 只指向本文，不符合「证据须为真实产物」；本轮真机重跑并补出 `docs/evidence/g2-editor/xiaomi-14-pro/result.md`（模式往返）、`docs/evidence/g3-save/xiaomi-14-pro/result.md`（自动保存与读回，revision `459b…`→`9773…`→`459b…`）、`docs/evidence/g4-agent-send/xiaomi-14-pro/result.md`（发送与回执，服务端 `status=done`），6 条证据路径现已全部指向独立证据文件。
 - 2026-10-24 状态文档校正与矩阵回写（纯文档）：把首行阶段描述改为「G4/G5 判据齐备、G6 范围受限通过、G1/G2/G3 仍缺退出条件项、尚未进入 P2」，重写「下一步顺序」，修正 `README.md` 项目状态段，并把「未完成 / 尚未验证」表里混入的已通过项（G5 / G6 / 工程 / CI）移入已完成表。矩阵按「P0–P1 已实现并验证」回写 **6 条 `已完成`**（WRI-004 富文本源码往返、WRI-010 自动保存、AGT-002 发送与回执、WB-004 文件打开编辑保存、WB-007 终端创建与屏幕、WB-009 终端关闭与共存），每行写入实现位置、证据与范围说明；其余 112 条保持 `未开始`。此前按原型覆盖度登记 33 行「部分实现」的做法已撤销（[01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)）。
 - 2026-10-24 补 G3 保存状态机并真机验证进程终止草稿恢复：抽 `EditorSession`（`feature/editor/EditorSession.kt`）——保存快照与当前编辑内容分离（回执只确认当时快照，期间继续编辑仍 dirty 并重新调度）、冲突时暂停自动保存（`resolveConflict` 才保存）、合并结果迟到时把新编辑 re-apply 不丢服务器修改、打开时优先恢复未提交草稿（`EditorOpen.decide`）；`DraftStorage` 接口新增 `loadDraft`，`EditorViewModel` 委托 `EditorSession`。新增 `EditorSessionTest`（12 测试）。**真机（小米14Pro）验证草稿事务提交前后终止进程通过**：提交前（<800ms）force-stop → 重启恢复服务器内容（编辑丢失）；提交后（断网让保存失败、草稿落盘）force-stop → 重启界面「已恢复未保存的编辑」、草稿表 content 72 字符。重叠冲突与迟到回包端到端因 adb 无法精确构造（选区替换/保存期间注入编辑）仍由单测覆盖。证据 `docs/evidence/g3-save/xiaomi-14-pro/recovery.md`。
+- 2026-10-24 开始 P3（第一切片：项目文件树 WRI-002）：右抽屉「项目目录」由占位改为真实文件树——`DenovaClient.resolveProjectFiles`（`POST /files/resolve`，`recursive: true` 一次铺开，**修正旧注释误写的 `/book/tree`**）+ `core/network/ProjectFileTree` DTO + `core/project/ProjectFileTree`（树构建 / 展开可见行纯逻辑，5 测试）+ `ProjectDirectoryViewModel`（加载 / 展开 / 刷新 / 选中）+ `RightDrawer` 文件树（目录 `▸/▾`、选中高亮）+ `MainActivity` 接线（编辑器项目 ID → 右抽屉加载 → 点击文件打开编辑器）。**真机通过**：`loaded dirs=1 rows=7`、点击 `ideas.md` → `opened … path=ideas.md`、重开右抽屉 `ideas.md` 高亮。未覆盖：大目录懒加载分页（无 `partial` 目录验证条件），故 `WRI-002` 暂不回写。证据 `docs/evidence/p3-project-directory/xiaomi-14-pro/result.md`。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -124,7 +125,7 @@
 
 1. **P1 已退出（2026-10-24）：** 未满足项按 [05 §3.1 台账](android-web-parity/05-roadmap.md#31-p1-证据台账2026-10-24-核对) 全部定性——环境受限 2 条（G1-b HTTPS/WSS、G6-a 基线回收）、留待 P3 7 条（G1-d、G2-c、G3-b/c/d、G4-d、G6-b），不再作为阶段阻塞；同节登记「无原生录屏」的证据形态缺口。
 2. **P2 工程基础（收尾中）：** AppContainer、单 Activity 导航、左右抽屉、DesignTokens、深浅主题、中英文、Room 草稿与命令身份、请求退休机制均已落地（2026-10-24）；仅剩「请求世代全 ViewModel 穿透接入 + 迟到 401 端到端构造」留待 P3 按请求密集路径接入；退出验证按 [05 §4](android-web-parity/05-roadmap.md#4-p2工程基础与公共界面)。
-3. **P3 起：** 按 [05 §5–§6](android-web-parity/05-roadmap.md#5-p3第一条完整写作链路) 铺开第一条完整写作链路与各业务模块；矩阵中 108 条 `未开始` 随页面实现逐条落地，确认完成后再回写。
+3. **P3（进行中）：** 第一切片「项目文件树 WRI-002」已实现并真机通过（加载 / 展开 / 选择 / 刷新 / 点击打开；大目录分页留待补），`WRI-002` 因分页未覆盖暂不回写；继续按 [05 §5–§6](android-web-parity/05-roadmap.md#5-p3第一条完整写作链路) 推进「选择书籍 → 打开项目目录 → 选择章节 → 编辑 → Agent」链路，矩阵条目实现即回写。
 4. **P3 需回补的 P1 台账条目：** G1-d 迟到 401 端到端、G2-c 全节点（图片 / 表格、中文 IME、选区）、G3-b 重叠冲突双端、G3-c 迟到回包端到端、G3-d 切文件（先补 `EditorSession.open()` 取消在途保存 + 用例）、G4-d 跨包升级安装；G6-b 权限分层随 P4-D。补齐并验收后再更新对应矩阵行。
 5. **遗留（不阻塞阶段推进）：** 其余 108 条首批场景仍需在 P2/P3 期间按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
 
