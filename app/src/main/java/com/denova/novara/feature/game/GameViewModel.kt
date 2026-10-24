@@ -58,6 +58,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var streamJob: Job? = null
     private var sendJob: Job? = null
 
+    // D03 性能埋点：事件投影耗时累计统计（不影响功能）。
+    private var perfEventCount = 0
+    private var perfTotalNanos = 0L
+    private var perfMaxNanos = 0L
+
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
@@ -112,6 +117,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         streamJob = null
         sendJob?.cancel()
         _uiState.value = _uiState.value.copy(storyId = storyId, branchId = branchId, sending = true, error = null)
+        val sendStartNanos = System.nanoTime()
+        perfEventCount = 0
+        perfTotalNanos = 0
+        perfMaxNanos = 0
         sendJob = viewModelScope.launch {
             commands.save(record) // 本地事务先落盘
             try {
@@ -129,6 +138,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     onEvent = { event ->
                         if (!accepted) {
                             accepted = true
+                            DenovaLog.i("GamePerf", "first-frame=${(System.nanoTime() - sendStartNanos) / 1_000_000.0}ms")
                             commands.updateStatus(commandId, CommandStatus.ACCEPTED)
                             _uiState.value = _uiState.value.copy(sending = false)
                         }
@@ -168,6 +178,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun onEvent(event: GameStreamEvent) {
+        val startNanos = System.nanoTime()
         val current = _uiState.value
         val stage = GameStageReducer.reduce(current.stage, event)
 
@@ -183,6 +194,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _uiState.value = current.copy(stage = stage, narrative = narrative, connected = true, error = null)
+
+        val costNanos = System.nanoTime() - startNanos
+        perfEventCount++
+        perfTotalNanos += costNanos
+        if (costNanos > perfMaxNanos) perfMaxNanos = costNanos
+        if (perfEventCount % 100 == 0) {
+            DenovaLog.i(
+                "GamePerf",
+                "events=$perfEventCount avgMs=${perfTotalNanos / 1_000_000.0 / perfEventCount} maxMs=${perfMaxNanos / 1_000_000.0}",
+            )
+        }
     }
 
     /** 流结束：若仍停在运行中，说明没收到 terminal 事件（流异常中断），标记断开。 */
