@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
@@ -95,18 +96,20 @@ class MainActivity : AppCompatActivity() {
                             ModalNavigationDrawer(
                                 drawerState = drawerState,
                                 drawerContent = {
-                                    AppDrawer(
-                                        currentRoute = currentRoute,
-                                        darkTheme = darkTheme,
-                                        onToggleDarkTheme = { settingsViewModel.toggleDarkTheme() },
-                                        language = language,
-                                        onSelectLanguage = { settingsViewModel.setLanguage(it) },
-                                    ) { destination ->
-                                        scope.launch { drawerState.close() }
-                                        navController.navigate(destination.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                            launchSingleTop = true
-                                            restoreState = true
+                                    ModalDrawerSheet {
+                                        AppDrawer(
+                                            currentRoute = currentRoute,
+                                            darkTheme = darkTheme,
+                                            onToggleDarkTheme = { settingsViewModel.toggleDarkTheme() },
+                                            language = language,
+                                            onSelectLanguage = { settingsViewModel.setLanguage(it) },
+                                        ) { destination ->
+                                            scope.launch { drawerState.close() }
+                                            navController.navigate(destination.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
                                         }
                                     }
                                 },

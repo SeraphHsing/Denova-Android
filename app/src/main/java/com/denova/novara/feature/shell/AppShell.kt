@@ -1,5 +1,6 @@
 package com.denova.novara.feature.shell
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -92,14 +93,9 @@ fun AppDrawer(
             }
         }
         HorizontalDivider()
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+        TextButton(onClick = onToggleDarkTheme, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.dark_mode), modifier = Modifier.weight(1f))
-            Switch(checked = darkTheme, onCheckedChange = { onToggleDarkTheme() })
+            Switch(checked = darkTheme, onCheckedChange = null)
         }
         Row(
             Modifier
