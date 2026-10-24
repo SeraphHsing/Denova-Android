@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.denova.novara.core.command.CommandRecord
 import com.denova.novara.core.command.CommandStatus
+import com.denova.novara.NovaraApplication
 import com.denova.novara.core.command.CommandStore
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
@@ -38,7 +39,7 @@ data class AgentScreenState(
 class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     private val json = Json { ignoreUnknownKeys = true }
-    private val commands = CommandStore(application)
+    private val commands = CommandStore((application as NovaraApplication).container.database.commandDao())
     private var client: DenovaClient? = null
     private var coordinator: AgentStreamRecoveryCoordinator? = null
     private var streamJob: Job? = null

@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import androidx.room.Room
+import com.denova.novara.core.db.NovaraDatabase
 import com.denova.novara.feature.agent.AgentViewModel
 import com.denova.novara.feature.connection.ConnectionViewModel
 import com.denova.novara.feature.debug.DebugPanelViewModel
@@ -22,7 +24,12 @@ import com.denova.novara.feature.terminal.TerminalViewModel
  *
  * 现在只提供 [viewModelFactory]；后续 Room 草稿库、请求退休机制、环境配置等共享依赖统一在此创建。
  */
-class AppContainer(application: Application) {
+class AppContainer(private val application: Application) {
+
+    /** 本地结构化存储（草稿与命令身份）；懒加载单例，业务只经 DraftStorage / CommandStorage 接口访问。 */
+    val database: NovaraDatabase by lazy {
+        Room.databaseBuilder(application, NovaraDatabase::class.java, "novara.db").build()
+    }
 
     val viewModelFactory: ViewModelProvider.Factory = viewModelFactory {
         initializer { ConnectionViewModel(application) }

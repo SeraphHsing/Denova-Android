@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
+import com.denova.novara.NovaraApplication
 import com.denova.novara.core.persistence.DraftStore
 import com.denova.novara.core.save.FileSaveCoordinator
 import com.denova.novara.core.save.SaveOutcome
@@ -39,7 +40,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         const val AUTOSAVE_DEBOUNCE_MILLIS = 800L
     }
 
-    private val drafts = DraftStore(application)
+    private val drafts = DraftStore((application as NovaraApplication).container.database.draftDao())
     private var client: DenovaClient? = null
     private var coordinator: FileSaveCoordinator? = null
 
