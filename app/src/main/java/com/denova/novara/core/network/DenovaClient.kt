@@ -2,6 +2,9 @@ package com.denova.novara.core.network
 
 import com.denova.novara.core.model.ServerKey
 import com.denova.novara.core.save.FileRemote
+import com.denova.novara.core.stream.AgentActiveView
+import com.denova.novara.core.stream.AgentRecoveryRequest
+import com.denova.novara.core.stream.AgentStreamTransport
 import com.denova.novara.core.stream.AgentUiFrame
 import com.denova.novara.core.stream.GameActiveView
 import com.denova.novara.core.stream.GameStreamError
@@ -104,7 +107,7 @@ class DenovaApiException(
  * 单个服务器的认证客户端。每个 ServerKey 一个实例；Cookie 通过内存 [InMemoryCookieJar]
  * 隔离，切换服务器即重建客户端，从而隔离会话 Cookie。
  */
-class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransport {
+class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransport, AgentStreamTransport {
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -289,7 +292,36 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
      * 响应为 AI SDK UI message stream（`x-vercel-ai-ui-message-stream: v1`），
      * 不依赖 Last-Event-ID，重连游标通过 `after=` 显式传递。
      */
-    fun agentStream(taskId: String, after: String?): Flow<AgentUiFrame> = flow {
+    override suspend fun agentActive(sessionId: String): AgentActiveView {
+        val request = Request.Builder().url(agentActiveUrl(sessionId)).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
+                json.decodeFromString(AgentActiveView.serializer(), body)
+            }
+        }
+    }
+
+    override suspend fun agentRecover(sessionId: String, action: RecoveryAction): RecoveryReceipt {
+        val body = json.encodeToString(
+            AgentRecoveryRequest.serializer(),
+            AgentRecoveryRequest(action, sessionId),
+        )
+        val request = Request.Builder()
+            .url(agentChatUrl("recovery"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toGameStreamError(resp.code, text)
+                json.decodeFromString(RecoveryReceipt.serializer(), text)
+            }
+        }
+    }
+
+    override fun agentStream(taskId: String, after: String?): Flow<AgentUiFrame> = flow {
         val request = Request.Builder().url(agentStreamUrl(taskId, after)).get().build()
         streamHttpClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) {
@@ -340,6 +372,12 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
 
     private fun interactiveSendUrl(): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/chat").build()
+
+    private fun agentChatUrl(path: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/chat/$path").build()
+
+    private fun agentActiveUrl(sessionId: String): HttpUrl =
+        agentChatUrl("active").newBuilder().addQueryParameter("session_id", sessionId).build()
 
     private fun agentStreamUrl(taskId: String, after: String?): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder()
