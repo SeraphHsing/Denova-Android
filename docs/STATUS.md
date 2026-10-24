@@ -73,6 +73,7 @@
 
 - 2026-10-24 G6 第 6 轮（范围决定 SD-01 通过，G6 收口）：用户（Hsing）确认 [SD-01](android-web-parity/07-evidence-and-decisions.md#范围决定scope-decision)——Web 挂载工作台回收所有 `attached=0` 且不在其持久化标签中的会话属固定基线行为，Android 侧不作对抗；Android 保证不静默重建空 PTY、7–25s 内如实提示、只 DELETE 自身会话、被回收后保留最近 64KB 只读历史（B）、进程被杀重启免登录并秒级重挂（C，[ADR-12](android-web-parity/07-evidence-and-decisions.md#3-架构决定)）。范围仅限终端 PTY 生命周期。据此 **G6 记为「通过（范围受限）」**，`05` G6 行与 `07` 均已引用 SD-01。遗留（不阻塞 G6）：多端 resize 冲突协商、R05 远程权限表现（P4-D）。
 
+- 2026-10-24 已验收项复核与证据补齐：118 条按每行 `steps` 逐条复核后确认 **6 条**满足「已实现 + 验收通过」，其余 112 条因缺行内步骤保持 `未开始`（典型：AUTH-001 缺 HTTPS、AUTH-002 缺受保护图片、AUTH-005 缺退出等待进行中读取、WRI-005 缺语料对照、GAM-004 Enter 行为不符、GAM-014 缺二次中断、WB-008 缺设备旋转、SYS-002 缺编辑器长章节）。原 4 条回写行的 `evidence_path` 只指向本文，不符合「证据须为真实产物」；本轮真机重跑并补出 `docs/evidence/g2-editor/xiaomi-14-pro/result.md`（模式往返）、`docs/evidence/g3-save/xiaomi-14-pro/result.md`（自动保存与读回，revision `459b…`→`9773…`→`459b…`）、`docs/evidence/g4-agent-send/xiaomi-14-pro/result.md`（发送与回执，服务端 `status=done`），6 条证据路径现已全部指向独立证据文件。
 - 2026-10-24 状态文档校正与矩阵回写（纯文档）：把首行阶段描述改为「G4/G5 判据齐备、G6 范围受限通过、G1/G2/G3 仍缺退出条件项、尚未进入 P2」，重写「下一步顺序」，修正 `README.md` 项目状态段，并把「未完成 / 尚未验证」表里混入的已通过项（G5 / G6 / 工程 / CI）移入已完成表。矩阵按「P0–P1 已实现并验证」回写 **6 条 `已完成`**（WRI-004 富文本源码往返、WRI-010 自动保存、AGT-002 发送与回执、WB-004 文件打开编辑保存、WB-007 终端创建与屏幕、WB-009 终端关闭与共存），每行写入实现位置、证据与范围说明；其余 112 条保持 `未开始`。此前按原型覆盖度登记 33 行「部分实现」的做法已撤销（[01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)）。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
