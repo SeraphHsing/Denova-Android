@@ -1,20 +1,18 @@
 package com.denova.novara.feature.settings
 
-import android.app.Application
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.os.LocaleListCompat
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.denova.novara.core.persistence.PreferencesStore
+import com.denova.novara.core.persistence.Preferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-/** 轻量界面偏好（主题/语言）的 ViewModel。 */
-class SettingsViewModel(application: Application) : AndroidViewModel(application) {
-
-    private val store = PreferencesStore(application)
+/** 轻量界面偏好（主题/语言）的 ViewModel。依赖注入 [Preferences] 与 [LocaleApplier]。 */
+class SettingsViewModel(
+    private val preferences: Preferences,
+    private val localeApplier: LocaleApplier,
+) : ViewModel() {
 
     private val _darkTheme = MutableStateFlow(false)
     val darkTheme: StateFlow<Boolean> = _darkTheme.asStateFlow()
@@ -24,22 +22,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     init {
         viewModelScope.launch {
-            store.darkTheme.collect { _darkTheme.value = it }
+            preferences.darkTheme.collect { _darkTheme.value = it }
         }
         viewModelScope.launch {
-            store.language.collect { _language.value = it }
+            preferences.language.collect { _language.value = it }
         }
     }
 
     fun toggleDarkTheme() {
-        viewModelScope.launch { store.setDarkTheme(!_darkTheme.value) }
+        viewModelScope.launch { preferences.setDarkTheme(!_darkTheme.value) }
     }
 
-    /** 切换应用语言（`en` / `zh`），写偏好并立即应用到 AppCompat locale。 */
+    /** 切换应用语言（`en` / `zh`），写偏好并立即应用。 */
     fun setLanguage(tag: String) {
         viewModelScope.launch {
-            store.setLanguage(tag)
-            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
+            preferences.setLanguage(tag)
+            localeApplier.applyLocale(tag)
         }
     }
 }

@@ -11,25 +11,25 @@ import kotlinx.coroutines.flow.map
 private val Context.preferencesDataStore by preferencesDataStore(name = "preferences")
 
 /** 轻量界面偏好（DataStore）：主题、语言等。服务器状态不存这里（见 AGENTS §4）。 */
-class PreferencesStore(private val context: Context) {
+class PreferencesStore(private val context: Context) : Preferences {
 
     private object Keys {
         val DARK_THEME = booleanPreferencesKey("dark_theme")
         val LANGUAGE = stringPreferencesKey("language")
     }
 
-    val darkTheme: Flow<Boolean> = context.preferencesDataStore.data
+    override val darkTheme: Flow<Boolean> = context.preferencesDataStore.data
         .map { prefs -> prefs[Keys.DARK_THEME] ?: false }
 
-    suspend fun setDarkTheme(enabled: Boolean) {
+    override suspend fun setDarkTheme(enabled: Boolean) {
         context.preferencesDataStore.edit { prefs -> prefs[Keys.DARK_THEME] = enabled }
     }
 
     /** 语言标签（BCP-47），如 `en` / `zh`；未设置默认跟随系统。 */
-    val language: Flow<String> = context.preferencesDataStore.data
+    override val language: Flow<String> = context.preferencesDataStore.data
         .map { prefs -> prefs[Keys.LANGUAGE] ?: "" }
 
-    suspend fun setLanguage(tag: String) {
+    override suspend fun setLanguage(tag: String) {
         context.preferencesDataStore.edit { prefs -> prefs[Keys.LANGUAGE] = tag }
     }
 }
