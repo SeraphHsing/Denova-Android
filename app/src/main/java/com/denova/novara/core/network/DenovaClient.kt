@@ -96,7 +96,12 @@ class DenovaApiException(
  */
 class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransport {
 
-    private val json = Json { ignoreUnknownKeys = true }
+    private val json = Json {
+        ignoreUnknownKeys = true
+        // 服务端可选字段可能显式返回 null（如 running 态的 recovery_actions:null），
+        // 强制收敛到模型默认值，避免非空类型解析崩溃。
+        coerceInputValues = true
+    }
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     /** 共享 OkHttpClient（含会话 CookieJar）：受保护图片、SSE、WS 都复用此实例，保证会话一致。 */

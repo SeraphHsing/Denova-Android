@@ -29,6 +29,9 @@ data class GameUiState(
     val storyId: String = "",
     val branchId: String = "",
     val stage: GameStageState = GameStageState(),
+    /** canonical 历史叙事基线（挂接前/重取时加载）。 */
+    val baseline: String = "",
+    /** 显示叙事 = canonical 基线 + 当前流增量。 */
     val narrative: String = "",
     val connected: Boolean = false,
     val error: String? = null,
@@ -61,6 +64,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = GameUiState(storyId = storyId, branchId = branchId)
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
+            // 先加载 canonical 历史作为叙事基线，再挂接流补充增量，
+            // 否则 checkpoint 回放只能重建当前轮，历史叙事会缺失。
+            loadBaseline(storyId, branchId)
             c.recover(storyId, branchId).collect { event ->
                 onEvent(event)
             }
@@ -85,11 +91,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 if (data != null && data.subagent != true) narrative += data.content.orEmpty()
             }
             GameEventType.TASK_CHECKPOINT,
-            GameEventType.TASK_REHYDRATE_REQUIRED -> narrative = ""
+            GameEventType.TASK_REHYDRATE_REQUIRED -> narrative = current.baseline
             else -> Unit
         }
 
         _uiState.value = current.copy(stage = stage, narrative = narrative, connected = true, error = null)
+    }
+
+    private suspend fun loadBaseline(storyId: String, branchId: String) {
+        val client = client ?: return
+        if (storyId.isBlank()) return
+        try {
+            val page = client.interactiveHistory(storyId, branchId, limit = 50)
+            val baseline = buildCanonicalNarrative(page.turns)
+            _uiState.value = _uiState.value.copy(baseline = baseline, narrative = baseline)
+            DenovaLog.i("Game", "canonical baseline loaded len=${baseline.length}")
+        } catch (e: Exception) {
+            DenovaLog.w("Game", "load canonical baseline failed", e)
+        }
     }
 
     private suspend fun reloadCanonical(request: RehydrateRequest?) {
@@ -97,18 +116,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val storyId = _uiState.value.storyId
         val branchId = _uiState.value.branchId
         DenovaLog.w("Game", "rehydrate required task=${request?.taskId} cursor=${request?.cursor}; reload canonical history")
-        val narrative = if (client != null && storyId.isNotBlank()) {
+        val baseline = if (client != null && storyId.isNotBlank()) {
             try {
                 val page = client.interactiveHistory(storyId, branchId, limit = 50)
                 buildCanonicalNarrative(page.turns)
             } catch (e: Exception) {
                 DenovaLog.w("Game", "reload canonical history failed", e)
-                ""
+                _uiState.value.baseline
             }
         } else {
-            ""
+            _uiState.value.baseline
         }
-        _uiState.value = _uiState.value.copy(narrative = narrative, stage = GameStageState())
+        _uiState.value = _uiState.value.copy(baseline = baseline, narrative = baseline, stage = GameStageState())
     }
 
     override fun onCleared() {

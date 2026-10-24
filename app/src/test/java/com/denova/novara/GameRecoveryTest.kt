@@ -8,6 +8,7 @@ import com.denova.novara.core.stream.parseGameStreamError
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GameRecoveryTest {
@@ -74,6 +75,20 @@ class GameRecoveryTest {
         assertEquals(409, err.status)
         assertEquals(10L, err.earliestCursor)
         assertEquals(20L, err.latestCursor)
+    }
+
+    @Test
+    fun `active view tolerates null recovery actions`() {
+        val tolerant = Json {
+            ignoreUnknownKeys = true
+            coerceInputValues = true
+        }
+        val view = tolerant.decodeFromString(
+            GameActiveView.serializer(),
+            """{"active":true,"task_id":"t1","recovery_actions":null,"recovery_paused":false,"runtime_recoverable":false}""",
+        )
+        assertEquals("t1", view.taskId)
+        assertTrue(view.recoveryActions.isEmpty())
     }
 
     @Test
