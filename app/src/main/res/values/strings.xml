@@ -1,4 +1,37 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Novara</string>
+
+    <!-- 抽屉 / 导航 -->
+    <string name="drawer_title">Novara</string>
+    <string name="dest_workbench">Workbench</string>
+    <string name="dest_editor">Writing</string>
+    <string name="dest_game">Story</string>
+    <string name="dest_agent">Writing Agent</string>
+    <string name="dest_lore">Lore</string>
+    <string name="dest_teller">Teller</string>
+    <string name="dest_versions">Versions</string>
+    <string name="dest_books">Books</string>
+    <string name="dest_skills">Skills</string>
+    <string name="dest_agents">Agents</string>
+    <string name="dest_automations">Automations</string>
+    <string name="dest_market">Market</string>
+    <string name="dest_settings">Settings</string>
+    <string name="not_implemented_suffix">·not implemented</string>
+    <string name="not_implemented">%1$s is not implemented yet</string>
+
+    <!-- 主题 / 语言 -->
+    <string name="dark_mode">Dark mode</string>
+    <string name="language">Language</string>
+
+    <!-- 公共顶栏动作 -->
+    <string name="back">Back</string>
+    <string name="save">Save</string>
+    <string name="logout">Sign out</string>
+    <string name="attach">Attach</string>
+    <string name="send">Send</string>
+    <string name="editor_title">Novara Editor</string>
+    <string name="game_title">Novara Story</string>
+    <string name="agent_title">Novara Writing</string>
+    <string name="terminal_title">Terminal</string>
 </resources>

@@ -21,29 +21,31 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.denova.novara.R
 
 /** 一级目的地（对齐 01 §3 导航顺序；写作/游戏并排入口，设置位于末尾）。 */
 data class AppDestination(
     val route: String,
-    val label: String,
+    val labelRes: Int,
     val implemented: Boolean,
 )
 
 val appDestinations: List<AppDestination> = listOf(
-    AppDestination("workbench", "工作台", implemented = false),
-    AppDestination("editor", "写作", implemented = true),
-    AppDestination("game", "游戏", implemented = true),
-    AppDestination("agent", "写作 Agent", implemented = true),
-    AppDestination("lore", "资料库", implemented = false),
-    AppDestination("teller", "创作方案", implemented = false),
-    AppDestination("versions", "版本管理", implemented = false),
-    AppDestination("books", "书籍管理", implemented = false),
-    AppDestination("skills", "Skills", implemented = false),
-    AppDestination("agents", "Agents", implemented = false),
-    AppDestination("automations", "自动化", implemented = false),
-    AppDestination("market", "资源中心", implemented = false),
-    AppDestination("settings", "设置", implemented = false),
+    AppDestination("workbench", R.string.dest_workbench, implemented = false),
+    AppDestination("editor", R.string.dest_editor, implemented = true),
+    AppDestination("game", R.string.dest_game, implemented = true),
+    AppDestination("agent", R.string.dest_agent, implemented = true),
+    AppDestination("lore", R.string.dest_lore, implemented = false),
+    AppDestination("teller", R.string.dest_teller, implemented = false),
+    AppDestination("versions", R.string.dest_versions, implemented = false),
+    AppDestination("books", R.string.dest_books, implemented = false),
+    AppDestination("skills", R.string.dest_skills, implemented = false),
+    AppDestination("agents", R.string.dest_agents, implemented = false),
+    AppDestination("automations", R.string.dest_automations, implemented = false),
+    AppDestination("market", R.string.dest_market, implemented = false),
+    AppDestination("settings", R.string.dest_settings, implemented = false),
 )
 
 /** 左导航抽屉内容。 */
@@ -52,6 +54,8 @@ fun AppDrawer(
     currentRoute: String?,
     darkTheme: Boolean,
     onToggleDarkTheme: () -> Unit,
+    language: String,
+    onSelectLanguage: (String) -> Unit,
     onNavigate: (AppDestination) -> Unit,
 ) {
     Column(
@@ -61,7 +65,7 @@ fun AppDrawer(
             .verticalScroll(rememberScrollState()),
     ) {
         Text(
-            "Novara",
+            stringResource(R.string.drawer_title),
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.padding(16.dp),
         )
@@ -74,12 +78,12 @@ fun AppDrawer(
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        destination.label,
+                        stringResource(destination.labelRes),
                         color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     )
                     if (!destination.implemented) {
                         Text(
-                            "·未实现",
+                            stringResource(R.string.not_implemented_suffix),
                             color = MaterialTheme.colorScheme.outline,
                             style = MaterialTheme.typography.labelSmall,
                         )
@@ -94,15 +98,41 @@ fun AppDrawer(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("深色模式", modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.dark_mode), modifier = Modifier.weight(1f))
             Switch(checked = darkTheme, onCheckedChange = { onToggleDarkTheme() })
         }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.language), modifier = Modifier.weight(1f))
+            LanguageOption("中文", "zh", language, onSelectLanguage)
+            LanguageOption("English", "en", language, onSelectLanguage)
+        }
+    }
+}
+
+@Composable
+private fun LanguageOption(
+    label: String,
+    tag: String,
+    current: String,
+    onSelect: (String) -> Unit,
+) {
+    val selected = current == tag || (current.isBlank() && tag == "en")
+    TextButton(onClick = { onSelect(tag) }) {
+        Text(
+            label,
+            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
 /** 未实现目的地的占位页。 */
 @Composable
-fun PlaceholderScreen(label: String, onOpenDrawer: () -> Unit) {
+fun PlaceholderScreen(labelRes: Int, onOpenDrawer: () -> Unit) {
     Column(
         Modifier
             .fillMaxSize()
@@ -110,10 +140,13 @@ fun PlaceholderScreen(label: String, onOpenDrawer: () -> Unit) {
     ) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
             IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text(label, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+            Text(stringResource(labelRes), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
         }
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("$label 尚未实现", color = MaterialTheme.colorScheme.outline)
+            Text(
+                stringResource(R.string.not_implemented, stringResource(labelRes)),
+                color = MaterialTheme.colorScheme.outline,
+            )
         }
     }
 }

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Novara</string>
+
+    <!-- 抽屉 / 导航 -->
+    <string name="drawer_title">Novara</string>
+    <string name="dest_workbench">工作台</string>
+    <string name="dest_editor">写作</string>
+    <string name="dest_game">游戏</string>
+    <string name="dest_agent">写作 Agent</string>
+    <string name="dest_lore">资料库</string>
+    <string name="dest_teller">创作方案</string>
+    <string name="dest_versions">版本管理</string>
+    <string name="dest_books">书籍管理</string>
+    <string name="dest_skills">Skills</string>
+    <string name="dest_agents">Agents</string>
+    <string name="dest_automations">自动化</string>
+    <string name="dest_market">资源中心</string>
+    <string name="dest_settings">设置</string>
+    <string name="not_implemented_suffix">·未实现</string>
+    <string name="not_implemented">%1$s 尚未实现</string>
+
+    <!-- 主题 / 语言 -->
+    <string name="dark_mode">深色模式</string>
+    <string name="language">语言</string>
+
+    <!-- 公共顶栏动作 -->
+    <string name="back">返回</string>
+    <string name="save">保存</string>
+    <string name="logout">退出</string>
+    <string name="attach">挂接</string>
+    <string name="send">发送</string>
+    <string name="editor_title">Novara 编辑器</string>
+    <string name="game_title">Novara 游戏</string>
+    <string name="agent_title">Novara 写作</string>
+    <string name="terminal_title">终端</string>
+</resources>

@@ -30,9 +30,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.denova.novara.R
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GamePhase
@@ -67,8 +69,8 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onBack: () ->
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text("Novara 游戏", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-            TextButton(onClick = onBack) { Text("返回") }
+            Text(stringResource(R.string.game_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {

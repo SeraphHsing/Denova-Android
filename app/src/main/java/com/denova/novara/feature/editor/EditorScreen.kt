@@ -26,6 +26,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.denova.novara.R
 import com.denova.novara.core.editor.MarkdownDocument
 
 private enum class EditorMode { SOURCE, RICH, PREVIEW }
@@ -69,10 +71,10 @@ fun EditorScreen(
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text("Novara 编辑器", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-            TextButton(onClick = { viewModel.save() }) { Text("保存") }
-            TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text("终端") }
-            TextButton(onClick = onLogout) { Text("退出") }
+            Text(stringResource(R.string.editor_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+            TextButton(onClick = { viewModel.save() }) { Text(stringResource(R.string.save)) }
+            TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text(stringResource(R.string.terminal_title)) }
+            TextButton(onClick = onLogout) { Text(stringResource(R.string.logout)) }
         }
 
         // 打开文件

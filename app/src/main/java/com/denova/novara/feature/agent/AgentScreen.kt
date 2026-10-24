@@ -24,7 +24,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.denova.novara.R
 import com.denova.novara.core.stream.AgentPhase
 
 /** 写作 Agent 舞台：输入 session/消息 → 挂接 → 展示正文/思考/活动/终态。 */
@@ -42,8 +44,8 @@ fun AgentScreen(viewModel: AgentViewModel, onOpenDrawer: () -> Unit, onBack: () 
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text("Novara 写作", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-            TextButton(onClick = onBack) { Text("返回") }
+            Text(stringResource(R.string.agent_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {

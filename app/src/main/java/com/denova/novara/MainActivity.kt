@@ -1,8 +1,8 @@
 package com.denova.novara
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -52,7 +52,7 @@ import com.denova.novara.feature.terminal.TerminalViewModel
 import com.denova.novara.ui.theme.NovaraTheme
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!logcatInstalled) {
@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
             val container = (application as NovaraApplication).container
             val settingsViewModel: SettingsViewModel = viewModel(factory = container.viewModelFactory)
             val darkTheme by settingsViewModel.darkTheme.collectAsState()
+            val language by settingsViewModel.language.collectAsState()
             NovaraTheme(darkTheme = darkTheme) {
                 val connectionViewModel: ConnectionViewModel = viewModel(factory = container.viewModelFactory)
                 val editorViewModel: EditorViewModel = viewModel(factory = container.viewModelFactory)
@@ -98,6 +99,8 @@ class MainActivity : ComponentActivity() {
                                         currentRoute = currentRoute,
                                         darkTheme = darkTheme,
                                         onToggleDarkTheme = { settingsViewModel.toggleDarkTheme() },
+                                        language = language,
+                                        onSelectLanguage = { settingsViewModel.setLanguage(it) },
                                     ) { destination ->
                                         scope.launch { drawerState.close() }
                                         navController.navigate(destination.route) {
@@ -151,7 +154,7 @@ class MainActivity : ComponentActivity() {
                                     appDestinations.filter { !it.implemented }.forEach { destination ->
                                         composable(destination.route) {
                                             PlaceholderScreen(
-                                                label = destination.label,
+                                                labelRes = destination.labelRes,
                                                 onOpenDrawer = { scope.launch { drawerState.open() } },
                                             )
                                         }

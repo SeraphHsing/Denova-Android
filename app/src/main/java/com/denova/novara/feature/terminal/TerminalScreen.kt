@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -65,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.denova.novara.R
 import com.denova.novara.core.terminal.DEFAULT_BG
 import com.denova.novara.core.terminal.TerminalAttr
 import com.denova.novara.core.terminal.buildRowRuns
@@ -133,8 +135,8 @@ fun TerminalScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text("终端", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-            TextButton(onClick = onBack) { Text("返回") }
+            Text(stringResource(R.string.terminal_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
             Text(state.status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))
             Text(
                 text = "${state.cols}x${state.rows}",
