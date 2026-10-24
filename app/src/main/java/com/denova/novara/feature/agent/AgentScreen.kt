@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,10 +32,27 @@ import com.denova.novara.core.stream.AgentPhase
 
 /** 写作 Agent 舞台：输入 session/消息 → 挂接 → 展示正文/思考/活动/终态。 */
 @Composable
-fun AgentScreen(viewModel: AgentViewModel, onOpenDrawer: () -> Unit, onBack: () -> Unit) {
+fun AgentScreen(
+    viewModel: AgentViewModel,
+    onOpenDrawer: () -> Unit,
+    onBack: () -> Unit,
+    projectId: String = "",
+    initialFile: String = "",
+) {
     val state by viewModel.state.collectAsState()
     var sessionId by remember { mutableStateOf("") }
     var input by remember { mutableStateOf("") }
+
+    // 从编辑器进入时自动确保写作会话（无需手动输入 session ID）。
+    LaunchedEffect(projectId, initialFile) {
+        if (sessionId.isBlank()) {
+            val ensured = viewModel.ensureSession()
+            if (ensured != null) {
+                sessionId = ensured
+                viewModel.start(ensured)
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -103,7 +121,8 @@ fun AgentScreen(viewModel: AgentViewModel, onOpenDrawer: () -> Unit, onBack: () 
             )
             OutlinedButton(
                 onClick = {
-                    viewModel.send(sessionId.trim(), input)
+                    val refs = if (initialFile.isNotBlank()) listOf(initialFile) else emptyList()
+                    viewModel.send(sessionId.trim(), input, refs)
                     input = ""
                 },
                 enabled = !state.sending && sessionId.isNotBlank() && input.isNotBlank(),

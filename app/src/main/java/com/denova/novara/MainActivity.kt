@@ -93,7 +93,9 @@ class MainActivity : AppCompatActivity() {
                 val navController = rememberNavController()
                 val drawerState = rememberDrawerState(DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
+                // 去 query 归一化，保证带参数的 route 也能在抽屉里高亮。
                 val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+                    ?.substringBefore('?')
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (state) {
@@ -162,6 +164,10 @@ class MainActivity : AppCompatActivity() {
                                             onLogout = { connectionViewModel.logout() },
                                             currentProjectId = currentProjectId,
                                             onProjectIdChange = { currentProjectId = it },
+                                            onOpenAgent = { pid, path ->
+                                                val encodedPath = android.net.Uri.encode(path)
+                                                navController.navigate("agent?projectId=$pid&filePath=$encodedPath")
+                                            },
                                         )
                                     }
                                     composable("game") {
@@ -172,11 +178,19 @@ class MainActivity : AppCompatActivity() {
                                             onBack = { navController.popBackStack() },
                                         )
                                     }
-                                    composable("agent") {
+                                    composable(
+                                        route = "agent?projectId={projectId}&filePath={filePath}",
+                                        arguments = listOf(
+                                            navArgument("projectId") { type = NavType.StringType; defaultValue = "" },
+                                            navArgument("filePath") { type = NavType.StringType; defaultValue = "" },
+                                        ),
+                                    ) { entry ->
                                         AgentScreen(
                                             viewModel = agentViewModel,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
                                             onBack = { navController.popBackStack() },
+                                            projectId = entry.arguments?.getString("projectId").orEmpty(),
+                                            initialFile = entry.arguments?.getString("filePath").orEmpty(),
                                         )
                                     }
                                     composable(

@@ -53,6 +53,30 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         this.coordinator = AgentStreamRecoveryCoordinator(client, reloadCanonical = ::reloadCanonical)
     }
 
+    /**
+     * 确保有可用的写作会话：优先当前 active 会话，否则首个会话，都没有则新建。
+     * 返回 session id；失败返回 null。
+     */
+    suspend fun ensureSession(): String? {
+        val c = client ?: return null
+        return try {
+            val sessions = c.sessionList()
+            val chosen = sessions.firstOrNull { it.active } ?: sessions.firstOrNull()
+            if (chosen != null) {
+                DenovaLog.i("Agent", "ensureSession picked=${chosen.id} active=${chosen.active}")
+                chosen.id
+            } else {
+                val created = c.createSession()
+                DenovaLog.i("Agent", "ensureSession created=${created.id}")
+                created.id
+            }
+        } catch (e: Exception) {
+            DenovaLog.w("Agent", "ensureSession failed", e)
+            _state.value = _state.value.copy(error = e.message)
+            null
+        }
+    }
+
     /** 挂接 session 的活动 Agent 流。 */
     fun start(sessionId: String) {
         val c = coordinator ?: return
@@ -74,13 +98,18 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** 发送写作输入：先落本地事务（SUBMITTING）再 POST /api/chat。 */
-    fun send(sessionId: String, message: String) {
+    /** 发送写作输入：先落本地事务（SUBMITTING）再 POST /api/chat（可带引用文件）。 */
+    fun send(sessionId: String, message: String, references: List<String> = emptyList()) {
         val client = client ?: return
         val text = message.trim()
         if (text.isEmpty() || sessionId.isBlank()) return
         val commandId = UUID.randomUUID().toString()
-        val request = SendChatRequest(commandId = commandId, sessionId = sessionId, message = text)
+        val request = SendChatRequest(
+            commandId = commandId,
+            sessionId = sessionId,
+            message = text,
+            references = references,
+        )
         val record = CommandRecord(
             commandId = commandId,
             target = "chat:$sessionId",
@@ -88,7 +117,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             status = CommandStatus.SUBMITTING,
             createdAt = System.currentTimeMillis(),
         )
-        DenovaLog.i("Agent", "send session=$sessionId cmd=$commandId")
+        DenovaLog.i("Agent", "send session=$sessionId cmd=$commandId refs=${references.size}")
         streamJob?.cancel()
         streamJob = null
         sendJob?.cancel()

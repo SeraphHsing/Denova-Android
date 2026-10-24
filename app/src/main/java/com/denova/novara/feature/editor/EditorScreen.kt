@@ -51,6 +51,7 @@ fun EditorScreen(
     onLogout: () -> Unit,
     currentProjectId: String = "",
     onProjectIdChange: (String) -> Unit = {},
+    onOpenAgent: (projectId: String, filePath: String) -> Unit = { _, _ -> },
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var mode by remember { mutableStateOf(EditorMode.SOURCE) }
@@ -87,6 +88,10 @@ fun EditorScreen(
             Text(stringResource(R.string.editor_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
             TextButton(onClick = { viewModel.save() }) { Text(stringResource(R.string.save)) }
             TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text(stringResource(R.string.terminal_title)) }
+            TextButton(
+                onClick = { onOpenAgent(projectId.trim(), filePath.trim()) },
+                enabled = projectId.isNotBlank(),
+            ) { Text(stringResource(R.string.agent_title)) }
             TextButton(onClick = onLogout) { Text(stringResource(R.string.logout)) }
             IconButton(onClick = onOpenRightDrawer) { Text("»") }
         }

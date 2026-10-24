@@ -102,7 +102,26 @@ data class SendChatRequest(
     @SerialName("command_id") val commandId: String,
     @SerialName("session_id") val sessionId: String,
     val message: String,
+    /** 引用文件路径（对齐 Web `sendMessage` 的 `references`）。 */
+    val references: List<String> = emptyList(),
 )
+
+/** 写作会话摘要（`GET /api/sessions`）；`active=true` 为当前会话。 */
+@Serializable
+data class SessionSummary(
+    val id: String,
+    val title: String = "",
+    @SerialName("created_at") val createdAt: String = "",
+    @SerialName("updated_at") val updatedAt: String = "",
+    val active: Boolean = false,
+    @SerialName("message_count") val messageCount: Int = 0,
+)
+
+@Serializable
+data class SessionsResponse(val sessions: List<SessionSummary> = emptyList())
+
+@Serializable
+data class CreateSessionRequest(val title: String = "")
 
 @Serializable
 data class SaveFileResponse(
@@ -405,6 +424,34 @@ class DenovaClient(
      * 响应为 AI SDK UI message stream（`x-vercel-ai-ui-message-stream: v1`），
      * 不依赖 Last-Event-ID，重连游标通过 `after=` 显式传递。
      */
+    /** 写作会话列表：`GET /api/sessions`（`active=true` 为当前会话）。 */
+    suspend fun sessionList(): List<SessionSummary> {
+        val request = Request.Builder().url(server.baseUrl + "/api/sessions").get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(SessionsResponse.serializer(), text).sessions
+            }
+        }
+    }
+
+    /** 创建写作会话：`POST /api/sessions`。 */
+    suspend fun createSession(title: String = ""): SessionSummary {
+        val body = json.encodeToString(CreateSessionRequest.serializer(), CreateSessionRequest(title))
+        val request = Request.Builder()
+            .url(server.baseUrl + "/api/sessions")
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(SessionSummary.serializer(), text)
+            }
+        }
+    }
+
     /** 发送写作输入：`POST /api/chat`，响应为 AI SDK UI message 流。 */
     fun postChat(request: SendChatRequest): Flow<AgentUiFrame> = flow {
         val body = json.encodeToString(SendChatRequest.serializer(), request)
