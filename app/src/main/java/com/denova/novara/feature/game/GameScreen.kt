@@ -44,7 +44,7 @@ import com.denova.novara.core.stream.GamePhase
  * 叙事按 chunk 累积；断线由 [GameViewModel] 内部恢复协调器自动重挂。
  */
 @Composable
-fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onBack: () -> Unit) {
+fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDrawer: () -> Unit, onBack: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
 
     // 后台被系统掐断连接后，回前台自动重挂（身份/结果仍对应）。
@@ -71,6 +71,7 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onBack: () ->
             IconButton(onClick = onOpenDrawer) { Text("☰") }
             Text(stringResource(R.string.game_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
             TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+            IconButton(onClick = onOpenRightDrawer) { Text("»") }
         }
 
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {

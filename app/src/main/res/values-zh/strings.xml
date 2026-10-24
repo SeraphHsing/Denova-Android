@@ -34,4 +34,6 @@
     <string name="game_title">Novara 游戏</string>
     <string name="agent_title">Novara 写作</string>
     <string name="terminal_title">终端</string>
+    <string name="right_drawer_project">项目目录</string>
+    <string name="right_drawer_console">游戏控制台</string>
 </resources>

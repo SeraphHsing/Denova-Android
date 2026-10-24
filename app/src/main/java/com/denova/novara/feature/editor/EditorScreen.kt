@@ -46,6 +46,7 @@ private enum class EditorMode { SOURCE, RICH, PREVIEW }
 fun EditorScreen(
     viewModel: EditorViewModel,
     onOpenDrawer: () -> Unit,
+    onOpenRightDrawer: () -> Unit,
     onOpenTerminal: (String) -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -75,6 +76,7 @@ fun EditorScreen(
             TextButton(onClick = { viewModel.save() }) { Text(stringResource(R.string.save)) }
             TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text(stringResource(R.string.terminal_title)) }
             TextButton(onClick = onLogout) { Text(stringResource(R.string.logout)) }
+            IconButton(onClick = onOpenRightDrawer) { Text("»") }
         }
 
         // 打开文件

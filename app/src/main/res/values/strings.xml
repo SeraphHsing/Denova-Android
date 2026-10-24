@@ -34,4 +34,6 @@
     <string name="game_title">Novara Story</string>
     <string name="agent_title">Novara Writing</string>
     <string name="terminal_title">Terminal</string>
+    <string name="right_drawer_project">Project files</string>
+    <string name="right_drawer_console">Game console</string>
 </resources>

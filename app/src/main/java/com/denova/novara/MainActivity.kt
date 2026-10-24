@@ -22,6 +22,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -31,6 +32,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.denova.novara.R
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.logging.LogcatSink
 import com.denova.novara.feature.agent.AgentScreen
@@ -46,7 +48,10 @@ import com.denova.novara.feature.game.GameScreen
 import com.denova.novara.feature.game.GameViewModel
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.shell.AppDrawer
+import com.denova.novara.feature.shell.GameConsoleContent
 import com.denova.novara.feature.shell.PlaceholderScreen
+import com.denova.novara.feature.shell.ProjectDirectoryContent
+import com.denova.novara.feature.shell.RightDrawer
 import com.denova.novara.feature.shell.appDestinations
 import com.denova.novara.feature.terminal.TerminalScreen
 import com.denova.novara.feature.terminal.TerminalViewModel
@@ -76,6 +81,7 @@ class MainActivity : AppCompatActivity() {
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val state by connectionViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
+                var showRightDrawer by remember { mutableStateOf(false) }
                 val navController = rememberNavController()
                 val drawerState = rememberDrawerState(DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -122,6 +128,7 @@ class MainActivity : AppCompatActivity() {
                                         EditorScreen(
                                             viewModel = editorViewModel,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenRightDrawer = { showRightDrawer = true },
                                             onOpenTerminal = { projectId ->
                                                 navController.navigate("terminal/$projectId")
                                             },
@@ -132,6 +139,7 @@ class MainActivity : AppCompatActivity() {
                                         GameScreen(
                                             viewModel = gameViewModel,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenRightDrawer = { showRightDrawer = true },
                                             onBack = { navController.popBackStack() },
                                         )
                                     }
@@ -166,6 +174,20 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         else -> ConnectionScreen(connectionViewModel)
+                    }
+
+                    // 右项目 / 控制台抽屉（按当前页面）。
+                    if (showRightDrawer) {
+                        RightDrawer(
+                            title = if (currentRoute == "game") {
+                                stringResource(R.string.right_drawer_console)
+                            } else {
+                                stringResource(R.string.right_drawer_project)
+                            },
+                            onDismiss = { showRightDrawer = false },
+                        ) {
+                            if (currentRoute == "game") GameConsoleContent() else ProjectDirectoryContent()
+                        }
                     }
 
                     // 仅 debug 构建显示调试入口与面板。
