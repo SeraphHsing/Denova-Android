@@ -76,6 +76,15 @@ data class SaveFileRequest(
 )
 
 @Serializable
+data class SendInteractiveChatRequest(
+    @SerialName("command_id") val commandId: String,
+    val mode: String = "story",
+    @SerialName("story_id") val storyId: String,
+    val branch: String? = null,
+    val message: String,
+)
+
+@Serializable
 data class SaveFileResponse(
     @SerialName("project_id") val projectId: String = "",
     val path: String,
@@ -248,6 +257,26 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
     }
 
     /**
+     * 发送游戏输入：`POST /api/interactive/chat`，响应即 `StreamTask`（SSE）。
+     * `command_id` 由调用方提供并先行落本地事务（服务端按 command_id 幂等）。
+     */
+    fun postInteractiveChat(request: SendInteractiveChatRequest): Flow<GameStreamEvent> = flow {
+        val body = json.encodeToString(SendInteractiveChatRequest.serializer(), request)
+        val req = Request.Builder()
+            .url(interactiveSendUrl())
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        okHttpClient.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) {
+                throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
+            }
+            val source = resp.body?.source()
+                ?: throw GameStreamError(resp.code, null, "empty interactive chat stream body")
+            emitAll(sseEventsFromSource(source))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /**
      * 写作 Agent UI message 流：`GET /api/chat/stream?task_id=&after=`。
      * 响应为 AI SDK UI message stream（`x-vercel-ai-ui-message-stream: v1`），
      * 不依赖 Last-Event-ID，重连游标通过 `after=` 显式传递。
@@ -300,6 +329,9 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
             .addQueryParameter("task_id", taskId)
             .apply { if (after != null) addQueryParameter("after", after) }
             .build()
+
+    private fun interactiveSendUrl(): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/chat").build()
 
     private fun agentStreamUrl(taskId: String, after: String?): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder()

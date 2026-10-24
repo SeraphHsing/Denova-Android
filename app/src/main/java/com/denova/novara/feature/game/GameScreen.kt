@@ -35,6 +35,7 @@ fun GameScreen(viewModel: GameViewModel, onBack: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
     var storyId by remember { mutableStateOf("") }
     var branchId by remember { mutableStateOf("") }
+    var input by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -95,9 +96,27 @@ fun GameScreen(viewModel: GameViewModel, onBack: () -> Unit) {
             text = uiState.narrative.ifBlank { "输入 story ID 后挂接游戏流" },
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier
-                .fillMaxSize()
+                .weight(1f)
                 .padding(12.dp)
                 .verticalScroll(rememberScrollState()),
         )
+
+        // 发送玩家输入（POST 实时流；先落本地命令事务再发送）
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            OutlinedTextField(
+                value = input,
+                onValueChange = { input = it },
+                label = { Text("玩家输入") },
+                singleLine = true,
+                modifier = Modifier.weight(1f).padding(end = 8.dp),
+            )
+            OutlinedButton(
+                onClick = {
+                    viewModel.send(storyId.trim(), branchId.trim(), input)
+                    input = ""
+                },
+                enabled = !uiState.sending && storyId.isNotBlank() && input.isNotBlank(),
+            ) { Text(if (uiState.sending) "发送中…" else "发送") }
+        }
     }
 }

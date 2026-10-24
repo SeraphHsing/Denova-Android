@@ -3,21 +3,28 @@ package com.denova.novara.feature.game
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.denova.novara.core.command.CommandRecord
+import com.denova.novara.core.command.CommandStatus
+import com.denova.novara.core.command.CommandStore
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
+import com.denova.novara.core.network.SendInteractiveChatRequest
 import com.denova.novara.core.stream.GameEventType
 import com.denova.novara.core.stream.GameStageReducer
 import com.denova.novara.core.stream.GameStageState
+import com.denova.novara.core.stream.GameStreamError
 import com.denova.novara.core.stream.GameStreamEvent
 import com.denova.novara.core.stream.GameStreamRecoveryCoordinator
 import com.denova.novara.core.stream.RehydrateRequest
 import com.denova.novara.core.stream.buildCanonicalNarrative
+import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /** chunk 事件负载的最小解析（叙事累积用）。 */
@@ -34,6 +41,7 @@ data class GameUiState(
     /** 显示叙事 = canonical 基线 + 当前流增量。 */
     val narrative: String = "",
     val connected: Boolean = false,
+    val sending: Boolean = false,
     val error: String? = null,
 )
 
@@ -41,9 +49,11 @@ data class GameUiState(
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val commands = CommandStore(application)
     private var client: DenovaClient? = null
     private var coordinator: GameStreamRecoveryCoordinator? = null
     private var streamJob: Job? = null
+    private var sendJob: Job? = null
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
@@ -74,9 +84,65 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** 发送玩家输入：先落本地事务（SUBMITTING）再 POST，流正常结束即 ACCEPTED。 */
+    fun send(storyId: String, branchId: String, message: String) {
+        val client = client ?: return
+        val text = message.trim()
+        if (text.isEmpty() || storyId.isBlank()) return
+        val commandId = UUID.randomUUID().toString()
+        val request = SendInteractiveChatRequest(
+            commandId = commandId,
+            storyId = storyId,
+            branch = branchId.ifBlank { null },
+            message = text,
+        )
+        val record = CommandRecord(
+            commandId = commandId,
+            target = "game:$storyId:$branchId",
+            payload = json.encodeToString(SendInteractiveChatRequest.serializer(), request),
+            status = CommandStatus.SUBMITTING,
+            createdAt = System.currentTimeMillis(),
+        )
+        DenovaLog.i("Game", "send story=$storyId cmd=$commandId")
+        // 结束当前观察流，改用 POST 实时流。
+        streamJob?.cancel()
+        streamJob = null
+        sendJob?.cancel()
+        _uiState.value = _uiState.value.copy(storyId = storyId, branchId = branchId, sending = true, error = null)
+        sendJob = viewModelScope.launch {
+            commands.save(record) // 本地事务先落盘
+            try {
+                var accepted = false
+                client.postInteractiveChat(request).collect { event ->
+                    if (!accepted) {
+                        accepted = true
+                        commands.updateStatus(commandId, CommandStatus.ACCEPTED)
+                        _uiState.value = _uiState.value.copy(sending = false)
+                    }
+                    onEvent(event)
+                }
+                if (!accepted) {
+                    commands.updateStatus(commandId, CommandStatus.ACCEPTED)
+                    _uiState.value = _uiState.value.copy(sending = false)
+                }
+            } catch (e: GameStreamError) {
+                val rejected = e.status in 400..499 && e.code != null && e.code != "agent_runtime.stream_attached"
+                commands.updateStatus(commandId, if (rejected) CommandStatus.REJECTED else CommandStatus.UNCERTAIN)
+                DenovaLog.w("Game", "send failed code=${e.code} status=${e.status}")
+                _uiState.value = _uiState.value.copy(sending = false, error = e.message)
+            } catch (e: Exception) {
+                commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
+                DenovaLog.w("Game", "send uncertain", e)
+                _uiState.value = _uiState.value.copy(sending = false, error = e.message)
+            }
+        }
+    }
+
     fun stop() {
         streamJob?.cancel()
         streamJob = null
+        sendJob?.cancel()
+        sendJob = null
         _uiState.value = _uiState.value.copy(connected = false)
     }
 
@@ -132,6 +198,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         streamJob?.cancel()
+        sendJob?.cancel()
         super.onCleared()
     }
 }
