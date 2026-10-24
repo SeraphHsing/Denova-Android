@@ -93,6 +93,7 @@
 - 2026-10-24 G3 双端并发真机验证（**发现并修复数据丢失缺陷**）：用 `tools/g3_dual_editor.py`（真实服务器第二客户端）与 App 并发编辑同一文件。**修复前**：无重叠并发触发 409 → 三方合并 → `merged+saved` 成功，但 `MergedAndSaved` 只回传 revision、本地未采纳合并文本，紧接着的一次保存用本地旧正文覆盖了对端修改（服务端读回第 2 行被还原）。**修复**：`MergedAndSaved(revision, mergedText)` 回传合并结果，`EditorViewModel` 采纳为 `content`/`baseContent` 并递增 `contentEpoch` 让编辑区重建；新增 2 个回归测试。**修复后重跑**：同样是 `merged+saved`，随后再次保存，服务端读回两端修改同时保留（rev `812c679d…`）。据此回写 **WRI-012**（无重叠并发）；**WRI-013 未回写**——重叠冲突在 adb 注入下只能构造出可合并的插入（三种方式均判 `merged`），仍只有单测覆盖。证据 `docs/evidence/g3-save/xiaomi-14-pro/dual-client.md`，测试文件测完已删除。
 - 2026-10-24 已验收项复核与证据补齐：118 条按每行 `steps` 逐条复核后确认 **6 条**满足「已实现 + 验收通过」，其余 112 条因缺行内步骤保持 `未开始`（典型：AUTH-001 缺 HTTPS、AUTH-002 缺受保护图片、AUTH-005 缺退出等待进行中读取、WRI-005 缺语料对照、GAM-004 Enter 行为不符、GAM-014 缺二次中断、WB-008 缺设备旋转、SYS-002 缺编辑器长章节）。原 4 条回写行的 `evidence_path` 只指向本文，不符合「证据须为真实产物」；本轮真机重跑并补出 `docs/evidence/g2-editor/xiaomi-14-pro/result.md`（模式往返）、`docs/evidence/g3-save/xiaomi-14-pro/result.md`（自动保存与读回，revision `459b…`→`9773…`→`459b…`）、`docs/evidence/g4-agent-send/xiaomi-14-pro/result.md`（发送与回执，服务端 `status=done`），6 条证据路径现已全部指向独立证据文件。
 - 2026-10-24 状态文档校正与矩阵回写（纯文档）：把首行阶段描述改为「G4/G5 判据齐备、G6 范围受限通过、G1/G2/G3 仍缺退出条件项、尚未进入 P2」，重写「下一步顺序」，修正 `README.md` 项目状态段，并把「未完成 / 尚未验证」表里混入的已通过项（G5 / G6 / 工程 / CI）移入已完成表。矩阵按「P0–P1 已实现并验证」回写 **6 条 `已完成`**（WRI-004 富文本源码往返、WRI-010 自动保存、AGT-002 发送与回执、WB-004 文件打开编辑保存、WB-007 终端创建与屏幕、WB-009 终端关闭与共存），每行写入实现位置、证据与范围说明；其余 112 条保持 `未开始`。此前按原型覆盖度登记 33 行「部分实现」的做法已撤销（[01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)）。
+- 2026-10-24 补 G3 保存状态机并真机验证进程终止草稿恢复：抽 `EditorSession`（`feature/editor/EditorSession.kt`）——保存快照与当前编辑内容分离（回执只确认当时快照，期间继续编辑仍 dirty 并重新调度）、冲突时暂停自动保存（`resolveConflict` 才保存）、合并结果迟到时把新编辑 re-apply 不丢服务器修改、打开时优先恢复未提交草稿（`EditorOpen.decide`）；`DraftStorage` 接口新增 `loadDraft`，`EditorViewModel` 委托 `EditorSession`。新增 `EditorSessionTest`（12 测试）。**真机（小米14Pro）验证草稿事务提交前后终止进程通过**：提交前（<800ms）force-stop → 重启恢复服务器内容（编辑丢失）；提交后（断网让保存失败、草稿落盘）force-stop → 重启界面「已恢复未保存的编辑」、草稿表 content 72 字符。重叠冲突与迟到回包端到端因 adb 无法精确构造（选区替换/保存期间注入编辑）仍由单测覆盖。证据 `docs/evidence/g3-save/xiaomi-14-pro/recovery.md`。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -115,13 +116,13 @@
 | API 契约 | 281 条已按 `85ec97c` 重提取；handler→DTO 已按族核对（认证/写作/Agent流/游戏流/设置模型/终端/长尾族） | 逐字段嵌套 DTO 与双端读回验证（P1 按需展开） |
 | G1 认证与网络 | 连接 + status + 登录 + 退出已真机真实往返；DataStore 服务器地址持久化；持久化 Cookie 免登录；**受保护图片读取真机通过**（`/files/asset` 带会话 200、无会话 401）；**退出时等待进行中读取真机通过**（`logout drain pending=1`）；**一次性配对真机通过**（首次 200、二次 401） | HTTPS/WSS（无 TLS 部署，**验证已放弃**，按环境限制登记）；迟到 401 并入 P2 |
 | G2 Markdown 编辑器 | 序列化层（commonmark + GFM 表格，8 测试）+ 源码/富文本/预览三模式 + 标记隐藏与格式化工具栏（4 测试）；真机渲染通过；**D03-W 已实测并于 2026-10-24 评审通过**（含对照语料：预览渲染全部节点；口径按 UTF-8 字节） | 图片/表格编辑、中文 IME 组合态、选区增强 |
-| G3 保存并发 | 三方合并 `ThreeWayMerge` + revision 校验 + `DraftStore` + `FileSaveCoordinator`（含合并结果采纳回归测试）+ 编辑器 UI 集成；真机单端两次完整保存周期；**双端并发 409 → 合并 → 读回已在真机 + 真实服务器通过**（修复了合并后覆盖对端的缺陷） | 重叠冲突的真实双端用例（现仅单测）、迟到回包、草稿事务提交前后终止进程 |
+| G3 保存并发 | 三方合并 `ThreeWayMerge` + revision 校验 + `DraftStore` + `FileSaveCoordinator`（含合并结果采纳回归测试）+ `EditorSession` 状态机（快照与当前编辑分离、冲突暂停自动保存、迟到回包 re-apply、草稿恢复）；编辑器 UI 集成；真机单端两次完整保存周期；**双端并发 409 → 合并 → 读回已在真机 + 真实服务器通过**（修复了合并后覆盖对端的缺陷）；**草稿事务提交前后终止进程已真机通过**（提交前不恢复、提交后恢复未提交编辑，见 `docs/evidence/g3-save/xiaomi-14-pro/recovery.md`） | 重叠冲突的真实双端用例、迟到回包端到端（两者 adb 无法精确构造，现由单测覆盖，真机证据留待 Web 端操作或输入法辅助） |
 
 
 ## 下一步顺序
 
 1. **G1 收尾说明：** 受保护图片、退出等待进行中读取、一次性配对均已真机通过（见 `docs/evidence/g1-auth/`）。**HTTPS/WSS 无 TLS 部署、验证已放弃（环境限制）**；迟到 401 并入 P2。G1 除这两项环境限制外其余判据已齐备。
-2. **补 G3 剩余判据：** 真实浏览器与 App 的重叠冲突用例（当前 adb 注入只能构造可合并插入，需能精确选区替换的手段或浏览器端操作）、迟到回包、草稿事务提交前后终止进程。
+2. **补 G3 剩余判据：** 草稿事务提交前后终止进程已真机通过（`docs/evidence/g3-save/xiaomi-14-pro/recovery.md`）；剩重叠冲突真实双端用例与迟到回包端到端——两者 adb 无法精确构造（选区替换/保存期间注入编辑），现由 `ThreeWayMergeTest`/`FileSaveCoordinatorTest`/`EditorSessionTest` 单测覆盖，真机证据留待 Web 端操作或输入法辅助。
 3. **P1 退出门槛：** 上述两项通过后，按 [05 §3](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据) 核对每个关卡的录屏/截图证据是否齐备。
 4. **P2 工程基础（收尾中）：** AppContainer、单 Activity 导航、左右抽屉、DesignTokens、深浅主题、中英文、Room 草稿与命令身份、请求退休机制均已落地（2026-10-24）；仅剩「请求世代全 ViewModel 穿透接入 + 迟到 401 端到端构造」留待 P3 按请求密集路径接入；退出验证按 [05 §4](android-web-parity/05-roadmap.md#4-p2工程基础与公共界面)。
 5. **P3 起：** 按 [05 §5–§6](android-web-parity/05-roadmap.md#5-p3第一条完整写作链路) 铺开第一条完整写作链路与各业务模块；矩阵中 108 条 `未开始` 随页面实现逐条落地，确认完成后再回写。
