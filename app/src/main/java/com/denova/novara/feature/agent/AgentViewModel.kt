@@ -16,6 +16,10 @@ import com.denova.novara.core.network.SendChatRequest
 import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
 import com.denova.novara.core.stream.AgentApprovalLogic
+import com.denova.novara.core.stream.AgentImagePart
+import com.denova.novara.core.stream.AgentMessageView
+import com.denova.novara.core.stream.AgentPartLogic
+import com.denova.novara.core.stream.AgentToolPart
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.stream.AgentAskQuestion
@@ -60,6 +64,12 @@ data class AgentScreenState(
     /** 答案 / 取消提交中。 */
     val askSubmitting: Boolean = false,
     val askError: String? = null,
+    /** 完整消息部件（AGT-001）：canonical 历史按 part 保留，界面据此渲染文本/推理/工具/图片。 */
+    val messages: List<AgentMessageView> = emptyList(),
+    val historyLoading: Boolean = false,
+    val historyError: String? = null,
+    /** 当前项目作用域：图片部件走 `/files/asset` 需要它。 */
+    val projectId: String = "",
 )
 
 /** 写作 Agent ViewModel：绑定 client → 恢复协调器 → 投影；发送先落命令事务再 POST。 */
@@ -113,11 +123,12 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** 挂接 session 的活动 Agent 流。 */
-    fun start(sessionId: String) {
+    fun start(sessionId: String, projectId: String = "") {
         val c = coordinator ?: return
         if (sessionId.isBlank()) return
-        DenovaLog.i("Agent", "start session=$sessionId")
-        _state.value = AgentScreenState(sessionId = sessionId)
+        DenovaLog.i("Agent", "start session=$sessionId project=${projectId.take(12)}")
+        // 项目作用域随会话一起带入：图片部件要用它拼 `/files/asset`。
+        _state.value = AgentScreenState(sessionId = sessionId, projectId = projectId)
         streamJob?.cancel()
         sendJob?.cancel()
         streamJob = viewModelScope.launch {
@@ -510,20 +521,65 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** 从 canonical 消息历史重建正文基线（rehydrate 后不丢已持久化内容）。 */
+    /**
+     * 从 canonical 消息历史重建部件视图（AGT-001）：保留每条消息的完整 parts，
+     * 不再压平成一段文本——文本/推理/工具/图片各自可访问，部件身份由「消息 id#序号」稳定给出。
+     * 流式正文清空，避免与历史里的同一段内容重复显示。
+     */
     private suspend fun reloadCanonical() {
         val client = client ?: return
         val sessionId = _state.value.sessionId
         if (sessionId.isBlank()) return
         try {
+            _state.value = _state.value.copy(historyLoading = true, historyError = null)
             val page = client.sessionMessages(sessionId, limit = 50)
-            val history = buildAgentHistoryNarrative(page.messages)
-            _state.value = _state.value.copy(ui = AgentUiState(content = history))
-            DenovaLog.i("Agent", "canonical history loaded len=${history.length}")
+            val views = AgentPartLogic.parseMessages(page.messages)
+            val tools = views.sumOf { view -> view.parts.count { it is AgentToolPart } }
+            _state.value = _state.value.copy(
+                messages = views,
+                historyLoading = false,
+                historyError = null,
+                ui = _state.value.ui.copy(content = "", thinking = ""),
+            )
+            DenovaLog.i(
+                "Agent",
+                "canonical parts loaded messages=${views.size} tools=$tools session=$sessionId",
+            )
         } catch (e: Exception) {
             DenovaLog.w("Agent", "load canonical history failed", e)
-            _state.value = _state.value.copy(ui = AgentUiState())
+            _state.value = _state.value.copy(
+                historyLoading = false,
+                historyError = e.message ?: "加载消息失败",
+            )
         }
+    }
+
+    /**
+     * 图片部件取字节，三种来源都覆盖：
+     * 工作区相对路径 → `/files/asset`；绝对 http(s) → 同鉴权客户端直取；`data:` → 本地 base64 解码。
+     */
+    suspend fun loadImage(part: AgentImagePart): ByteArray? {
+        val client = client ?: return null
+        val projectId = _state.value.projectId
+        return try {
+            when {
+                part.isInline -> decodeDataUrl(part.url)
+                part.isRemote -> client.fetchBytes(part.url)
+                part.isWorkspacePath && projectId.isNotBlank() -> client.projectAssetBytes(projectId, part.url)
+                else -> null
+            }
+        } catch (e: Exception) {
+            DenovaLog.w("Agent", "image load failed path=${part.url.take(48)}", e)
+            null
+        }
+    }
+
+    private fun decodeDataUrl(url: String): ByteArray? {
+        val comma = url.indexOf(',')
+        if (comma <= 0) return null
+        return runCatching {
+            android.util.Base64.decode(url.substring(comma + 1), android.util.Base64.DEFAULT)
+        }.getOrNull()
     }
 
     private fun onFrame(frame: AgentUiFrame) {

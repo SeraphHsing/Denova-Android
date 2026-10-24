@@ -808,6 +808,39 @@ class DenovaClient(
         }
     }
 
+    /**
+     * 项目资源原始字节：`GET /api/projects/:id/files/asset?path=`（消息里的图片部件走这里）。
+     * 走同一个已鉴权的 OkHttpClient，因此不依赖图片库的 cookie 配置。
+     */
+    suspend fun projectAssetBytes(projectId: String, path: String): ByteArray {
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/files/asset")
+            .addQueryParameter("path", path)
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                val bytes = resp.body?.bytes() ?: ByteArray(0)
+                if (!resp.isSuccessful) {
+                    throw toException(resp.code, bytes.toString(Charsets.UTF_8))
+                }
+                bytes
+            }
+        }
+    }
+
+    /** 绝对 http(s) 资源字节（消息里的远程图片部件）：沿用同一鉴权客户端，避免图片库各自配 cookie。 */
+    suspend fun fetchBytes(url: String): ByteArray {
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                val bytes = resp.body?.bytes() ?: ByteArray(0)
+                if (!resp.isSuccessful) {
+                    throw toException(resp.code, bytes.toString(Charsets.UTF_8))
+                }
+                bytes
+            }
+        }
+    }
+
     /** 读取 story 的 canonical 历史（rehydrate 后重建叙事基线）。 */
     suspend fun interactiveHistory(storyId: String, branchId: String, limit: Int): StoryHistoryPage {
         val request = Request.Builder()
