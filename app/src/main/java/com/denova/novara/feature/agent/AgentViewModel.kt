@@ -10,6 +10,7 @@ import com.denova.novara.core.command.CommandStore
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.SendChatRequest
+import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentPhase
 import com.denova.novara.core.stream.AgentStreamRecoveryCoordinator
 import com.denova.novara.core.stream.AgentUiFrame
@@ -47,6 +48,10 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow(AgentScreenState())
     val state: StateFlow<AgentScreenState> = _state.asStateFlow()
+
+    /** 待发送的正文选区引用（WRI-009）：编辑器「引用到 AI」写入，随下一条消息提交。 */
+    private val _selections = MutableStateFlow<List<TextSelectionRef>>(emptyList())
+    val selections: StateFlow<List<TextSelectionRef>> = _selections.asStateFlow()
 
     fun bindClient(client: DenovaClient) {
         this.client = client
@@ -98,8 +103,31 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** 发送写作输入：先落本地事务（SUBMITTING）再 POST /api/chat（可带引用文件）。 */
-    fun send(sessionId: String, message: String, references: List<String> = emptyList()) {
+    /** 追加一段正文引用；同一文件同一区间同一内容只保留一条。 */
+    fun addSelection(selection: TextSelectionRef) {
+        val current = _selections.value
+        if (current.any { it == selection }) return
+        _selections.value = current + selection
+        DenovaLog.i(
+            "Agent",
+            "selection added file=${selection.fileName} lines=${selection.startLine}-${selection.endLine} chars=${selection.content.length}",
+        )
+    }
+
+    fun removeSelection(index: Int) {
+        val current = _selections.value
+        if (index !in current.indices) return
+        _selections.value = current.filterIndexed { i, _ -> i != index }
+        DenovaLog.i("Agent", "selection removed index=$index left=${_selections.value.size}")
+    }
+
+    /** 发送写作输入：先落本地事务（SUBMITTING）再 POST /api/chat（可带引用文件与正文选区）。 */
+    fun send(
+        sessionId: String,
+        message: String,
+        references: List<String> = emptyList(),
+        selections: List<TextSelectionRef> = emptyList(),
+    ) {
         val client = client ?: return
         val text = message.trim()
         if (text.isEmpty() || sessionId.isBlank()) return
@@ -109,6 +137,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             sessionId = sessionId,
             message = text,
             references = references,
+            selections = selections,
         )
         val record = CommandRecord(
             commandId = commandId,
@@ -117,7 +146,10 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             status = CommandStatus.SUBMITTING,
             createdAt = System.currentTimeMillis(),
         )
-        DenovaLog.i("Agent", "send session=$sessionId cmd=$commandId refs=${references.size}")
+        DenovaLog.i(
+            "Agent",
+            "send session=$sessionId cmd=$commandId refs=${references.size} selections=${selections.size}",
+        )
         streamJob?.cancel()
         streamJob = null
         sendJob?.cancel()
@@ -141,6 +173,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                             accepted = true
                             commands.updateStatus(commandId, CommandStatus.ACCEPTED)
                             _state.value = _state.value.copy(sending = false)
+                            // 服务端已接受：引用的使命结束；失败时不解释放，便于原样重发。
+                            _selections.value = emptyList()
                         }
                         onFrame(frame)
                     },
@@ -148,6 +182,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 if (!accepted) {
                     commands.updateStatus(commandId, CommandStatus.ACCEPTED)
                     _state.value = _state.value.copy(sending = false)
+                    _selections.value = emptyList()
                 }
                 if (idleTerminated) {
                     DenovaLog.w("Agent", "stream idle timeout; task finished")

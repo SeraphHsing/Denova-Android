@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.denova.novara.R
 import com.denova.novara.core.editor.MarkdownDocument
+import com.denova.novara.core.network.TextSelectionRef
 
 private enum class EditorMode { SOURCE, RICH, PREVIEW }
 
@@ -72,6 +73,7 @@ fun EditorScreen(
     currentProjectId: String = "",
     onProjectIdChange: (String) -> Unit = {},
     onOpenAgent: (projectId: String, filePath: String) -> Unit = { _, _ -> },
+    onQuoteSelection: (projectId: String, selection: TextSelectionRef) -> Unit = { _, _ -> },
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val tabsState by viewModel.tabs.collectAsState()
@@ -182,6 +184,29 @@ fun EditorScreen(
             ModeButton("源码", mode == EditorMode.SOURCE) { mode = EditorMode.SOURCE }
             ModeButton("富文本", mode == EditorMode.RICH) { mode = EditorMode.RICH }
             ModeButton("预览", mode == EditorMode.PREVIEW) { mode = EditorMode.PREVIEW }
+        }
+
+        // 选区引用（WRI-009）：有非空选区时显示「引用到 AI」与定位（file:Lx-Ly）。
+        val selection = textFieldValue.selection
+        val quote = if (uiState.loaded && !selection.collapsed) {
+            TextSelectionQuote.of(uiState.filePath, textFieldValue.text, selection.start, selection.end)
+        } else {
+            null
+        }
+        if (quote != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(onClick = { onQuoteSelection(projectId.trim(), quote) }) {
+                    Text(stringResource(R.string.quote_selection))
+                }
+                Text(
+                    TextSelectionQuote.label(quote),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
 
         if (mode == EditorMode.RICH) {

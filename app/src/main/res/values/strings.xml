@@ -65,4 +65,8 @@
     <string name="tab_move_right">Move right</string>
     <string name="tab_close_current">Close tab</string>
     <string name="tab_close">Close %1$s</string>
+
+    <!-- 选区引用（WRI-009） -->
+    <string name="quote_selection">Quote to AI</string>
+    <string name="selections_title">References</string>
 </resources>

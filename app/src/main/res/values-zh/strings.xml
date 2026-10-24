@@ -65,4 +65,8 @@
     <string name="tab_move_right">右移</string>
     <string name="tab_close_current">关闭当前</string>
     <string name="tab_close">关闭 %1$s</string>
+
+    <!-- 选区引用（WRI-009） -->
+    <string name="quote_selection">引用到 AI</string>
+    <string name="selections_title">引用</string>
 </resources>

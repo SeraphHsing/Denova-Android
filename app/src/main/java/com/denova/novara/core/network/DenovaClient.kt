@@ -97,6 +97,18 @@ data class SendInteractiveChatRequest(
     val message: String,
 )
 
+/**
+ * 正文选区引用（WRI-009）：对齐 Web `TextSelection` 与后端 `chat.TextSelectionRef`，
+ * 线上字段 `file_name` / `start_line` / `end_line` / `content`，行号 1 基。
+ */
+@Serializable
+data class TextSelectionRef(
+    @SerialName("file_name") val fileName: String,
+    @SerialName("start_line") val startLine: Int,
+    @SerialName("end_line") val endLine: Int,
+    val content: String,
+)
+
 @Serializable
 data class SendChatRequest(
     @SerialName("command_id") val commandId: String,
@@ -104,6 +116,8 @@ data class SendChatRequest(
     val message: String,
     /** 引用文件路径（对齐 Web `sendMessage` 的 `references`）。 */
     val references: List<String> = emptyList(),
+    /** 正文选区引用（对齐 Web `sendMessage` 的 `selections`）。 */
+    val selections: List<TextSelectionRef> = emptyList(),
 )
 
 /** 写作会话摘要（`GET /api/sessions`）；`active=true` 为当前会话。 */

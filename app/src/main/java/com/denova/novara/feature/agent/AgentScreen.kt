@@ -1,5 +1,8 @@
 package com.denova.novara.feature.agent
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
 import com.denova.novara.core.stream.AgentPhase
+import com.denova.novara.feature.editor.TextSelectionQuote
 
 /** 写作 Agent 舞台：输入 session/消息 → 挂接 → 展示正文/思考/活动/终态。 */
 @Composable
@@ -40,6 +44,7 @@ fun AgentScreen(
     initialFile: String = "",
 ) {
     val state by viewModel.state.collectAsState()
+    val selections by viewModel.selections.collectAsState()
     var sessionId by remember { mutableStateOf("") }
     var input by remember { mutableStateOf("") }
 
@@ -111,6 +116,34 @@ fun AgentScreen(
                 .verticalScroll(rememberScrollState()),
         )
 
+        // 选区引用卡（WRI-009）：`file:Lx-Ly 内容前 30 字…`，可逐条移除。
+        if (selections.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
+            ) {
+                selections.forEachIndexed { index, selection ->
+                    Row(
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .background(
+                                MaterialTheme.colorScheme.secondaryContainer,
+                                androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                            )
+                            .clickable { viewModel.removeSelection(index) }
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text(
+                            "${TextSelectionQuote.label(selection)} ${TextSelectionQuote.excerpt(selection)} ×",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+        }
+
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             OutlinedTextField(
                 value = input,
@@ -122,7 +155,7 @@ fun AgentScreen(
             OutlinedButton(
                 onClick = {
                     val refs = if (initialFile.isNotBlank()) listOf(initialFile) else emptyList()
-                    viewModel.send(sessionId.trim(), input, refs)
+                    viewModel.send(sessionId.trim(), input, refs, selections)
                     input = ""
                 },
                 enabled = !state.sending && sessionId.isNotBlank() && input.isNotBlank(),

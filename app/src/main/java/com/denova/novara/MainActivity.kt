@@ -181,6 +181,12 @@ class MainActivity : AppCompatActivity() {
                                                 val encodedPath = android.net.Uri.encode(path)
                                                 navController.navigate("agent?projectId=$pid&filePath=$encodedPath")
                                             },
+                                            // 选区引用（WRI-009）：引用进 Agent 输入区，随后随消息提交。
+                                            onQuoteSelection = { pid, selection ->
+                                                agentViewModel.addSelection(selection)
+                                                val encodedPath = android.net.Uri.encode(selection.fileName)
+                                                navController.navigate("agent?projectId=$pid&filePath=$encodedPath")
+                                            },
                                         )
                                     }
                                     composable("game") {
