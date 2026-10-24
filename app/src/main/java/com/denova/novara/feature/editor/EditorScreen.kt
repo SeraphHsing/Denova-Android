@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -42,8 +43,7 @@ private enum class EditorMode { SOURCE, RICH, PREVIEW }
 @Composable
 fun EditorScreen(
     viewModel: EditorViewModel,
-    onOpenGame: () -> Unit,
-    onOpenAgent: () -> Unit,
+    onOpenDrawer: () -> Unit,
     onOpenTerminal: (String) -> Unit,
     onLogout: () -> Unit,
 ) {
@@ -68,10 +68,9 @@ fun EditorScreen(
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            IconButton(onClick = onOpenDrawer) { Text("☰") }
             Text("Novara 编辑器", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
             TextButton(onClick = { viewModel.save() }) { Text("保存") }
-            TextButton(onClick = onOpenGame) { Text("游戏") }
-            TextButton(onClick = onOpenAgent) { Text("写作") }
             TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text("终端") }
             TextButton(onClick = onLogout) { Text("退出") }
         }

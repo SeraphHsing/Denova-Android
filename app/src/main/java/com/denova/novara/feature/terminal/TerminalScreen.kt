@@ -24,6 +24,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -83,6 +84,7 @@ import com.denova.novara.core.terminal.TerminalScreen as TerminalBuffer
 @Composable
 fun TerminalScreen(
     viewModel: TerminalViewModel,
+    onOpenDrawer: () -> Unit,
     onBack: () -> Unit,
     initialProjectId: String = "",
 ) {
@@ -130,6 +132,7 @@ fun TerminalScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            IconButton(onClick = onOpenDrawer) { Text("☰") }
             Text("终端", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
             TextButton(onClick = onBack) { Text("返回") }
             Text(state.status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))

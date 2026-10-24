@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -28,7 +29,7 @@ import com.denova.novara.core.stream.AgentPhase
 
 /** 写作 Agent 舞台：输入 session/消息 → 挂接 → 展示正文/思考/活动/终态。 */
 @Composable
-fun AgentScreen(viewModel: AgentViewModel, onBack: () -> Unit) {
+fun AgentScreen(viewModel: AgentViewModel, onOpenDrawer: () -> Unit, onBack: () -> Unit) {
     val state by viewModel.state.collectAsState()
     var sessionId by remember { mutableStateOf("") }
     var input by remember { mutableStateOf("") }
@@ -40,6 +41,7 @@ fun AgentScreen(viewModel: AgentViewModel, onBack: () -> Unit) {
             .imePadding(),
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            IconButton(onClick = onOpenDrawer) { Text("☰") }
             Text("Novara 写作", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
             TextButton(onClick = onBack) { Text("返回") }
         }

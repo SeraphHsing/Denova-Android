@@ -8,21 +8,27 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.denova.novara.core.logging.DenovaLog
@@ -38,8 +44,12 @@ import com.denova.novara.feature.editor.EditorScreen
 import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.feature.game.GameScreen
 import com.denova.novara.feature.game.GameViewModel
+import com.denova.novara.feature.shell.AppDrawer
+import com.denova.novara.feature.shell.PlaceholderScreen
+import com.denova.novara.feature.shell.appDestinations
 import com.denova.novara.feature.terminal.TerminalScreen
 import com.denova.novara.feature.terminal.TerminalViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -62,6 +72,9 @@ class MainActivity : ComponentActivity() {
                 val state by connectionViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
                 val navController = rememberNavController()
+                val drawerState = rememberDrawerState(DrawerValue.Closed)
+                val scope = rememberCoroutineScope()
+                val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (state) {
@@ -75,37 +88,67 @@ class MainActivity : ComponentActivity() {
                                     terminalViewModel.bindClient(client)
                                 }
                             }
-                            NavHost(
-                                navController = navController,
-                                startDestination = "editor",
+                            ModalNavigationDrawer(
+                                drawerState = drawerState,
+                                drawerContent = {
+                                    AppDrawer(currentRoute = currentRoute) { destination ->
+                                        scope.launch { drawerState.close() }
+                                        navController.navigate(destination.route) {
+                                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    }
+                                },
                             ) {
-                                composable("editor") {
-                                    EditorScreen(
-                                        viewModel = editorViewModel,
-                                        onOpenGame = { navController.navigate("game") },
-                                        onOpenAgent = { navController.navigate("agent") },
-                                        onOpenTerminal = { projectId ->
-                                            navController.navigate("terminal/$projectId")
-                                        },
-                                        onLogout = { connectionViewModel.logout() },
-                                    )
-                                }
-                                composable("game") {
-                                    GameScreen(viewModel = gameViewModel, onBack = { navController.popBackStack() })
-                                }
-                                composable("agent") {
-                                    AgentScreen(viewModel = agentViewModel, onBack = { navController.popBackStack() })
-                                }
-                                composable(
-                                    route = "terminal/{projectId}",
-                                    arguments = listOf(navArgument("projectId") { type = NavType.StringType }),
-                                ) { entry ->
-                                    val projectId = entry.arguments?.getString("projectId").orEmpty()
-                                    TerminalScreen(
-                                        viewModel = terminalViewModel,
-                                        initialProjectId = projectId,
-                                        onBack = { navController.popBackStack() },
-                                    )
+                                NavHost(
+                                    navController = navController,
+                                    startDestination = "editor",
+                                ) {
+                                    composable("editor") {
+                                        EditorScreen(
+                                            viewModel = editorViewModel,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenTerminal = { projectId ->
+                                                navController.navigate("terminal/$projectId")
+                                            },
+                                            onLogout = { connectionViewModel.logout() },
+                                        )
+                                    }
+                                    composable("game") {
+                                        GameScreen(
+                                            viewModel = gameViewModel,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onBack = { navController.popBackStack() },
+                                        )
+                                    }
+                                    composable("agent") {
+                                        AgentScreen(
+                                            viewModel = agentViewModel,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onBack = { navController.popBackStack() },
+                                        )
+                                    }
+                                    composable(
+                                        route = "terminal/{projectId}",
+                                        arguments = listOf(navArgument("projectId") { type = NavType.StringType }),
+                                    ) { entry ->
+                                        val projectId = entry.arguments?.getString("projectId").orEmpty()
+                                        TerminalScreen(
+                                            viewModel = terminalViewModel,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            initialProjectId = projectId,
+                                            onBack = { navController.popBackStack() },
+                                        )
+                                    }
+                                    appDestinations.filter { !it.implemented }.forEach { destination ->
+                                        composable(destination.route) {
+                                            PlaceholderScreen(
+                                                label = destination.label,
+                                                onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

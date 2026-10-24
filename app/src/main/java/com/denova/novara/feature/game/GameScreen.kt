@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -41,7 +42,7 @@ import com.denova.novara.core.stream.GamePhase
  * 叙事按 chunk 累积；断线由 [GameViewModel] 内部恢复协调器自动重挂。
  */
 @Composable
-fun GameScreen(viewModel: GameViewModel, onBack: () -> Unit) {
+fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onBack: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
 
     // 后台被系统掐断连接后，回前台自动重挂（身份/结果仍对应）。
@@ -65,6 +66,7 @@ fun GameScreen(viewModel: GameViewModel, onBack: () -> Unit) {
             .imePadding(),
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            IconButton(onClick = onOpenDrawer) { Text("☰") }
             Text("Novara 游戏", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
             TextButton(onClick = onBack) { Text("返回") }
         }
