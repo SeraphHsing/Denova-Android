@@ -34,6 +34,8 @@ import com.denova.novara.feature.editor.EditorScreen
 import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.feature.game.GameScreen
 import com.denova.novara.feature.game.GameViewModel
+import com.denova.novara.feature.terminal.TerminalScreen
+import com.denova.novara.feature.terminal.TerminalViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,6 +68,11 @@ class MainActivity : ComponentActivity() {
                         checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
                     )
                 }
+                val terminalViewModel: TerminalViewModel = viewModel {
+                    TerminalViewModel(
+                        checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
+                    )
+                }
                 val debugViewModel: DebugPanelViewModel = viewModel {
                     DebugPanelViewModel(
                         checkNotNull(this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY]),
@@ -75,6 +82,8 @@ class MainActivity : ComponentActivity() {
                 var showDebug by remember { mutableStateOf(false) }
                 var showGame by remember { mutableStateOf(false) }
                 var showAgent by remember { mutableStateOf(false) }
+                var showTerminal by remember { mutableStateOf(false) }
+                var terminalProjectId by remember { mutableStateOf("") }
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (state) {
@@ -85,15 +94,25 @@ class MainActivity : ComponentActivity() {
                                     editorViewModel.bindClient(client)
                                     gameViewModel.bindClient(client)
                                     agentViewModel.bindClient(client)
+                                    terminalViewModel.bindClient(client)
                                 }
                             }
                             when {
                                 showAgent -> AgentScreen(viewModel = agentViewModel, onBack = { showAgent = false })
                                 showGame -> GameScreen(viewModel = gameViewModel, onBack = { showGame = false })
+                                showTerminal -> TerminalScreen(
+                                    viewModel = terminalViewModel,
+                                    initialProjectId = terminalProjectId,
+                                    onBack = { showTerminal = false },
+                                )
                                 else -> EditorScreen(
                                     viewModel = editorViewModel,
                                     onOpenGame = { showGame = true },
                                     onOpenAgent = { showAgent = true },
+                                    onOpenTerminal = { projectId ->
+                                        terminalProjectId = projectId
+                                        showTerminal = true
+                                    },
                                     onLogout = { connectionViewModel.logout() },
                                 )
                             }

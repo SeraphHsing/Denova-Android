@@ -16,6 +16,9 @@ import com.denova.novara.core.stream.RecoveryReceipt
 import com.denova.novara.core.stream.RecoveryRequest
 import com.denova.novara.core.stream.StoryHistoryPage
 import com.denova.novara.core.stream.parseGameStreamError
+import com.denova.novara.core.terminal.TerminalCreateRequest
+import com.denova.novara.core.terminal.TerminalSessionInfo
+import com.denova.novara.core.terminal.TerminalSessionsPage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -33,6 +36,8 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
 import java.util.concurrent.TimeUnit
 
 @Serializable
@@ -112,10 +117,19 @@ class DenovaApiException(
 ) : Exception(message ?: "HTTP $status")
 
 /**
- * 单个服务器的认证客户端。每个 ServerKey 一个实例；Cookie 通过内存 [InMemoryCookieJar]
- * 隔离，切换服务器即重建客户端，从而隔离会话 Cookie。
+ * 单个服务器的认证客户端。每个 ServerKey 一个实例；Cookie 通过 [CookieJar] 隔离，
+ * 切换服务器即重建客户端，从而隔离会话 Cookie。
+ *
+ * [cookieJar] 默认内存态；传 [com.denova.novara.core.persistence.PersistentCookieJar]
+ * 可在进程被杀后复用登录态（G6 决策 C：把「重启后必须重新登录」的分钟级窗口压到秒级）。
  */
-class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransport, AgentStreamTransport {
+class DenovaClient(
+    private val server: ServerKey,
+    private val cookieJar: CookieJar = InMemoryCookieJar(),
+) : FileRemote, GameStreamTransport, AgentStreamTransport {
+
+    /** 连接身份（隔离 key）：HistoryStore / 草稿等按此分目录。 */
+    val serverOrigin: String get() = server.origin
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -127,7 +141,7 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
 
     /** 共享 OkHttpClient（含会话 CookieJar）：受保护图片、SSE、WS 都复用此实例，保证会话一致。 */
     val okHttpClient: OkHttpClient = OkHttpClient.Builder()
-        .cookieJar(InMemoryCookieJar())
+        .cookieJar(cookieJar)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
@@ -384,6 +398,123 @@ class DenovaClient(private val server: ServerKey) : FileRemote, GameStreamTransp
             }
         }
     }
+
+    // ---- 终端（G5）----
+
+    /** 创建 PTY 会话；`owner_tab_id` 决定归属，重进时据此找回同一 PTY。 */
+    suspend fun createTerminalSession(
+        projectId: String,
+        ownerTabId: String,
+        cols: Int,
+        rows: Int,
+        title: String = "",
+    ): TerminalSessionInfo {
+        // 后端 ResolveStartupCommand 只认 "shell" 或已配置的 profile id；空值会 400。
+        val payload = TerminalCreateRequest(
+            ownerTabId = ownerTabId,
+            profileId = "shell",
+            title = title,
+            cols = cols,
+            rows = rows,
+        )
+        val body = json.encodeToString(TerminalCreateRequest.serializer(), payload)
+        val request = Request.Builder()
+            .url(projectTerminalSessionsUrl(projectId))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                // 用 DenovaApiException 而不是 GameStreamError：终端要按 code（ownerConflict /
+                // tokenInvalid / notFound）决定是否重试，SSE 的错误类型没有这层语义
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(TerminalSessionInfo.serializer(), text)
+            }
+        }
+    }
+
+    /** 存活会话列表（含 attach token）：用于切页 / 重启后重挂同一 PTY。 */
+    suspend fun terminalSessions(): TerminalSessionsPage {
+        val request = Request.Builder().url(terminalSessionsUrl()).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(TerminalSessionsPage.serializer(), text)
+            }
+        }
+    }
+
+    /** 关闭并释放 PTY。 */
+    suspend fun deleteTerminalSession(sessionId: String) {
+        val request = Request.Builder().url(terminalSessionUrl(sessionId)).delete().build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    throw toException(resp.code, resp.body?.string().orEmpty())
+                }
+            }
+        }
+    }
+
+    /** 打开 attach WebSocket（binary=PTY 字节，text=控制帧）。 */
+    fun openTerminal(sessionId: String, token: String): TerminalConnection {
+        val connection = TerminalConnection(json)
+        val request = Request.Builder().url(terminalAttachUrl(sessionId, token)).build()
+        okHttpClient.newWebSocket(
+            request,
+            object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: okhttp3.Response) {
+                    connection.bind(webSocket)
+                }
+
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    connection.onTextMessage(text)
+                }
+
+                override fun onMessage(webSocket: WebSocket, bytes: okio.ByteString) {
+                    connection.onBinaryMessage(bytes.toByteArray())
+                }
+
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    connection.onClosed(code, reason)
+                }
+
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                    connection.onClosed(code, reason)
+                }
+
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: okhttp3.Response?) {
+                    connection.onFailure(t.message ?: "terminal socket failure")
+                }
+            },
+        )
+        return connection
+    }
+
+    private fun projectTerminalSessionsUrl(projectId: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/terminal/sessions")
+            .build()
+
+    private fun terminalSessionsUrl(): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/terminal/sessions").build()
+
+    private fun terminalSessionUrl(sessionId: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/terminal/sessions/$sessionId").build()
+
+    /**
+     * attach URL。
+     *
+     * **必须保持 http/https**：OkHttp 的 `HttpUrl.Builder.scheme` 只接受 http/https，
+     * 传 `ws` / `wss` 会直接抛 `IllegalArgumentException: unexpected scheme: ws`（真机崩溃过）。
+     * `newWebSocket()` 拿到 http(s) URL 后会自动按 ws(s) 升级，无需手工改 scheme。
+     */
+    internal fun terminalAttachUrl(sessionId: String, token: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/terminal/sessions/$sessionId/attach")
+            .addQueryParameter("token", token)
+            .build()
 
     private fun interactiveChatUrl(path: String): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/chat/$path").build()

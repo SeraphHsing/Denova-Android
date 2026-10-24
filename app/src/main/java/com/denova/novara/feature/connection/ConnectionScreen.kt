@@ -25,6 +25,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 
@@ -117,6 +119,12 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: String?) {
         label = { Text("密码") },
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
+        // 密码字段必须声明为 Password 类型并关闭自动纠错/联想：
+        // 否则输入法会把密码记进建议词与剪贴板历史（真机验证时已观察到密码出现在候选栏）。
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            autoCorrectEnabled = false,
+        ),
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(12.dp))
@@ -133,6 +141,11 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: String?) {
         onValueChange = { token = it },
         label = { Text("配对链接 token") },
         singleLine = true,
+        // 配对 token 是凭证，同样不能进输入法词库
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            autoCorrectEnabled = false,
+        ),
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(12.dp))

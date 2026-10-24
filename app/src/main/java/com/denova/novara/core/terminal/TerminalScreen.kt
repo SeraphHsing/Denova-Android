@@ -8,10 +8,16 @@ package com.denova.novara.core.terminal
  * 光标 / 区域均以 0 基内部表示，对外接口（如 CSI H）保持 ANSI 的 1 基语义由解析器转换。
  */
 class TerminalScreen(
-    val cols: Int,
-    val rows: Int,
+    cols: Int,
+    rows: Int,
     private val scrollbackLimit: Int = 2000,
 ) {
+
+    /** 可通过 [resize] 改变；解析器持有同一个实例，不随尺寸变化重建。 */
+    var cols: Int = cols
+        private set
+    var rows: Int = rows
+        private set
 
     private var grid: Array<Array<TerminalCell>> = newGrid()
 
@@ -51,6 +57,87 @@ class TerminalScreen(
     val scrollbackSize: Int get() = scrollback.size
 
     fun scrollbackRow(index: Int): Array<TerminalCell> = scrollback[index]
+
+    /** 备用屏（1049 等）生效中：全屏程序自己管滚动，此时没有回滚可看。 */
+    val altScreenActive: Boolean get() = altActive
+
+    // ---- 尺寸 ----
+
+    /**
+     * 改变网格尺寸并保留可见内容。
+     *
+     * - 列变化：右侧裁剪 / 补白，不做折行重排；宽字被截断时退化为空格，避免出现孤立续格。
+     * - 行变少：把顶部丢弃的行并入回滚（备用屏不写回滚），光标随之下移，保证最新输出仍在可视区。
+     * - 行变多：底部补空行。
+     *
+     * 旋转屏幕、IME 弹出都会触发尺寸变化，缺这条路径会整屏内容直接丢失。
+     */
+    fun resize(newCols: Int, newRows: Int) {
+        val targetCols = newCols.coerceAtLeast(1)
+        val targetRows = newRows.coerceAtLeast(1)
+        if (targetCols == cols && targetRows == rows) return
+
+        val sourceRows = rows
+        val sourceGrid = grid
+        val sourceAlt = altGrid
+        // 备用屏（全屏 TUI）按顶部对齐裁剪，主屏则保留最新输出
+        val dropTop = if (altActive) 0 else (sourceRows - targetRows).coerceAtLeast(0)
+
+        cols = targetCols
+        rows = targetRows
+
+        if (dropTop > 0) for (r in 0 until dropTop) pushResizedRow(sourceGrid[r])
+        grid = Array(targetRows) { r ->
+            val index = r + dropTop
+            if (index < sourceRows) reshapeRow(sourceGrid[index]) else blankRow()
+        }
+        altGrid = sourceAlt?.let { alt ->
+            Array(targetRows) { r -> if (r < sourceRows) reshapeRow(alt[r]) else blankRow() }
+        }
+
+        val resizedScrollback = ArrayDeque<Array<TerminalCell>>(scrollback.size)
+        scrollback.forEach { resizedScrollback.addLast(reshapeRow(it)) }
+        scrollback.clear()
+        scrollback.addAll(resizedScrollback)
+
+        cursorRow = (cursorRow - dropTop).coerceIn(0, rows - 1)
+        cursorCol = cursorCol.coerceIn(0, cols - 1)
+        resetScrollRegion()
+        wrapPending = false
+    }
+
+    private fun blankRow(): Array<TerminalCell> = Array(cols) { TerminalCell() }
+
+    /** 把一行重排到当前 [cols]。 */
+    private fun reshapeRow(source: Array<TerminalCell>): Array<TerminalCell> {
+        val out = blankRow()
+        val limit = minOf(source.size, cols)
+        var c = 0
+        while (c < limit) {
+            val cell = source[c]
+            if (cell.continuation) {
+                out[c].set(" ", cell.attr)
+                c++
+                continue
+            }
+            val wide = c + 1 < source.size && source[c + 1].continuation
+            if (wide && c + 1 >= cols) {
+                out[c].set(" ", cell.attr)
+                c++
+                continue
+            }
+            out[c].set(cell.text, cell.attr, cell.continuation)
+            if (wide) out[c + 1].set(source[c + 1].text, source[c + 1].attr, true)
+            c += if (wide) 2 else 1
+        }
+        return out
+    }
+
+    private fun pushResizedRow(source: Array<TerminalCell>) {
+        if (scrollbackLimit <= 0) return
+        scrollback.addLast(reshapeRow(source))
+        while (scrollback.size > scrollbackLimit) scrollback.removeFirst()
+    }
 
     // ---- 写入 ----
 

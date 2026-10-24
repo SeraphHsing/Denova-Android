@@ -43,6 +43,7 @@ fun EditorScreen(
     viewModel: EditorViewModel,
     onOpenGame: () -> Unit,
     onOpenAgent: () -> Unit,
+    onOpenTerminal: (String) -> Unit,
     onLogout: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -67,6 +68,7 @@ fun EditorScreen(
             TextButton(onClick = { viewModel.save() }) { Text("保存") }
             TextButton(onClick = onOpenGame) { Text("游戏") }
             TextButton(onClick = onOpenAgent) { Text("写作") }
+            TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text("终端") }
             TextButton(onClick = onLogout) { Text("退出") }
         }
 

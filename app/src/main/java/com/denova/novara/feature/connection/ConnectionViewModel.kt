@@ -8,6 +8,9 @@ import com.denova.novara.core.model.ServerKey
 import com.denova.novara.core.network.DenovaApiException
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.persistence.ConnectionStore
+import com.denova.novara.core.persistence.CookieStore
+import com.denova.novara.core.persistence.PersistentCookieJar
+import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +30,12 @@ sealed interface ConnectionUiState {
  */
 class ConnectionViewModel(
     application: Application,
-    private val createClient: (ServerKey) -> DenovaClient = { DenovaClient(it) },
+    private val cookieStore: CookieStore = CookieStore(File(application.filesDir, "cookies")),
+    private val createClient: (ServerKey) -> DenovaClient = { key ->
+        // 会话 Cookie 落盘（按 origin 隔离）：进程被杀后重启可直接复用登录态，
+        // 缩短终端 attached=0 的窗口（G6 决策 C）。退出登录时清空。
+        DenovaClient(key, PersistentCookieJar(key.origin, cookieStore))
+    },
 ) : AndroidViewModel(application) {
 
     private val store = ConnectionStore(application)
@@ -123,6 +131,8 @@ class ConnectionViewModel(
                 // 退出失败不阻塞本地回到未认证态；服务端会话撤销失败属已知边界。
                 DenovaLog.w("Connection", "logout failed", e)
             }
+            // 本地持久化的会话 Cookie 必须一起清掉，否则「退出登录」在重启后形同没退
+            (c.okHttpClient.cookieJar as? PersistentCookieJar)?.clear()
             _state.value = ConnectionUiState.Unauthenticated(current, local = false)
         }
     }
