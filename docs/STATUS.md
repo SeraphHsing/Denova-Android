@@ -42,6 +42,7 @@
 - 2026-10-24 完成 G4 第 7 轮（Agent UIMessage 流）：`AgentUiStreamParser`（AI SDK UI message stream：`data: <json>` 帧 + `data: [DONE]`，type 含 start/text-*/reasoning-*/tool-*/data-agent-*/error/abort/finish；`SseParser` 扩展为保留"有 data 无 event"的帧），`core/network/AgentUiStreamReader` + `DenovaClient.agentStream(taskId, after)`（`GET /api/chat/stream`，`after=` 显式游标、不依赖 Last-Event-ID）。新增 11 个测试。
 - 2026-10-24 完成 G4 第 8 轮（命令持久化与发送边界）：`core/command`（`CommandRecord`/`CommandStatus` submitting/accepted/uncertain/rejected + `CommandStore` DataStore + `CommandSender` 编排）——**发送前先完成本地事务（SUBMITTING）**，成功 ACCEPTED、明确 4xx REJECTED、网络/5xx/无 code UNCERTAIN（保留记录、重试复用同一 command_id、`stream_attached` 视为已接受）。新增 6 个测试。仍待接真实 `POST` 端点与发送 UI。
 - 2026-10-24 完成 G4 第 9 轮（发送端点 + 发送 UI，真机验证）：`DenovaClient.postInteractiveChat`（`POST /api/interactive/chat` 返回 StreamTask 流）、`GameViewModel.send`（`CommandStore` 先落 SUBMITTING → POST → 首帧 ACCEPTED / 明确 4xx REJECTED / 网络·5xx UNCERTAIN）、`GameScreen` 玩家输入框 + 发送按钮。真机（小米14Pro）验证并修复 3 个问题：① 30s readTimeout 截断 LLM 长生成 → 流请求改用 `streamHttpClient`（readTimeout=0，复用连接池/Cookie）；② 流异常结束且无 terminal 事件时 UI 卡在运行中 → `finishStream` 把 RUNNING 标记 ERROR；③ 键盘遮挡发送框 → `imePadding`。真机确认：发送链路连通、首帧 ACCEPTED、SSE 持续 90s+ 不断、409 `agent_runtime.busy`（有 pending interruption 时服务端拒绝新 turn，需先 resume/abort）正确映射为 REJECTED + 错误提示。**已知限制**：服务端 LLM 连续 error 时客户端流未及时关闭，UI 可能停留在运行中（待加流空闲/active 轮询兜底；属服务端 LLM 环境问题）。
+- 2026-10-24 完成 G4 第 10 轮（完整端到端真机验证，新 story `st_dmc2p6amro52de34e38f`，29 turns）：发送「go」→ 实时 SSE → **chunk 实时累积**（截图可见生成正文）→ 服务端 `status=done`（cursor 2546→2672），客户端状态正确显示「完成」，无 crash、无 SSE 超时；随后 `force-stop` 重启重登重挂，`canonical baseline loaded len=76545` 恢复历史叙事。同时修复：canonical 基线把 turn 的 `user`（可能是内部提示 `[Source: story opening configuration...]`）误展示 → `buildCanonicalNarrative` 过滤以 `[Source:` 开头的 user。**至此 Game 流「发送→流→done→断线恢复」全链路真机通过**。
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
@@ -56,7 +57,7 @@
 | G1 认证与网络 | 完成：连接 + status + 登录 + 退出 已真机真实往返通过；DataStore 服务器地址持久化完成 | 配对、受保护图片、SSE、WS、HTTPS/WSS、迟到 401 完成真实往返 |
 | G2 Markdown 编辑器 | 两轮完成：序列化层（commonmark 0.30.0 + GFM 表格，8 测试）+ 源码/富文本/预览三模式；富文本 = 标记隐藏(零宽替换) + 内联样式 + 格式化工具栏，纯逻辑层 4 测试；本地 + CI 全绿；真机验证富文本渲染 | 图片/表格编辑、中文 IME、选区增强、D03 性能预算 |
 | G3 保存并发 | 三轮完成：三方合并 `ThreeWayMerge`（diff3，5 测试）+ 文件读写 revision 校验 + 本地草稿 `DraftStore` + 保存编排 `FileSaveCoordinator`（Mutex 串行，3 测试）+ 编辑器 UI 集成（`EditorViewModel` 打开文件/防抖自动保存/冲突提示 + `EditorScreen` 项目ID/路径输入 + 保存状态）；本地 26 测试 + CI 全绿；真机两次完整保存周期（插入空格→已保存→revision 递增→删除→再保存→恢复） | 真机并发（双端编辑触发 409→合并）、迟到回包、进程恢复实测 |
-| G4 Agent / Game 流恢复 | Game 流「发送→流→恢复」已真机端到端验证通过（含发送端点/命令事务/SSE 无超时）；Agent(UIMessage) 流解析+网络层、命令持久化已本地全绿；仍缺 Agent 流恢复协调器/UI、Agent 发送 UI、流空闲兜底、D03 性能预算 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
+| G4 Agent / Game 流恢复 | Game 流「发送→流→done→断线恢复」全链路真机通过（chunk 实时累积 + canonical 基线恢复 + 内部提示过滤）；Agent(UIMessage) 流解析+网络层、命令持久化已本地全绿；仍缺 Agent 流恢复协调器/UI、Agent 发送 UI、流空闲兜底、D03 性能预算 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收双流、命令持久化与发送边界、D03 性能预算 |
 | G5 原生终端 | 未开始 | 按[正式关卡](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)验收 ANSI / VT、输入、resize、owner 生命周期与 D03 性能预算 |
 | G6 远程权限与双端共存 | 未开始 | 以[路线中的G6](android-web-parity/05-roadmap.md#3-p1高风险原型先形成技术证据)为准；误删对方PTY或丢失会话内容时未通过，仅记录限制不能退出 |
 | CI 与 APK | 已配置并通过（GitHub Actions 全绿，APK 工件 `novara-debug-apk` 上传成功） | GitHub Actions 运行构建、测试、Lint 并保存报告与 APK 工件 |
