@@ -75,4 +75,9 @@
     <string name="agent_stop">停止</string>
     <string name="agent_stopping">正在停止…</string>
     <string name="agent_suspended">已暂停</string>
+
+    <!-- Agent 提问交互（AGT-004） -->
+    <string name="ask_submit">提交</string>
+    <string name="ask_submitting">提交中…</string>
+    <string name="ask_cancel">取消</string>
 </resources>

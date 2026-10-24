@@ -33,6 +33,8 @@ data class AgentActiveView(
     /** Agent Runtime journal 游标；不可用作 SSE `after`。 */
     val cursor: Long? = null,
     @SerialName("last_operation") val lastOperation: AgentOperationView? = null,
+    /** 尚未解决的提问（AGT-004）：页面恢复时据此重新露出待答卡片，回答/取消后消失。 */
+    @SerialName("pending_asks") val pendingAsks: List<AgentAskInteraction> = emptyList(),
     @SerialName("recovery_actions") val recoveryActions: List<RecoveryAction> = emptyList(),
 )
 

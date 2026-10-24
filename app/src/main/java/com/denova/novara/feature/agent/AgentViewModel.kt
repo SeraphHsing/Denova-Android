@@ -15,6 +15,11 @@ import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.SendChatRequest
 import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
+import com.denova.novara.core.stream.AgentAskInteraction
+import com.denova.novara.core.stream.AgentAskLogic
+import com.denova.novara.core.stream.AgentAskQuestion
+import com.denova.novara.core.stream.AgentAskResolution
+import com.denova.novara.core.stream.AgentUiChunk
 import com.denova.novara.core.stream.AgentPhase
 import com.denova.novara.core.stream.AgentStreamRecoveryCoordinator
 import com.denova.novara.core.stream.AgentUiFrame
@@ -46,6 +51,13 @@ data class AgentScreenState(
     val runtimePhase: String = "",
     /** 已请求停止，等待服务端给出最终状态。 */
     val abortPending: Boolean = false,
+    /** 待回答的提问（AGT-004）：来自流 `data-ask` 或 active 投影 `pending_asks`。 */
+    val pendingAsks: List<AgentAskInteraction> = emptyList(),
+    /** 已解决的提问，用于展示「已回答 / 已取消」与答案文案。 */
+    val resolvedAsks: List<AgentAskInteraction> = emptyList(),
+    /** 答案 / 取消提交中。 */
+    val askSubmitting: Boolean = false,
+    val askError: String? = null,
 )
 
 /** 写作 Agent ViewModel：绑定 client → 恢复协调器 → 投影；发送先落命令事务再 POST。 */
@@ -64,6 +76,10 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     /** 待发送的正文选区引用（WRI-009）：编辑器「引用到 AI」写入，随下一条消息提交。 */
     private val _selections = MutableStateFlow<List<TextSelectionRef>>(emptyList())
     val selections: StateFlow<List<TextSelectionRef>> = _selections.asStateFlow()
+
+    /** 提问交互的选项选择：askId → (questionId → 选中项)。提问被回答/取消后清理。 */
+    private val _askSelections = MutableStateFlow<Map<String, Map<String, List<String>>>>(emptyMap())
+    val askSelections: StateFlow<Map<String, Map<String, List<String>>>> = _askSelections.asStateFlow()
 
     fun bindClient(client: DenovaClient) {
         this.client = client
@@ -237,11 +253,19 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         return try {
             val view = client.agentActive(sessionId)
             val operationId = AgentCommands.activeOperationId(view)
-            _state.value = _state.value.copy(
+            val state = _state.value
+            _state.value = state.copy(
                 activeOperationId = operationId,
                 runtimePhase = view.phase.orEmpty(),
                 // 服务端不再报告当前操作即说明停止已落地：清掉「正在停止…」，否则按钮文案会一直挂着。
-                abortPending = _state.value.abortPending && operationId.isNotEmpty(),
+                abortPending = state.abortPending && operationId.isNotEmpty(),
+                // 页面恢复（切页返回 / 进程重建）：以服务端 pending_asks 为准重新露出待答卡片；
+                // 投影暂时为空时保留本地卡片，避免刚由流投递、投影尚未落库的提问被抹掉。
+                pendingAsks = if (view.pendingAsks.isNotEmpty()) {
+                    view.pendingAsks
+                } else {
+                    state.pendingAsks
+                },
             )
             view
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -326,6 +350,119 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** 切换某个问题的选项：单选覆盖、多选切换（纯逻辑在 [AgentAskLogic.toggle]）。 */
+    fun toggleAskOption(askId: String, question: AgentAskQuestion, optionId: String) {
+        val current = _askSelections.value[askId].orEmpty()
+        val updated = current.toMutableMap().apply {
+            this[question.id] = AgentAskLogic.toggle(question, current[question.id].orEmpty(), optionId)
+        }
+        _askSelections.value = _askSelections.value + (askId to updated)
+    }
+
+    /** 回答提问：答案体只包含已选问题，成功后用服务端返回的 resolution 落状态并刷新投影。 */
+    fun answerAsk(askId: String) {
+        val client = client ?: return
+        val sessionId = _state.value.sessionId.trim()
+        val ask = _state.value.pendingAsks.firstOrNull { it.id == askId } ?: return
+        if (sessionId.isBlank() || _state.value.askSubmitting) return
+        val selected = _askSelections.value[askId].orEmpty()
+        if (!AgentAskLogic.canSubmit(ask, selected)) {
+            _state.value = _state.value.copy(askError = "每个问题都要选择一个选项")
+            return
+        }
+        val answers = AgentAskLogic.answers(ask, selected)
+        _state.value = _state.value.copy(askSubmitting = true, askError = null)
+        viewModelScope.launch {
+            try {
+                val resolution: AgentAskResolution = client.answerSessionAsk(sessionId, askId, answers)
+                DenovaLog.i("Agent", "ask answered id=$askId status=${resolution.status} answers=${answers.size}")
+                applyAskResolution(ask, resolution)
+            } catch (e: DenovaApiException) {
+                DenovaLog.w("Agent", "ask answer failed id=$askId code=${e.code} status=${e.status}")
+                _state.value = _state.value.copy(askError = AgentAskLogic.askError(e.code, e.message))
+                // 已过期 / 不存在：本地卡片不再可信，用投影纠正而不是重发同一答案。
+                if (AgentAskLogic.needsRefresh(e.code)) refreshActive()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Agent", "ask answer uncertain id=$askId", e)
+                _state.value = _state.value.copy(askError = e.message ?: "回答失败")
+            } finally {
+                _state.value = _state.value.copy(askSubmitting = false)
+            }
+        }
+    }
+
+    /** 取消提问：原因固定 `user_cancelled`（与 Web 默认值一致）。 */
+    fun cancelAsk(askId: String) {
+        val client = client ?: return
+        val sessionId = _state.value.sessionId.trim()
+        val ask = _state.value.pendingAsks.firstOrNull { it.id == askId } ?: return
+        if (sessionId.isBlank() || _state.value.askSubmitting) return
+        _state.value = _state.value.copy(askSubmitting = true, askError = null)
+        viewModelScope.launch {
+            try {
+                val resolution = client.cancelSessionAsk(sessionId, askId)
+                DenovaLog.i("Agent", "ask cancelled id=$askId status=${resolution.status} reason=${resolution.cancelReason}")
+                applyAskResolution(ask, resolution)
+            } catch (e: DenovaApiException) {
+                DenovaLog.w("Agent", "ask cancel failed id=$askId code=${e.code} status=${e.status}")
+                _state.value = _state.value.copy(askError = AgentAskLogic.askError(e.code, e.message))
+                if (AgentAskLogic.needsRefresh(e.code)) refreshActive()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Agent", "ask cancel uncertain id=$askId", e)
+                _state.value = _state.value.copy(askError = e.message ?: "取消失败")
+            } finally {
+                _state.value = _state.value.copy(askSubmitting = false)
+            }
+        }
+    }
+
+    /** 落定一次回答/取消：从待答列表移除、记入已解决，并以 active 投影校正。 */
+    private fun applyAskResolution(ask: AgentAskInteraction, resolution: AgentAskResolution) {
+        val resolved = AgentAskLogic.applyResolution(ask, resolution)
+        val state = _state.value
+        _state.value = state.copy(
+            pendingAsks = state.pendingAsks.filterNot { it.id == ask.id },
+            resolvedAsks = (state.resolvedAsks.filterNot { it.id == ask.id } + resolved).takeLast(5),
+        )
+        _askSelections.value = _askSelections.value - ask.id
+        viewModelScope.launch { refreshActive() }
+    }
+
+    /** 流里的 `data-ask` 部件：待答则入列，已解决则移出并记状态。 */
+    private fun handleAskChunk(chunk: AgentUiChunk) {
+        if (chunk.type != ASK_CHUNK_TYPE) return
+        val data = chunk.data ?: return
+        val ask = runCatching {
+            json.decodeFromString(AgentAskInteraction.serializer(), data.toString())
+        }.getOrNull()
+        if (ask == null || ask.id.isBlank()) {
+            DenovaLog.w("Agent", "ask chunk ignored: unparsable")
+            return
+        }
+        val state = _state.value
+        val previous = state.pendingAsks.firstOrNull { it.id == ask.id }
+            ?: state.resolvedAsks.firstOrNull { it.id == ask.id }
+        _state.value = if (ask.isPending) {
+            DenovaLog.i("Agent", "ask pending id=${ask.id} questions=${ask.questions.size}")
+            state.copy(
+                pendingAsks = state.pendingAsks.filterNot { it.id == ask.id } + ask,
+                resolvedAsks = state.resolvedAsks.filterNot { it.id == ask.id },
+            )
+        } else {
+            DenovaLog.i("Agent", "ask resolved id=${ask.id} status=${ask.status}")
+            // 流里的 resolved 部件可能缺答案/原因，与本地已有详情合并，避免界面丢掉已答内容。
+            val merged = AgentAskLogic.merge(previous, ask)
+            state.copy(
+                pendingAsks = state.pendingAsks.filterNot { it.id == ask.id },
+                resolvedAsks = (state.resolvedAsks.filterNot { it.id == ask.id } + merged).takeLast(5),
+            )
+        }
+    }
+
     /** 从 canonical 消息历史重建正文基线（rehydrate 后不丢已持久化内容）。 */
     private suspend fun reloadCanonical() {
         val client = client ?: return
@@ -345,12 +482,16 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private fun onFrame(frame: AgentUiFrame) {
         val current = _state.value
         when (frame) {
-            is AgentUiFrame.Chunk -> _state.value = current.copy(
-                ui = AgentUiReducer.reduce(current.ui, frame.chunk),
-                connected = true,
-            )
+            is AgentUiFrame.Chunk -> {
+                // 提问交互（AGT-004）走独立的 data 部件，先于正文投影处理。
+                handleAskChunk(frame.chunk)
+                _state.value = _state.value.copy(
+                    ui = AgentUiReducer.reduce(_state.value.ui, frame.chunk),
+                    connected = true,
+                )
+            }
 
-            AgentUiFrame.Done -> _state.value = current.copy(connected = false)
+            AgentUiFrame.Done -> _state.value = _state.value.copy(connected = false)
         }
     }
 
@@ -372,5 +513,10 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         streamJob?.cancel()
         sendJob?.cancel()
         super.onCleared()
+    }
+
+    private companion object {
+        /** 提问交互的 AI SDK data 部件类型（后端 `agentui.DataTypeAsk`）。 */
+        const val ASK_CHUNK_TYPE = "data-agent-ask"
     }
 }

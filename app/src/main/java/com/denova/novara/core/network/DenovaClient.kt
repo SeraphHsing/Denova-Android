@@ -3,6 +3,9 @@ package com.denova.novara.core.network
 import com.denova.novara.core.model.ServerKey
 import com.denova.novara.core.save.FileRemote
 import com.denova.novara.core.stream.AgentActiveView
+import com.denova.novara.core.stream.AgentAskAnswer
+import com.denova.novara.core.stream.AgentAskLogic
+import com.denova.novara.core.stream.AgentAskResolution
 import com.denova.novara.core.stream.AgentMessagesPage
 import com.denova.novara.core.stream.AgentRecoveryRequest
 import com.denova.novara.core.stream.AgentStreamTransport
@@ -123,6 +126,20 @@ data class AgentCommandRequest(
     @SerialName("command_id") val commandId: String,
     @SerialName("target_operation_id") val targetOperationId: String,
     val reason: String? = null,
+)
+
+/** 回答提问的请求体（`POST /api/session/asks/:id/answer`）。 */
+@Serializable
+data class SessionAskAnswerRequest(
+    @SerialName("session_id") val sessionId: String,
+    val answers: List<AgentAskAnswer> = emptyList(),
+)
+
+/** 取消提问的请求体（`POST /api/session/asks/:id/cancel`）。 */
+@Serializable
+data class SessionAskCancelRequest(
+    @SerialName("session_id") val sessionId: String,
+    val reason: String,
 )
 
 /** 命令受理回执：服务端确认后的命令身份、操作身份与游标。 */
@@ -568,6 +585,50 @@ class DenovaClient(
                 val body = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
                 json.decodeFromString(AgentActiveView.serializer(), body)
+            }
+        }
+    }
+
+    /**
+     * 回答提问（AGT-004）：`POST /api/session/asks/:ask_id/answer`。
+     * 答案体的 `question_id` / `selected_option_ids` 必须来自服务端下发的问句，不能自造。
+     */
+    suspend fun answerSessionAsk(
+        sessionId: String,
+        askId: String,
+        answers: List<AgentAskAnswer>,
+    ): AgentAskResolution = postAskResolution(
+        path = "asks/$askId/answer",
+        body = json.encodeToString(
+            SessionAskAnswerRequest.serializer(),
+            SessionAskAnswerRequest(sessionId = sessionId, answers = answers),
+        ),
+    )
+
+    /** 取消提问（AGT-004）：`POST /api/session/asks/:ask_id/cancel`，原因默认 `user_cancelled`。 */
+    suspend fun cancelSessionAsk(
+        sessionId: String,
+        askId: String,
+        reason: String = AgentAskLogic.CANCEL_REASON_USER,
+    ): AgentAskResolution = postAskResolution(
+        path = "asks/$askId/cancel",
+        body = json.encodeToString(
+            SessionAskCancelRequest.serializer(),
+            SessionAskCancelRequest(sessionId = sessionId, reason = reason),
+        ),
+    )
+
+    private suspend fun postAskResolution(path: String, body: String): AgentAskResolution {
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/session/")
+            .addPathSegments(path)
+            .build()
+        val call = Request.Builder().url(url).post(body.toRequestBody(jsonMediaType)).build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(call).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentAskResolution.serializer(), text)
             }
         }
     }

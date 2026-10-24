@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,12 +28,73 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.core.stream.AgentAskInteraction
+import com.denova.novara.core.stream.AgentAskLogic
+import com.denova.novara.core.stream.AgentAskQuestion
 import com.denova.novara.core.stream.AgentPhase
 import com.denova.novara.feature.editor.TextSelectionQuote
+
+/**
+ * 提问卡片（AGT-004）：逐题列出服务端选项，选中才能提交；取消按固定原因上报。
+ * 选项文案、推荐项与新选项全部来自服务端问句，本地不构造问题。
+ */
+@Composable
+private fun AgentAskCard(
+    ask: AgentAskInteraction,
+    selected: Map<String, List<String>>,
+    submitting: Boolean,
+    onToggle: (AgentAskQuestion, String) -> Unit,
+    onSubmit: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
+            .padding(10.dp),
+    ) {
+        ask.questions.forEach { question ->
+            Text(question.question, style = MaterialTheme.typography.bodyMedium)
+            val picked = selected[question.id].orEmpty()
+            question.options.forEach { option ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(enabled = !submitting) { onToggle(question, option.id) }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(if (option.id in picked) "●" else "○", modifier = Modifier.padding(end = 8.dp))
+                    Column {
+                        Text(
+                            option.label + if (option.id == question.recommendedOptionId) "（推荐）" else "",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        option.description?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
+                }
+            }
+        }
+        Row(modifier = Modifier.padding(top = 6.dp)) {
+            OutlinedButton(onClick = onSubmit, enabled = !submitting) {
+                Text(stringResource(if (submitting) R.string.ask_submitting else R.string.ask_submit))
+            }
+            OutlinedButton(
+                onClick = onCancel,
+                enabled = !submitting,
+                modifier = Modifier.padding(start = 8.dp),
+            ) { Text(stringResource(R.string.ask_cancel)) }
+        }
+    }
+}
 
 /** 写作 Agent 舞台：输入 session/消息 → 挂接 → 展示正文/思考/活动/终态。 */
 @Composable
@@ -45,6 +107,7 @@ fun AgentScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val selections by viewModel.selections.collectAsState()
+    val askSelections by viewModel.askSelections.collectAsState()
     var sessionId by remember { mutableStateOf("") }
     var input by remember { mutableStateOf("") }
 
@@ -147,6 +210,34 @@ fun AgentScreen(
                 .padding(12.dp)
                 .verticalScroll(rememberScrollState()),
         )
+
+        // 提问交互（AGT-004）：待答卡片 + 已解决状态。选项与答案来自服务端问句，本地只记录选择。
+        state.pendingAsks.forEach { ask ->
+            AgentAskCard(
+                ask = ask,
+                selected = askSelections[ask.id].orEmpty(),
+                submitting = state.askSubmitting,
+                onToggle = { question, optionId -> viewModel.toggleAskOption(ask.id, question, optionId) },
+                onSubmit = { viewModel.answerAsk(ask.id) },
+                onCancel = { viewModel.cancelAsk(ask.id) },
+            )
+        }
+        state.askError?.let {
+            Text(
+                it,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+        }
+        state.resolvedAsks.forEach { ask ->
+            Text(
+                AgentAskLogic.statusText(ask),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+        }
 
         // 选区引用卡（WRI-009）：`file:Lx-Ly 内容前 30 字…`，可逐条移除。
         if (selections.isNotEmpty()) {
