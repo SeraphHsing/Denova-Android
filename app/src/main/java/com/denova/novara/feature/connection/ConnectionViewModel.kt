@@ -69,6 +69,8 @@ class ConnectionViewModel(
         val current = (state.value as? ConnectionUiState.Unauthenticated)?.server ?: return
         viewModelScope.launch {
             try {
+                // D03 恢复耗时埋点：认证往返起点
+                DenovaLog.i("Perf", "login-start")
                 val result = c.login(username.trim(), password)
                 DenovaLog.i("Connection", "login ok local=${result.local}")
                 _actionError.value = null

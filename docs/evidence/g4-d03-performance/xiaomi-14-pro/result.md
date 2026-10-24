@@ -93,6 +93,24 @@
 
 说明：模拟器为**软件渲染**（swiftshader），其合成/绘制耗时与真机 GPU 不可比，仅作最低档可用性证据，不作性能结论来源。
 
+### 4.4 恢复耗时（固定断线场景，真机 5 次）
+
+场景固定：`force-stop` → 冷启 → 连接/登录 → 游戏 → `story=st_dmc2p6amro52de34e38f` → 挂接（Settle 路径，加载 canonical 历史并渲染，不含模型生成）。
+
+埋点（`Perf` tag，logcat `-v epoch` 对齐）：
+`process-start` → `login-start` → `login ok` → `Game: start story=` → `canonical baseline loaded` → `narrative-visible`
+
+| run | 认证往返 | 附接 + canonical 合并 | 基线 → 可操作渲染 | 合计 |
+|---|---|---|---|---|
+| 1 | 158 ms | 2651 ms | 52 ms | 2861 ms |
+| 2 | 126 ms | 2632 ms | 65 ms | 2823 ms |
+| 3 | 101 ms | 2659 ms | 61 ms | 2821 ms |
+| 4 | 166 ms | 2597 ms | 56 ms | 2819 ms |
+| 5 | 126 ms | 2656 ms | 95 ms | 2877 ms |
+| **中位数** | **126 ms** | **2651 ms** | **61 ms** | **2823 ms** |
+
+口径：三段均为 app 内部埋点差值，排除人工/adb 导航耗时。**附接 + canonical 合并占 94%**（2651/2823），是后续优化重点（history 端点 ~95KB JSON 拉取 + 解析）。
+
 ## 五、G4 数值预算（本轮冻结）
 
 依据：真机 5 次中位数（主档）+ 模拟器与 Web 基线（参照）；各项留约 2× 余量，未在测量失败后放宽。
@@ -103,6 +121,10 @@
 | 事件接收 → 投影可见 p99 | 同上 | **≤ 80 ms** | 真机中位 33 ms |
 | 单事件投影耗时 | reducer + 状态发布 | **≤ 2 ms** | 真机 0.122 ms、模拟器 0.116 ms |
 | 峰值 PSS 增量 | D03-S 60s / 6MB / ≈205 万字 | **≤ 60 MB** | 真机 +30.3 MB；模拟器 +3.3 MB |
+| **恢复总耗时**（认证 + 附接 + canonical 合并 → 可操作） | 冷启 + 固定断线（`force-stop`） | **≤ 4000 ms** | 真机 5 次中位 **2823 ms** |
+| 其中：认证往返 | `login-start` → `login ok` | **≤ 500 ms** | 中位 126 ms |
+| 其中：附接 + canonical 合并 | `start story=` → `baseline loaded` | **≤ 3500 ms** | 中位 2651 ms |
+| 其中：基线 → 可操作渲染 | `baseline loaded` → 首次可见 | **≤ 200 ms** | 中位 61 ms |
 | 流式更新帧时间 | — | **暂不冻结** | 本机 `gfxinfo` janky/percentile 经对照实验判定不可用（见 §一），改用可见延迟作为替代口径 |
 
 ## 六、仍未达 D03 通过条件

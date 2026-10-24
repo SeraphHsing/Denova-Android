@@ -25,6 +25,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GamePhase
 
@@ -124,6 +125,16 @@ fun GameScreen(viewModel: GameViewModel, onBack: () -> Unit) {
 @Composable
 private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifier) {
     val blocks by viewModel.blocks.collectAsState()
+    // D03 恢复耗时埋点：叙事首次可见 = 恢复后「可操作」终点（每次进入写作/游戏界面记一次）。
+    var visibilityMarked by remember { mutableStateOf(false) }
+    if (!visibilityMarked && blocks.isNotEmpty()) {
+        SideEffect {
+            if (!visibilityMarked) {
+                visibilityMarked = true
+                DenovaLog.i("Perf", "narrative-visible blocks=${blocks.size}")
+            }
+        }
+    }
     if (blocks.isEmpty()) {
         Text(
             text = "输入 story ID 后挂接游戏流",

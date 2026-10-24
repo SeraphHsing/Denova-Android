@@ -42,6 +42,8 @@ class MainActivity : ComponentActivity() {
             logcatInstalled = true
             DenovaLog.addSink(LogcatSink())
         }
+        // D03 恢复耗时埋点：进程冷启起点（与 login ok / attach / baseline / narrative-visible 对齐）
+        DenovaLog.i("Perf", "process-start")
         setContent {
             MaterialTheme {
                 val connectionViewModel: ConnectionViewModel = viewModel {
