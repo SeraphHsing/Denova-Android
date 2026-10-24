@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -93,15 +93,8 @@ fun GameScreen(viewModel: GameViewModel, onBack: () -> Unit) {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
         }
 
-        // 叙事
-        Text(
-            text = uiState.narrative.ifBlank { "输入 story ID 后挂接游戏流" },
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier
-                .weight(1f)
-                .padding(12.dp)
-                .verticalScroll(rememberScrollState()),
-        )
+        // 叙事单独收集 blocks 流：高频更新只重组本面板
+        NarrativePane(viewModel = viewModel, modifier = Modifier.weight(1f))
 
         // 发送玩家输入（POST 实时流；先落本地命令事务再发送）
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
@@ -119,6 +112,38 @@ fun GameScreen(viewModel: GameViewModel, onBack: () -> Unit) {
                 },
                 enabled = !uiState.sending && storyId.isNotBlank() && input.isNotBlank(),
             ) { Text(if (uiState.sending) "发送中…" else "发送") }
+        }
+    }
+}
+
+/**
+ * 叙事面板：只有它收集高频 [GameViewModel.blocks] 流，
+ * chunk 更新不会连带重组状态行与输入框（含 IME 布局，代价高）。
+ */
+@Composable
+private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifier) {
+    val blocks by viewModel.blocks.collectAsState()
+    if (blocks.isEmpty()) {
+        Text(
+            text = "输入 story ID 后挂接游戏流",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = modifier.padding(12.dp),
+        )
+        return
+    }
+    // reverseLayout：新块追加后视图天然锚定底部，无需每次 flush 调 scrollToItem。
+    LazyColumn(
+        reverseLayout = true,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(12.dp),
+    ) {
+        itemsIndexed(blocks.asReversed()) { _, block ->
+            Text(
+                text = block,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(vertical = 2.dp),
+            )
         }
     }
 }

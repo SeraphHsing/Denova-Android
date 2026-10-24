@@ -17,11 +17,13 @@ import com.denova.novara.core.stream.GameStageState
 import com.denova.novara.core.stream.GameStreamError
 import com.denova.novara.core.stream.GameStreamEvent
 import com.denova.novara.core.stream.GameStreamRecoveryCoordinator
+import com.denova.novara.core.stream.NarrativeBuilder
 import com.denova.novara.core.stream.RehydrateRequest
 import com.denova.novara.core.stream.buildCanonicalNarrative
 import com.denova.novara.core.stream.collectWithIdleGuard
 import java.util.UUID
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +36,9 @@ import kotlinx.serialization.json.Json
 @Serializable
 private data class ChunkData(val content: String? = null, val subagent: Boolean? = null)
 
+/** chunk 合批发布间隔：约 16 次/秒，兼顾流式观感与主线程负载。 */
+private const val CHUNK_FLUSH_INTERVAL_MS = 60L
+
 /** 游戏 UI 状态：投影阶段 + 累积叙事 + 连接态。 */
 data class GameUiState(
     val storyId: String = "",
@@ -41,8 +46,6 @@ data class GameUiState(
     val stage: GameStageState = GameStageState(),
     /** canonical 历史叙事基线（挂接前/重取时加载）。 */
     val baseline: String = "",
-    /** 显示叙事 = canonical 基线 + 当前流增量。 */
-    val narrative: String = "",
     val connected: Boolean = false,
     val sending: Boolean = false,
     val error: String? = null,
@@ -58,13 +61,27 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var streamJob: Job? = null
     private var sendJob: Job? = null
 
-    // D03 性能埋点：事件投影耗时累计统计（不影响功能）。
+    // D03 性能埋点：事件投影耗时 + 合批频次累计统计（不影响功能）。
     private var perfEventCount = 0
     private var perfTotalNanos = 0L
     private var perfMaxNanos = 0L
+    private var perfFlushCount = 0
+    private var perfCharsPerFlush = 0
+
+    // 叙事增量分块 + chunk 合批（60ms 发布一次，避免每个 chunk 触发重组）。
+    private val narrative = NarrativeBuilder()
+    private val pendingChunks = StringBuilder()
+    private var flushJob: Job? = null
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
+
+    /**
+     * 叙事分块单独成流：高频（~16 次/秒）更新只驱动叙事面板重组，
+     * 不会连带重组状态行与输入框（后者含 IME 布局，代价高）。
+     */
+    private val _blocks = MutableStateFlow<List<String>>(emptyList())
+    val blocks: StateFlow<List<String>> = _blocks.asStateFlow()
 
     /** 登录后绑定当前连接的 client，建立恢复协调器。 */
     fun bindClient(client: DenovaClient) {
@@ -79,6 +96,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun start(storyId: String, branchId: String) {
         val c = coordinator ?: return
         DenovaLog.i("Game", "start story=$storyId branch=$branchId")
+        dropPendingChunks()
+        narrative.reset("")
+        _blocks.value = emptyList()
         _uiState.value = GameUiState(storyId = storyId, branchId = branchId)
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
@@ -121,6 +141,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         perfEventCount = 0
         perfTotalNanos = 0
         perfMaxNanos = 0
+        perfFlushCount = 0
+        perfCharsPerFlush = 0
         sendJob = viewModelScope.launch {
             commands.save(record) // 本地事务先落盘
             try {
@@ -182,18 +204,30 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val current = _uiState.value
         val stage = GameStageReducer.reduce(current.stage, event)
 
-        var narrative = current.narrative
         when (event.type) {
             GameEventType.CHUNK -> {
                 val data = runCatching { json.decodeFromString(ChunkData.serializer(), event.data ?: "") }.getOrNull()
-                if (data != null && data.subagent != true) narrative += data.content.orEmpty()
+                val content = data?.content.orEmpty()
+                if (data != null && data.subagent != true && content.isNotEmpty()) {
+                    pendingChunks.append(content)
+                    scheduleFlush()
+                }
+                // 正文走合批；阶段变化（例如首帧进入运行中）仍需立即反映。
+                if (stage != current.stage) {
+                    _uiState.value = current.copy(stage = stage, connected = true, error = null)
+                }
             }
-            GameEventType.TASK_CHECKPOINT,
-            GameEventType.TASK_REHYDRATE_REQUIRED -> narrative = current.baseline
-            else -> Unit
-        }
 
-        _uiState.value = current.copy(stage = stage, narrative = narrative, connected = true, error = null)
+            GameEventType.TASK_CHECKPOINT,
+            GameEventType.TASK_REHYDRATE_REQUIRED -> {
+                dropPendingChunks()
+                narrative.reset(current.baseline)
+                _blocks.value = narrative.snapshot
+                _uiState.value = current.copy(stage = stage, connected = true, error = null)
+            }
+
+            else -> _uiState.value = current.copy(stage = stage, connected = true, error = null)
+        }
 
         val costNanos = System.nanoTime() - startNanos
         perfEventCount++
@@ -207,8 +241,45 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * chunk 合批：把高频 chunk 攒进缓冲，按 [CHUNK_FLUSH_INTERVAL_MS] 合并发布一次。
+     * 重组频率从「每 chunk」降到约 16 次/秒，避免 UI 线程被逐帧更新淹没。
+     */
+    private fun scheduleFlush() {
+        if (flushJob?.isActive == true) return
+        flushJob = viewModelScope.launch {
+            delay(CHUNK_FLUSH_INTERVAL_MS)
+            flushPendingChunks()
+        }
+    }
+
+    private fun flushPendingChunks() {
+        if (pendingChunks.isEmpty()) return
+        val text = pendingChunks.toString()
+        pendingChunks.setLength(0)
+        narrative.append(text)
+        _blocks.value = narrative.snapshot
+
+        perfFlushCount++
+        perfCharsPerFlush += text.length
+        if (perfFlushCount % 50 == 0) {
+            DenovaLog.i(
+                "GamePerf",
+                "flushes=$perfFlushCount avgChars=${perfCharsPerFlush / perfFlushCount} blocks=${narrative.snapshot.size}",
+            )
+        }
+    }
+
+    /** 丢弃未发布的 chunk（checkpoint/rehydrate 会整段重建，避免旧增量串进新基线）。 */
+    private fun dropPendingChunks() {
+        flushJob?.cancel()
+        flushJob = null
+        pendingChunks.setLength(0)
+    }
+
     /** 流结束：若仍停在运行中，说明没收到 terminal 事件（流异常中断），标记断开。 */
     private fun finishStream() {
+        flushPendingChunks()
         val current = _uiState.value
         val stage = if (current.stage.phase == GamePhase.RUNNING) {
             current.stage.copy(phase = GamePhase.ERROR, activity = GameActivity.IDLE, streamFailed = true)
@@ -224,7 +295,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         try {
             val page = client.interactiveHistory(storyId, branchId, limit = 50)
             val baseline = buildCanonicalNarrative(page.turns)
-            _uiState.value = _uiState.value.copy(baseline = baseline, narrative = baseline)
+            narrative.reset(baseline)
+            _blocks.value = narrative.snapshot
+            _uiState.value = _uiState.value.copy(baseline = baseline)
             DenovaLog.i("Game", "canonical baseline loaded len=${baseline.length}")
         } catch (e: Exception) {
             DenovaLog.w("Game", "load canonical baseline failed", e)
@@ -247,12 +320,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             _uiState.value.baseline
         }
-        _uiState.value = _uiState.value.copy(baseline = baseline, narrative = baseline, stage = GameStageState())
+        dropPendingChunks()
+        narrative.reset(baseline)
+        _blocks.value = narrative.snapshot
+        _uiState.value = _uiState.value.copy(baseline = baseline, stage = GameStageState())
     }
 
     override fun onCleared() {
         streamJob?.cancel()
         sendJob?.cancel()
+        flushJob?.cancel()
         super.onCleared()
     }
 }
