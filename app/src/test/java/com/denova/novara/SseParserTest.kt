@@ -2,6 +2,7 @@ package com.denova.novara
 
 import com.denova.novara.core.stream.SseParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SseParserTest {
@@ -73,9 +74,17 @@ class SseParserTest {
     }
 
     @Test
-    fun `drops frame without event`() {
+    fun `keeps data-only frame without event`() {
         val parser = SseParser()
-        val frames = parser.feed("id: 1\ndata: no-event\n\n")
-        assertEquals(0, frames.size)
+        val frames = parser.feed("data: {\"type\":\"start\"}\n\n")
+        assertEquals(1, frames.size)
+        assertNull(frames[0].event)
+        assertEquals("{\"type\":\"start\"}", frames[0].data)
+    }
+
+    @Test
+    fun `drops blank block`() {
+        val parser = SseParser()
+        assertEquals(0, parser.feed(": comment only\n\n").size)
     }
 }

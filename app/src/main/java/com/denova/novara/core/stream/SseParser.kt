@@ -67,7 +67,9 @@ class SseParser {
                 "data" -> data.add(value)
             }
         }
-        if (event.isNullOrEmpty()) return null
+        // 保留"有 data 无 event"的帧（AI SDK UI message 流只有 data 行）；
+        // 既无 event 又无 data 的空块/注释块才丢弃。
+        if (event.isNullOrEmpty() && data.isEmpty()) return null
         return SseFrame(id, event, data.takeIf { it.isNotEmpty() }?.joinToString("\n"))
     }
 }
