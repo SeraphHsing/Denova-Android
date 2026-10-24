@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
@@ -44,11 +43,13 @@ import com.denova.novara.feature.editor.EditorScreen
 import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.feature.game.GameScreen
 import com.denova.novara.feature.game.GameViewModel
+import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.shell.AppDrawer
 import com.denova.novara.feature.shell.PlaceholderScreen
 import com.denova.novara.feature.shell.appDestinations
 import com.denova.novara.feature.terminal.TerminalScreen
 import com.denova.novara.feature.terminal.TerminalViewModel
+import com.denova.novara.ui.theme.NovaraTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -61,8 +62,10 @@ class MainActivity : ComponentActivity() {
         // D03 恢复耗时埋点：进程冷启起点（与 login ok / attach / baseline / narrative-visible 对齐）
         DenovaLog.i("Perf", "process-start")
         setContent {
-            MaterialTheme {
-                val container = (application as NovaraApplication).container
+            val container = (application as NovaraApplication).container
+            val settingsViewModel: SettingsViewModel = viewModel(factory = container.viewModelFactory)
+            val darkTheme by settingsViewModel.darkTheme.collectAsState()
+            NovaraTheme(darkTheme = darkTheme) {
                 val connectionViewModel: ConnectionViewModel = viewModel(factory = container.viewModelFactory)
                 val editorViewModel: EditorViewModel = viewModel(factory = container.viewModelFactory)
                 val gameViewModel: GameViewModel = viewModel(factory = container.viewModelFactory)
@@ -91,7 +94,11 @@ class MainActivity : ComponentActivity() {
                             ModalNavigationDrawer(
                                 drawerState = drawerState,
                                 drawerContent = {
-                                    AppDrawer(currentRoute = currentRoute) { destination ->
+                                    AppDrawer(
+                                        currentRoute = currentRoute,
+                                        darkTheme = darkTheme,
+                                        onToggleDarkTheme = { settingsViewModel.toggleDarkTheme() },
+                                    ) { destination ->
                                         scope.launch { drawerState.close() }
                                         navController.navigate(destination.route) {
                                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }

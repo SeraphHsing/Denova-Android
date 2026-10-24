@@ -9,6 +9,7 @@ import com.denova.novara.feature.connection.ConnectionViewModel
 import com.denova.novara.feature.debug.DebugPanelViewModel
 import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.feature.game.GameViewModel
+import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.terminal.TerminalViewModel
 
 /**
@@ -28,5 +29,6 @@ class AppContainer(application: Application) {
         initializer { AgentViewModel(application) }
         initializer { TerminalViewModel(application) }
         initializer { DebugPanelViewModel(application) }
+        initializer { SettingsViewModel(application) }
     }
 }

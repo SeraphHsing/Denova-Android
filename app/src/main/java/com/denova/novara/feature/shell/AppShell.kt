@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,7 +48,12 @@ val appDestinations: List<AppDestination> = listOf(
 
 /** 左导航抽屉内容。 */
 @Composable
-fun AppDrawer(currentRoute: String?, onNavigate: (AppDestination) -> Unit) {
+fun AppDrawer(
+    currentRoute: String?,
+    darkTheme: Boolean,
+    onToggleDarkTheme: () -> Unit,
+    onNavigate: (AppDestination) -> Unit,
+) {
     Column(
         Modifier
             .fillMaxSize()
@@ -80,6 +86,16 @@ fun AppDrawer(currentRoute: String?, onNavigate: (AppDestination) -> Unit) {
                     }
                 }
             }
+        }
+        HorizontalDivider()
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("深色模式", modifier = Modifier.weight(1f))
+            Switch(checked = darkTheme, onCheckedChange = { onToggleDarkTheme() })
         }
     }
 }
