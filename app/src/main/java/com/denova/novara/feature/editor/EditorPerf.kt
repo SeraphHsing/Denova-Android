@@ -73,5 +73,6 @@ object EditorPerf {
         inputLatency.reset()
         openAtMillis = 0L
         editAtMillis = 0L
+        lastEditAtMillis = 0L
     }
 }
