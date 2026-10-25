@@ -208,6 +208,12 @@
     <string name="agent_queue_steer">Steer</string>
     <string name="agent_queue_delete">Delete</string>
     <string name="agent_queue_item_steered">%1$s · steer requested</string>
+    <string name="agent_queue_edit">Edit</string>
+    <string name="agent_queue_truncated"> (truncated)</string>
+
+    <!-- History pagination (AGT-010) -->
+    <string name="agent_history_load_older">Load earlier messages</string>
+    <string name="agent_new_messages">New messages — tap to jump to bottom</string>
 
     <!-- 调试抽屉入口（仅 debug 构建） -->
     <string name="drawer_debug">Debug log</string>

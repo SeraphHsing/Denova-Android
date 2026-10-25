@@ -813,9 +813,12 @@ class DenovaClient(
         }
     }.flowOn(Dispatchers.IO)
 
-    /** 读取写作 session 的 canonical 消息历史（rehydrate/挂接后重建基线）。 */
-    suspend fun sessionMessages(sessionId: String, limit: Int): AgentMessagesPage {
-        val request = Request.Builder().url(sessionMessagesUrl(sessionId, limit)).get().build()
+    /**
+     * 读取写作 session 的 canonical 消息历史（rehydrate/挂接后重建基线）。
+     * [before] 是分页游标：带上一页的 `page.next_before` 即向历史更早处翻页（AGT-010）。
+     */
+    suspend fun sessionMessages(sessionId: String, limit: Int, before: String? = null): AgentMessagesPage {
+        val request = Request.Builder().url(sessionMessagesUrl(sessionId, limit, before)).get().build()
         return withContext(Dispatchers.IO) {
             okHttpClient.newCall(request).execute().use { resp ->
                 val body = resp.body?.string().orEmpty()
@@ -1015,11 +1018,12 @@ class DenovaClient(
     private fun interactiveSendUrl(): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/chat").build()
 
-    private fun sessionMessagesUrl(sessionId: String, limit: Int): HttpUrl =
+    private fun sessionMessagesUrl(sessionId: String, limit: Int, before: String? = null): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder()
             .addPathSegments("api/session/messages")
             .addQueryParameter("session_id", sessionId)
             .addQueryParameter("limit", limit.toString())
+            .apply { before?.takeIf { it.isNotBlank() }?.let { addQueryParameter("before", it) } }
             .build()
 
     private fun chatSendUrl(): HttpUrl =

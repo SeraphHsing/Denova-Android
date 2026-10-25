@@ -52,5 +52,5 @@
 
 ## 7. 残留
 
-- 队列项「取回编辑」（Web `queuedComposerDraftsRef` + `cancel reason=returned_to_editor`）未做：Android 没有提交时的编辑区草稿引用，本轮只提供 转向 / 删除。
-- `message_truncated=true` 的队列项未单独标示，只显示服务端给出的摘要。
+- 队列项「取回编辑」已补：输入区草稿改由 `AgentViewModel`（`composerDraft`）持有，`cancel_queued`（`reason=returned_to_editor`）成功后把正文回填，详见 `docs/evidence/agt-007/xiaomi-14-pro/result.md` §7。
+- `message_truncated=true` 的队列项在正文后标「（已截断）」；真机未构造出被截断的正文（阈值需长文本，`adb input text` 长串丢字符），仅单测覆盖。

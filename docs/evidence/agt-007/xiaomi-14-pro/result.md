@@ -61,7 +61,20 @@ queue control type=cancel_queued target=ff4b386d-e446-4ee1-802e-6db371dc31c0
 - JVM：`AgentQueueTest` 另 6 例（队列查找、换代后禁止转向、已清空禁止删除、转向/删除命令体、`reason` 取值、命令线含 `target_command_id`）。
 - 真机：§1–§4 在本机完成；主检查 `testDebugUnitTest` + `lintDebug` + `assembleDebug` 全绿（50 suites / 340 tests / 0 failures）；仪器测试未执行。
 
-## 7. 残留
+## 7. 取回编辑（`reason=returned_to_editor`）
 
-- 「取回编辑」（`reason=returned_to_editor`）未做，本轮删除固定 `user_deleted`。
+23:41:24 暂停态追加 `goback`（`queue=1`，`delivery=follow_up`），点该行「取回」：
+
+```
+queue control type=cancel_queued target=f6aa5448-f23a-4357-a9fc-0fc64020ac38
+  cmd=380dde10-0c0d-4d21-a411-323235299e7d op=run-20261025T153903.778181068-b4c7e0af3f02
+```
+
+- 服务端：`queue=0`，该项不再排队（取消而不是执行——同轮的另一项 `takeback` 被边界消费时队列是自然归零，两者现象可区分）。
+- 界面：`queue` 区收起，输入框被回填为 `goback`，右侧按钮仍为「追加」（`return-to-editor.png`）。
+- 回填发生在**取消成功之后**：取消失败时正文不会两头都在。
+
+## 8. 残留
+
+- `message_truncated` 的队列项会在正文后标「（已截断）」，但真机没构造出被服务端截断的正文（需要超过服务端摘要阈值的长度，`adb input text` 长串会丢字符），只由单测覆盖解析与标记。
 - 跨端同时操作同一队列项（另一端 steer / cancel 同一 `command_id`）未真机构造，仅由 `queue_conflict` / `target_operation_mismatch` 错误码兜底。

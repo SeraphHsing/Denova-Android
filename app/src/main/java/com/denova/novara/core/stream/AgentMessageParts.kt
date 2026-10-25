@@ -140,9 +140,12 @@ object AgentPartLogic {
      * 既保证部件 id 唯一，又保持同一条历史在多次重载后得到同一 key。
      */
     fun parseMessages(messages: List<AgentMessage>): List<AgentMessageView> =
-        messages.mapIndexedNotNull { index, message ->
+        messages.mapNotNull { message ->
+            // 身份不能带位置：历史分页会把更早的页插到前面（AGT-010），位置一变 id 就全变，
+            // 锚点定位与去重都会失效；改用「服务端 id + 内容摘要」，既跨页稳定又能区分共用 run id 的两条消息。
             val base = message.id.ifBlank { "msg" }
-            val view = parseMessage(message, identity = "$base@$index")
+            val digest = message.parts.joinToString("|") { it.toString() }.hashCode()
+            val view = parseMessage(message, identity = "$base@${Integer.toHexString(digest)}")
             if (view.parts.isEmpty()) null else view
         }
 

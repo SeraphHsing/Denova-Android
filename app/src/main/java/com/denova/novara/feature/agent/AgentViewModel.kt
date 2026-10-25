@@ -17,6 +17,8 @@ import com.denova.novara.core.network.SendChatRequest
 import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
 import com.denova.novara.core.stream.AgentApprovalLogic
+import com.denova.novara.core.stream.AgentMessage
+import com.denova.novara.core.stream.mergeOlderMessages
 import com.denova.novara.core.stream.AgentImagePart
 import com.denova.novara.core.stream.AgentMessagesPage
 import com.denova.novara.core.stream.AgentMessageView
@@ -97,6 +99,16 @@ data class AgentScreenState(
     val appending: Boolean = false,
     /** 队列项操作提交中：只禁用该行，避免两项互相阻塞（AGT-007）。 */
     val queueActionPendingCommandId: String = "",
+    /** 历史是否还有更早的一页（`page.has_more`，AGT-010）。 */
+    val historyHasMore: Boolean = false,
+    /** 上一页游标（`page.next_before`）：为空表示还没有可翻的页。 */
+    val historyNextBefore: String = "",
+    /** 正在向上翻页。 */
+    val historyLoadingMore: Boolean = false,
+    /** 用户不在底部时到达新内容：不自动贴底，改用「有新消息」提示（AGT-010 阅读锚点）。 */
+    val newMessagesPending: Boolean = false,
+    /** 输入区草稿：放到状态里，队列项「取回编辑」才能把正文填回输入框。 */
+    val composerDraft: String = "",
 )
 
 /** 写作 Agent ViewModel：绑定 client → 恢复协调器 → 投影；发送先落命令事务再 POST。 */
@@ -110,6 +122,9 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private var streamJob: Job? = null
     private var sendJob: Job? = null
     private var queueTicker: Job? = null
+
+    /** canonical 原始消息：分页以 `id` 去重合并后再整体解析，保证视图与合并结果一致。 */
+    private var historyRaw: List<AgentMessage> = emptyList()
 
     private val _state = MutableStateFlow(AgentScreenState())
     val state: StateFlow<AgentScreenState> = _state.asStateFlow()
@@ -671,11 +686,29 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         submitQueueControl(AgentCommands.TYPE_CANCEL_QUEUED, commandId, AgentCommands.CANCEL_REASON_DELETED)
 
     /**
+     * 取回编辑（`cancel_queued` + `reason=returned_to_editor`）：把该项正文填回输入框，
+     * 再取消队列项——与 Web `queuedComposerDraftsRef` 的口径一致，取消成功才回填，避免正文两头都在。
+     */
+    fun returnQueuedCommandToEditor(commandId: String) {
+        submitQueueControl(
+            AgentCommands.TYPE_CANCEL_QUEUED,
+            commandId,
+            AgentCommands.CANCEL_REASON_EDITOR,
+            onAccepted = { item -> setComposerDraft(item.message) },
+        )
+    }
+
+    /**
      * 队列项控制（AGT-007）：先用 active 投影确认该项仍在队列里——不信本地列表，
      * 因为队列可能已被执行或被另一端改掉；确认后落本地事务再 POST。
      * 成功按回执乐观更新该行，随后重取投影（暂停态转向会让服务端恢复执行）。
      */
-    private fun submitQueueControl(type: String, targetCommandId: String, reason: String = "") {
+    private fun submitQueueControl(
+        type: String,
+        targetCommandId: String,
+        reason: String = "",
+        onAccepted: (AgentQueuedCommand) -> Unit = {},
+    ) {
         val client = client ?: return
         val sessionId = _state.value.sessionId.trim()
         if (sessionId.isBlank() || _state.value.queueActionPendingCommandId.isNotBlank()) return
@@ -720,6 +753,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 client.submitAgentCommand(request)
                 commands.updateStatus(id, CommandStatus.ACCEPTED)
                 applyQueueReceipt(type, item)
+                onAccepted(item)
                 refreshActive()
             } catch (e: DenovaApiException) {
                 val rejected = e.status in 400..499
@@ -936,16 +970,87 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private fun applyCanonical(page: AgentMessagesPage) {
         val views = AgentPartLogic.parseMessages(page.messages)
         val tools = views.sumOf { view -> view.parts.count { it is AgentToolPart } }
+        historyRaw = page.messages
         _state.value = _state.value.copy(
             messages = views,
             historyLoading = false,
             historyError = null,
             ui = _state.value.ui.copy(content = "", thinking = ""),
+            // 分页游标随页面一起重置：翻页只对当前这份历史有效（AGT-010）。
+            historyHasMore = page.page?.hasMore == true,
+            historyNextBefore = page.page?.nextBefore.orEmpty(),
+            historyLoadingMore = false,
         )
         DenovaLog.i(
             "Agent",
-            "canonical parts loaded messages=${views.size} tools=$tools session=${_state.value.sessionId}",
+            "canonical parts loaded messages=${views.size} tools=$tools has_more=${page.page?.hasMore} total=${page.page?.total} session=${_state.value.sessionId}",
         )
+    }
+
+    /**
+     * 向历史更早处翻一页（AGT-010）。游标取 `page.next_before`，按消息 id 去重后前置：
+     * 翻页期间若有新消息写入，边界页可能重复，去重保证「分页身份合并无重复」。
+     */
+    fun loadOlderHistory() {
+        val client = client ?: return
+        val state = _state.value
+        val sessionId = state.sessionId.trim()
+        val before = state.historyNextBefore.trim()
+        if (sessionId.isBlank() || !state.historyHasMore || state.historyLoadingMore || before.isEmpty()) return
+        _state.value = state.copy(historyLoadingMore = true, historyError = null)
+        viewModelScope.launch {
+            try {
+                val page = client.sessionMessages(sessionId, limit = CANONICAL_LIMIT, before = before)
+                val current = _state.value
+                // 迟到回包只对同一会话、同一游标有效：期间换过会话或已重载历史就丢弃这一页。
+                if (current.sessionId.trim() != sessionId || current.historyNextBefore.trim() != before) {
+                    DenovaLog.w("Agent", "older history discarded session=$sessionId before=$before")
+                    return@launch
+                }
+                val merged = mergeOlderMessages(historyRaw, page.messages)
+                val added = merged.size - historyRaw.size
+                historyRaw = merged
+                _state.value = current.copy(
+                    messages = AgentPartLogic.parseMessages(merged),
+                    historyLoadingMore = false,
+                    historyHasMore = page.page?.hasMore == true,
+                    historyNextBefore = page.page?.nextBefore.orEmpty(),
+                )
+                DenovaLog.i(
+                    "Agent",
+                    "older history loaded added=$added total=${merged.size} before=$before has_more=${page.page?.hasMore}",
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Agent", "load older history failed", e)
+                _state.value = _state.value.copy(
+                    historyLoadingMore = false,
+                    historyError = e.message ?: "加载更早消息失败",
+                )
+            }
+        }
+    }
+
+    /** 用户已在底部：清掉「有新消息」提示（是否贴底由界面判断）。 */
+    fun clearNewMessages() {
+        if (_state.value.newMessagesPending) {
+            _state.value = _state.value.copy(newMessagesPending = false)
+        }
+    }
+
+    /** 用户正在往上读时到达新内容：不抢滚动位置，只挂提示。 */
+    fun markNewMessages() {
+        if (!_state.value.newMessagesPending) {
+            _state.value = _state.value.copy(newMessagesPending = true)
+        }
+    }
+
+    /** 输入区草稿：队列项「取回编辑」把正文写回这里，避免再往流里投一条命令。 */
+    fun setComposerDraft(text: String) {
+        if (_state.value.composerDraft != text) {
+            _state.value = _state.value.copy(composerDraft = text)
+        }
     }
 
     /**

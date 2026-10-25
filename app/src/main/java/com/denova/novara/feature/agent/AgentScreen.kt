@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -34,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -44,6 +46,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import com.denova.novara.core.stream.AgentApprovalLogic
 import com.denova.novara.core.stream.AgentDataPart
 import com.denova.novara.core.stream.AgentImagePart
@@ -100,6 +104,19 @@ private fun approvalReasonText(reason: ApprovalReason): String = stringResource(
         ApprovalReason.GENERIC -> R.string.approval_reason_generic
     },
 )
+
+/**
+ * 列表是否已贴近底部（AGT-010）。
+ *
+ * 用「最后一个可见项 index 与总数之差」判断，不依赖 `canScrollForward`：内容不足一屏时它恒为 false，
+ * 会把「在底部」误判成「正在阅读历史」。
+ */
+private fun isNearBottom(state: LazyListState): Boolean {
+    val info = state.layoutInfo
+    if (info.totalItemsCount == 0) return true
+    val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+    return last >= info.totalItemsCount - 2
+}
 
 @Composable
 private fun approvalRiskText(risk: ApprovalRisk): String = stringResource(
@@ -512,7 +529,6 @@ fun AgentScreen(
     val selections by viewModel.selections.collectAsState()
     val askSelections by viewModel.askSelections.collectAsState()
     var sessionId by remember { mutableStateOf("") }
-    var input by remember { mutableStateOf("") }
 
     // 进入页面自动回到会话（AGT-013）：优先上次挂接的会话，其次服务端 active / 最近会话。
     // 进程被杀后重启也能直接落回同一会话，pending ask 与任务入口由服务端投影恢复。
@@ -685,10 +701,61 @@ fun AgentScreen(
         // 完整消息部件（AGT-001）：历史按 part 渲染（文本 / 推理 / 工具 / 图片 / 事件），
         // 末尾再显示本轮流式正文。工具详情、推理与原始事件都可展开，图片按需取字节。
         val listState = rememberLazyListState()
-        // 新消息或流式增量到达时贴底，避免用户每次手动往下滚（历史很长时尤其明显）。
+        // 阅读锚点（AGT-010）：用户不在底部时到达新内容只挂「有新消息」提示，不抢滚动位置；
+        // 在底部时才贴底。往上翻页由列表滚到顶部触发，翻页前记下当前首项，回包后按 key 复位。
+        var anchorId by remember { mutableStateOf<String?>(null) }
+        var anchorOffset by remember { mutableStateOf(0) }
+        var lastContentLen by remember { mutableStateOf(0) }
+        var pinnedOnce by remember { mutableStateOf(false) }
+        val scrollScope = rememberCoroutineScope()
+        // 首次历史到达后贴底一次：布局完成前 totalItemsCount 还是 0，直接滚会被忽略。
+        LaunchedEffect(state.messages.size) {
+            if (pinnedOnce || state.messages.isEmpty()) return@LaunchedEffect
+            delay(80)
+            val total = listState.layoutInfo.totalItemsCount
+            if (total > 0) {
+                listState.scrollToItem(total - 1)
+                pinnedOnce = true
+                viewModel.clearNewMessages()
+            }
+        }
         LaunchedEffect(state.messages.size, state.ui.content.length) {
             val total = listState.layoutInfo.totalItemsCount
-            if (total > 0) listState.scrollToItem(total - 1)
+            if (total <= 0) return@LaunchedEffect
+            // 翻页进行中或正等待锚点复位：这一帧不能动滚动位置。
+            if (state.historyLoadingMore || anchorId != null) return@LaunchedEffect
+            val streamingGrew = state.ui.content.length > lastContentLen
+            lastContentLen = state.ui.content.length
+            if (isNearBottom(listState) || state.messages.isEmpty()) {
+                listState.scrollToItem(total - 1)
+                viewModel.clearNewMessages()
+            } else if (streamingGrew) {
+                // 只有「流里真的来了新正文」才算有新消息；往上翻页插入旧消息不算。
+                viewModel.markNewMessages()
+            }
+        }
+        // 取上一页：入口是列表顶部的「加载更早的消息」。翻页前记下当前首项，
+        // 回包后由下面的锚点复位把视线留在原处（读历史时不能被插入的旧消息顶走）。
+        val loadOlder = {
+            val top = state.messages.firstOrNull()
+            if (top != null && !state.historyLoadingMore) {
+                anchorId = top.id
+                anchorOffset = listState.firstVisibleItemScrollOffset
+            }
+            viewModel.loadOlderHistory()
+        }
+        // 翻页回包：把原先的可见首项重新滚回视野，避免历史插到上方后视线跳走。
+        LaunchedEffect(state.messages.size, state.historyLoadingMore) {
+            com.denova.novara.core.logging.DenovaLog.i(
+                "AgentPag",
+                "anchor effect size=${state.messages.size} loading=${state.historyLoadingMore} anchor=$anchorId",
+            )
+            if (state.historyLoadingMore) return@LaunchedEffect
+            val id = anchorId ?: return@LaunchedEffect
+            val index = state.messages.indexOfFirst { it.id == id }
+            anchorId = null
+            com.denova.novara.core.logging.DenovaLog.i("AgentPag", "anchor restore index=$index offset=$anchorOffset")
+            if (index >= 0) listState.scrollToItem(index, anchorOffset)
         }
         LazyColumn(
             state = listState,
@@ -697,6 +764,24 @@ fun AgentScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
         ) {
+            if (state.historyHasMore || state.historyLoadingMore) {
+                item(key = "history-older") {
+                    // 滚到顶部即自动翻页；这里同时是可见入口，点它也能手动取上一页。
+                    Text(
+                        if (state.historyLoadingMore) {
+                            stringResource(R.string.agent_history_loading)
+                        } else {
+                            stringResource(R.string.agent_history_load_older)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { loadOlder() }
+                            .padding(vertical = 6.dp),
+                    )
+                }
+            }
             if (state.historyLoading && state.messages.isEmpty()) {
                 item(key = "history-loading") {
                     Text(
@@ -733,6 +818,17 @@ fun AgentScreen(
                     }
                 }
             }
+        }
+
+        // 有新消息提示（AGT-010）：用户正在往上读时不抢滚动位置，点它才回到底部。
+        if (state.newMessagesPending) {
+            TextButton(
+                onClick = {
+                    val last = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                    scrollScope.launch { listState.animateScrollToItem(last) }
+                    viewModel.clearNewMessages()
+                },
+            ) { Text(stringResource(R.string.agent_new_messages)) }
         }
 
         // 提问交互（AGT-004）：待答卡片 + 已解决状态。选项与答案来自服务端问句，本地只记录选择。
@@ -818,8 +914,13 @@ fun AgentScreen(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
             )
             state.queue.forEach { item ->
-                // 队列项控制（AGT-007）：转向只改该项执行方式，删除只移除该项；提交中只禁本行。
-                val label = "• ${item.message.ifBlank { item.commandId }}"
+                // 队列项控制（AGT-007）：转向只改该项执行方式，删除只移除该项，取回把正文放回输入框。
+                // 服务端截断过的正文用 `message_truncated` 标出，避免用户以为取回后拿到的是全文。
+                val text = item.message.ifBlank { item.commandId }
+                val label = buildString {
+                    append("• ").append(text)
+                    if (item.messageTruncated) append(stringResource(R.string.agent_queue_truncated))
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -839,6 +940,10 @@ fun AgentScreen(
                         enabled = state.queueActionPendingCommandId.isBlank(),
                     ) { Text(stringResource(R.string.agent_queue_steer)) }
                     TextButton(
+                        onClick = { viewModel.returnQueuedCommandToEditor(item.commandId) },
+                        enabled = state.queueActionPendingCommandId.isBlank(),
+                    ) { Text(stringResource(R.string.agent_queue_edit)) }
+                    TextButton(
                         onClick = { viewModel.cancelQueuedCommand(item.commandId) },
                         enabled = state.queueActionPendingCommandId.isBlank(),
                     ) { Text(stringResource(R.string.agent_queue_delete)) }
@@ -847,17 +952,19 @@ fun AgentScreen(
         }
 
         // 输入区提交：与按钮同一入口，参数一致（IME「发送」动作也走这里）。
+        // 草稿放在 ViewModel：队列项「取回编辑」要能把正文写回同一个输入框。
+        val draft = state.composerDraft
         val submitComposer = {
-            if (input.isNotBlank() && sessionId.isNotBlank() && !state.sending && !state.appending) {
+            if (draft.isNotBlank() && sessionId.isNotBlank() && !state.sending && !state.appending) {
                 val refs = if (initialFile.isNotBlank()) listOf(initialFile) else emptyList()
-                viewModel.send(sessionId.trim(), input, refs, selections)
-                input = ""
+                viewModel.send(sessionId.trim(), draft, refs, selections)
+                viewModel.setComposerDraft("")
             }
         }
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
+                value = draft,
+                onValueChange = { viewModel.setComposerDraft(it) },
                 label = { Text("消息") },
                 singleLine = true,
                 // 键盘「发送」键与右侧按钮等价（终端输入同样以 IME 动作提交）。
@@ -868,7 +975,7 @@ fun AgentScreen(
             OutlinedButton(
                 onClick = submitComposer,
                 enabled = !state.sending && !state.appending &&
-                    sessionId.isNotBlank() && input.isNotBlank(),
+                    sessionId.isNotBlank() && draft.isNotBlank(),
             ) {
                 Text(
                     when {

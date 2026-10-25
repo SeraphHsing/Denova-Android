@@ -152,7 +152,9 @@ class AgentPartsTest {
             ),
         )
         assertEquals(2, views.size)
-        assertEquals("b@1#0", views[1].parts.single().id)
+        // 部件身份 = 消息身份 + 部件序号；消息身份不再带位置（AGT-010 分页后仍稳定）。
+        assertTrue(views[1].parts.single().id.startsWith("b@"))
+        assertTrue(views[1].parts.single().id.endsWith("#0"))
     }
 
     @Test
@@ -166,8 +168,9 @@ class AgentPartsTest {
         )
         assertEquals(2, views.size)
         assertEquals(views.map { it.id }.distinct().size, views.size)
-        assertEquals("run-1@0", views[0].id)
-        assertEquals("run-1@1", views[1].id)
+        // 身份按「服务端 id + 内容摘要」生成：同 id 不同内容仍可区分，且不随列表位置变化（历史分页前置后仍稳定）。
+        assertTrue(views[0].id.startsWith("run-1@"))
+        assertTrue(views[1].id.startsWith("run-1@"))
         assertTrue(views.flatMap { it.parts }.map { it.id }.distinct().size == 2)
     }
 

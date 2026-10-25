@@ -208,6 +208,12 @@
     <string name="agent_queue_steer">转向</string>
     <string name="agent_queue_delete">删除</string>
     <string name="agent_queue_item_steered">%1$s · 已请求转向</string>
+    <string name="agent_queue_edit">取回</string>
+    <string name="agent_queue_truncated">（已截断）</string>
+
+    <!-- 历史分页（AGT-010） -->
+    <string name="agent_history_load_older">加载更早的消息</string>
+    <string name="agent_new_messages">有新消息，点此回到底部</string>
 
     <!-- 调试抽屉入口（仅 debug 构建） -->
     <string name="drawer_debug">调试日志</string>
