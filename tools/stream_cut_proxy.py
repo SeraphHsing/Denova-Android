@@ -7,9 +7,13 @@
 - `close`：写完半帧后正常 FIN（中间设备 / 反代关闭连接的样子），客户端读到干净 EOF；
 - `reset`：SO_LINGER=0 强制 RST（真断网 / 链路丢包的样子），客户端读到异常。
 
+`--inject-error` 在截断点改注入一条 `{"type":"error","errorText":...}` 帧并以 `[DONE]` 收尾，
+用来验证「服务端明确报错」时客户端是否展示错误原因（流级错误 UI，AGT-009）。
+
 用法：
   python tools/stream_cut_proxy.py --listen 0.0.0.0:18098 --target http://192.168.2.102:18081 \
       --path /chat/stream --cut-after-bytes 2048 --cuts 2 --cut-mode reset
+  python tools/stream_cut_proxy.py --cuts 1 --inject-error "model overloaded (injected)"
 """
 
 from __future__ import annotations
@@ -43,6 +47,7 @@ class Handler(BaseHTTPRequestHandler):
     cut_path = '/chat/stream'
     cut_after_bytes = 2048
     cut_mode = 'close'
+    inject_error = ''
 
     def do_GET(self) -> None:
         self._forward('GET')
@@ -106,6 +111,18 @@ class Handler(BaseHTTPRequestHandler):
                     if remaining:
                         self.wfile.write(chunk[:remaining])
                         self.wfile.flush()
+                    if self.inject_error:
+                        # 用服务端的错误帧收尾（而不是断流）：验证流级错误原因是否渲染出来。
+                        payload = json.dumps(
+                            {"type": "error", "errorText": self.inject_error},
+                            ensure_ascii=False,
+                        )
+                        self.wfile.write(f"\n\ndata: {payload}\n\ndata: [DONE]\n\n".encode())
+                        self.wfile.flush()
+                        log(f"inject error frame at {self.cut_after_bytes} bytes: {self.inject_error}")
+                        self.close_connection = True
+                        conn.close()
+                        return
                     log(f"stream cut after {self.cut_after_bytes} bytes mode={self.cut_mode}")
                     self.close_connection = True
                     if self.cut_mode == 'reset':
@@ -143,6 +160,7 @@ def main() -> None:
     parser.add_argument('--cut-after-bytes', type=int, default=2048)
     parser.add_argument('--cuts', type=int, default=2)
     parser.add_argument('--cut-mode', choices=('close', 'reset'), default='close')
+    parser.add_argument('--inject-error', default='', help='在截断点注入 error 帧并以 [DONE] 收尾')
     parser.add_argument('--log', default='')
     args = parser.parse_args()
 
@@ -153,10 +171,12 @@ def main() -> None:
     Handler.cut_path = args.path
     Handler.cut_after_bytes = args.cut_after_bytes
     Handler.cut_mode = args.cut_mode
+    Handler.inject_error = args.inject_error
     server = ThreadingHTTPServer((host, int(port)), Handler)
     log(
         f"proxy listening {args.listen} -> {args.target} path={args.path} "
-        f"cuts={args.cuts} bytes={args.cut_after_bytes} mode={args.cut_mode}"
+        f"cuts={args.cuts} bytes={args.cut_after_bytes} mode={args.cut_mode} "
+        f"inject_error={args.inject_error or '-'}"
     )
     server.serve_forever()
 
