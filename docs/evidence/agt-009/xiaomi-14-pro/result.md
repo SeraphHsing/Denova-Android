@@ -97,6 +97,33 @@ I Agent: canonical parts loaded messages=27 tools=5 session=default
 I Agent: attach task=task-bb2660c3de54acbb0d39a661d49d9494-21 cursor=411 attempt=1
 ```
 
+> 上表的 `limit=20` + `limit=50` 两次拉取是当时的实现；2026-10-25 已合并为一次，见 3.4。
+
+### 3.4 发送路径就地挂接：核对与重建共用一次历史
+
+原先发送被截断后的恢复是一次「二次跳转」：`reconcileSend()`（20 条判定）→ `start()`（重置页面状态）→ 50 条重建 → 挂接。改法：
+
+- 核对改为按 canonical 页大小（`CANONICAL_LIMIT = 50`）拉**一次**，落地判定与正文重建共用这次响应（`applyCanonical`）；
+- 抽 `attachLoop()`（`refreshActive` + coordinator `recover`）供 `start()` 与「核对已落地」共用，发送路径在**同一个 job 内**核对 → 重建 → 挂接，不再重置页面状态、不再二次全量拉取；
+- 落地判定抽成 `AgentPartLogic.hasLandedMessage` 并补单测（只看基线之后的用户消息；基线不在本页时退回最后一条）。
+
+`--cuts 2 --cut-mode close`（FIN 首响应 + FIN 重挂各一次）实测请求序列：
+
+```text
+21:12:08 POST /api/chat -> 200
+21:12:08 cut stream /api/chat after 1200 bytes (cuts left=1)
+21:12:10 GET /api/session/messages?session_id=default&limit=50     ← 核对+重建（仅一次）
+21:12:11 GET /api/chat/active?session_id=default                   ← refreshActive
+21:12:11 GET /api/chat/stream?...&after=90 -> 200                  ← 就地挂接
+21:12:11 cut stream ... (cuts left=0)                              ← 第二次断流
+21:12:11 GET /api/session/messages?...&limit=50                    ← coordinator 重读
+21:12:13 GET /api/chat/stream?...&after=302 -> 200                 ← 再次重挂
+I Agent: reconcile landed cmd=...; resume without refetch
+```
+
+「重新核对」按钮走同一套 `reconcile` + `attachLoop`：代理断开时发送得到 `核对失败`，恢复后点按钮只发一次 `GET /api/session/messages?limit=50`，结论为 `reconcile not landed` → 横幅「服务端未收到该命令；为避免重复回答不会自动重发，请手动重发」，且不误触发挂接。
+
+
 终态：`状态：完成`，正文完整显示，`agent-execution-summary · completed`，无重复段落（每次重挂前 `reloadCanonical` 清空流式正文，历史由 canonical 重建）。
 
 ## 4. 干净 EOF 判定（`--cut-mode close`）
@@ -146,6 +173,6 @@ W Agent: stream retry exhausted after 9 failures session=default
 - 通过：附接 → 断流 → 重读 canonical → 重挂 → 再断流 → 再重挂 → 完成，全程无重复正文，命令不重复下发；发送回包丢失时不自动重发，核对结论以服务端 canonical 历史为准。
 - 通过：干净 EOF（FIN）按「缺完成标记」判为截断，发送路径与挂接路径都进入恢复链；流级错误原因与「放弃恢复」的兜底文案都渲染在状态行下方。
 - 缺口：
-  1. 发送路径的断流恢复依赖「核对 → `start()` → 重挂」二次跳转，`sendJob` 本身不会重挂；本场景验证通过，但多一次 canonical 全量拉取。
-  2. 预算耗尽后只有兜底文案，没有「手动重新挂接」以外的恢复入口（`recovery_actions` 未接）。
-  3. 终态判定把 `error` 帧当完成：若服务端在 `error` 之后仍继续产出内容，客户端不会重挂（按当前后端收尾行为这是正确取舍，协议变化时需复核）。
+  1. 预算耗尽后只有兜底文案，没有「手动重新挂接」以外的恢复入口（`recovery_actions` 未接）。
+  2. 终态判定把 `error` 帧当完成：若服务端在 `error` 之后仍继续产出内容，客户端不会重挂（按当前后端收尾行为这是正确取舍，协议变化时需复核）。
+  3. `refreshActive` 与 coordinator 的 active 探测各发一次 `GET /api/chat/active`，同一时刻有两次重复探测（不影响正确性，属可再省一次的优化）。

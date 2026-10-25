@@ -292,6 +292,21 @@ object AgentPartLogic {
         .joinToString("")
         .trim()
 
+    /**
+     * 这条用户输入是否已经落到服务端 canonical 历史里（AGT-008 的落地判定）。
+     *
+     * 只看 [baselineId] 之后的用户消息，避免把发送前就存在的同文消息误判成本次已收到；
+     * 基线不在本页（历史更长）时退回「最后一条用户消息同文」，因为此时无法定位发送点。
+     */
+    fun hasLandedMessage(messages: List<AgentMessage>, baselineId: String, text: String): Boolean {
+        val target = text.trim()
+        if (target.isEmpty()) return false
+        val users = messages.filter { it.role == ROLE_USER }
+        val baselineIndex = users.indexOfFirst { it.id == baselineId }
+        if (baselineIndex >= 0) return users.drop(baselineIndex + 1).any { messageText(it) == target }
+        return users.lastOrNull()?.let { messageText(it) == target } == true
+    }
+
     /** 格式化 JSON（能解析则两空格缩进），超过 [maxChars] 截断并标注原长。 */
     fun prettyText(raw: String, maxChars: Int = 1200): String {
         if (raw.isBlank()) return ""

@@ -18,6 +18,7 @@ import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
 import com.denova.novara.core.stream.AgentApprovalLogic
 import com.denova.novara.core.stream.AgentImagePart
+import com.denova.novara.core.stream.AgentMessagesPage
 import com.denova.novara.core.stream.AgentMessageView
 import com.denova.novara.core.stream.AgentPartLogic
 import com.denova.novara.core.stream.AgentToolPart
@@ -137,7 +138,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 挂接 session 的活动 Agent 流。 */
     fun start(sessionId: String, projectId: String = "") {
-        val c = coordinator ?: return
+        if (coordinator == null) return
         if (sessionId.isBlank()) return
         DenovaLog.i("Agent", "start session=$sessionId project=${projectId.take(12)}")
         viewModelScope.launch { prefs.setLastAgentSession(sessionId) }
@@ -149,15 +150,24 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 // 先加载 canonical 历史作为基线，再挂接流补充增量。
                 reloadCanonical()
-                // 挂接前同步一次 active：暂停 / 停止按钮只对「当前确实存在的操作」可用（AGT-005）。
-                refreshActive()
-                c.recover(sessionId).collect { onFrame(it) }
+                attachLoop(sessionId)
             } catch (e: Exception) {
                 DenovaLog.w("Agent", "recover failed", e)
                 _state.value = _state.value.copy(error = e.message)
             }
             finishStream()
         }
+    }
+
+    /**
+     * 挂接流：先同步一次 active（暂停 / 停止按钮只对「当前确实存在的操作」可用，AGT-005），
+     * 再交给恢复协调器（active → 挂接 → 断线重挂）。
+     * [start] 与「发送被截断后核对已落地」共用，避免后者为同一目标再走一次状态重置。
+     */
+    private suspend fun attachLoop(sessionId: String) {
+        val c = coordinator ?: return
+        refreshActive()
+        c.recover(sessionId).collect { onFrame(it) }
     }
 
     /** 追加一段正文引用；同一文件同一区间同一内容只保留一条。 */
@@ -256,7 +266,12 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 if (!completed && !idleTerminated && !_state.value.abortPending) {
                     commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
                     DenovaLog.w("Agent", "stream ended without completion marker; reconcile instead of resend")
-                    markUncertain(commandId, text, baseline)
+                    setUncertain(commandId, text, baseline)
+                    // 在本 job 内核对并接管：核对已落地就直接挂接补结果。
+                    // 核对用的 canonical 页同时用于重建正文，因此不再二次全量拉取、也不重置页面状态。
+                    if (reconcile(client, sessionId, commandId, text, baseline) is ReconcileOutcome.Landed) {
+                        attachLoop(sessionId)
+                    }
                 } else {
                     if (!accepted) {
                         commands.updateStatus(commandId, CommandStatus.ACCEPTED)
@@ -289,6 +304,12 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
      * 新命令会带来重复回答，因此核对只用历史 + active 两个只读接口。
      */
     private fun markUncertain(commandId: String, message: String, baselineId: String) {
+        setUncertain(commandId, message, baselineId)
+        reconcileSend()
+    }
+
+    /** 只标记「结果不明」，由调用方决定随后的核对方式（就地等待或后台发起）。 */
+    private fun setUncertain(commandId: String, message: String, baselineId: String) {
         _state.value = _state.value.copy(
             sending = false,
             uncertainCommandId = commandId,
@@ -297,55 +318,77 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             error = null,
             reconcileNotice = "发送结果不明，正在核对…",
         )
-        reconcileSend()
     }
 
-    /**
-     * 核对「这条命令到底有没有落到服务端」：以服务端 canonical 历史为准。
-     * 找到发送前最后一条用户消息之后、正文与本次相同的用户消息，即视为服务端已收到；
-     * 收到则只挂接流补结果（等价 handoff），未收到则明确告知，不自动重发。
-     */
+    /** 核对结论：已落地（带 canonical 页面）/ 未落地 / 核对失败。 */
+    private sealed interface ReconcileOutcome {
+        data class Landed(val page: AgentMessagesPage) : ReconcileOutcome
+        data object NotLanded : ReconcileOutcome
+        data class Failed(val message: String) : ReconcileOutcome
+    }
+
+    /** 用户点「重新核对」：后台核对，落地则挂接补结果。 */
     fun reconcileSend() {
         val c = client ?: return
         val s = _state.value
         if (s.uncertainCommandId.isBlank() || s.reconciling) return
-        val sessionId = s.sessionId
-        val text = s.uncertainMessage.trim()
         viewModelScope.launch {
-            _state.value = _state.value.copy(reconciling = true, reconcileNotice = "正在向服务端核对…")
-            try {
-                val page = c.sessionMessages(sessionId, limit = 20)
-                val users = page.messages.filter { it.role == AgentPartLogic.ROLE_USER }
-                val baselineIndex = users.indexOfFirst { it.id == s.uncertainBaselineId }
-                val candidate = users.drop(baselineIndex + 1)
-                val landed = candidate.any { AgentPartLogic.messageText(it) == text } ||
-                    (baselineIndex < 0 && users.lastOrNull()?.let { AgentPartLogic.messageText(it) == text } == true)
-                if (landed) {
-                    commands.updateStatus(s.uncertainCommandId, CommandStatus.ACCEPTED)
-                    DenovaLog.i("Agent", "reconcile landed cmd=${s.uncertainCommandId}")
-                    _state.value = _state.value.copy(
-                        reconciling = false,
-                        uncertainCommandId = "",
-                        uncertainMessage = "",
-                        uncertainBaselineId = "",
-                        reconcileNotice = "已确认服务端收到，正在接回结果",
-                    )
-                    // 只挂接，不重发：canonical 历史与流都从服务端取。
-                    start(sessionId, s.projectId)
-                } else {
-                    DenovaLog.w("Agent", "reconcile not landed cmd=${s.uncertainCommandId}")
-                    _state.value = _state.value.copy(
-                        reconciling = false,
-                        reconcileNotice = "服务端未收到该命令；为避免重复回答不会自动重发，请手动重发",
-                    )
-                }
-            } catch (e: Exception) {
-                DenovaLog.w("Agent", "reconcile failed cmd=${s.uncertainCommandId}", e)
+            val outcome = reconcile(c, s.sessionId, s.uncertainCommandId, s.uncertainMessage, s.uncertainBaselineId)
+            if (outcome is ReconcileOutcome.Landed) {
+                attachLoop(s.sessionId)
+                finishStream()
+            }
+        }
+    }
+
+    /**
+     * 核对「这条命令到底有没有落到服务端」：以服务端 canonical 历史为准。
+     * 找到发送前最后一条用户消息之后、正文与本次相同的用户消息，即视为已收到。
+     *
+     * 核对按 canonical 页大小拉一次历史，判定落地与重建正文**共用这一次响应**：
+     * 落地后直接挂接，不再为了挂接二次全量拉取（此前是 limit=20 判定 + limit=50 重建）。
+     */
+    private suspend fun reconcile(
+        client: DenovaClient,
+        sessionId: String,
+        commandId: String,
+        message: String,
+        baselineId: String,
+    ): ReconcileOutcome {
+        _state.value = _state.value.copy(reconciling = true, reconcileNotice = "正在向服务端核对…")
+        return try {
+            val page = client.sessionMessages(sessionId, limit = CANONICAL_LIMIT)
+            if (AgentPartLogic.hasLandedMessage(page.messages, baselineId, message.trim())) {
+                commands.updateStatus(commandId, CommandStatus.ACCEPTED)
+                DenovaLog.i("Agent", "reconcile landed cmd=$commandId; resume without refetch")
+                // 用这一次响应重建正文（清空流式尾块避免与历史重复），挂接交给调用方。
+                applyCanonical(page)
+                _state.value = _state.value.copy(
+                    sending = false,
+                    reconciling = false,
+                    uncertainCommandId = "",
+                    uncertainMessage = "",
+                    uncertainBaselineId = "",
+                    reconcileNotice = "",
+                )
+                ReconcileOutcome.Landed(page)
+            } else {
+                DenovaLog.w("Agent", "reconcile not landed cmd=$commandId")
                 _state.value = _state.value.copy(
                     reconciling = false,
-                    reconcileNotice = "核对失败：${e.message ?: "网络错误"}",
+                    reconcileNotice = "服务端未收到该命令；为避免重复回答不会自动重发，请手动重发",
                 )
+                ReconcileOutcome.NotLanded
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            DenovaLog.w("Agent", "reconcile failed cmd=$commandId", e)
+            _state.value = _state.value.copy(
+                reconciling = false,
+                reconcileNotice = "核对失败：${e.message ?: "网络错误"}",
+            )
+            ReconcileOutcome.Failed(e.message ?: "网络错误")
         }
     }
 
@@ -634,19 +677,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         if (sessionId.isBlank()) return
         try {
             _state.value = _state.value.copy(historyLoading = true, historyError = null)
-            val page = client.sessionMessages(sessionId, limit = 50)
-            val views = AgentPartLogic.parseMessages(page.messages)
-            val tools = views.sumOf { view -> view.parts.count { it is AgentToolPart } }
-            _state.value = _state.value.copy(
-                messages = views,
-                historyLoading = false,
-                historyError = null,
-                ui = _state.value.ui.copy(content = "", thinking = ""),
-            )
-            DenovaLog.i(
-                "Agent",
-                "canonical parts loaded messages=${views.size} tools=$tools session=$sessionId",
-            )
+            applyCanonical(client.sessionMessages(sessionId, limit = CANONICAL_LIMIT))
         } catch (e: Exception) {
             DenovaLog.w("Agent", "load canonical history failed", e)
             _state.value = _state.value.copy(
@@ -654,6 +685,25 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 historyError = e.message ?: "加载消息失败",
             )
         }
+    }
+
+    /**
+     * 用一页 canonical 历史重建消息部件，并清空流式正文（避免与历史里的同一段内容重复显示）。
+     * 挂接前的常规重建与「核对已落地」的重建共用，保证两条路径的显示口径一致。
+     */
+    private fun applyCanonical(page: AgentMessagesPage) {
+        val views = AgentPartLogic.parseMessages(page.messages)
+        val tools = views.sumOf { view -> view.parts.count { it is AgentToolPart } }
+        _state.value = _state.value.copy(
+            messages = views,
+            historyLoading = false,
+            historyError = null,
+            ui = _state.value.ui.copy(content = "", thinking = ""),
+        )
+        DenovaLog.i(
+            "Agent",
+            "canonical parts loaded messages=${views.size} tools=$tools session=${_state.value.sessionId}",
+        )
     }
 
     /**
@@ -723,5 +773,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private companion object {
         /** 提问交互的 AI SDK data 部件类型（后端 `agentui.DataTypeAsk`）。 */
         const val ASK_CHUNK_TYPE = "data-agent-ask"
+
+        /** canonical 历史一页的消息数：常规重建与「核对+重建」共用同一口径。 */
+        const val CANONICAL_LIMIT = 50
     }
 }

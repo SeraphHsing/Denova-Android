@@ -114,6 +114,8 @@
 
 - 2026-10-25 补 AGT-009 两处缺口（干净 EOF 判定 + 流级错误原因）：新增 `AgentUiFrame.completesTurn()`（`data: [DONE]` 或 finish/abort/error 终态帧）——服务端收尾必写 `finish` 再写 `[DONE]`，因此**干净 EOF（FIN）只要缺完成标记就判为截断**：coordinator 抛 `TruncatedAgentStream` 走重挂，发送路径判 `UNCERTAIN` 后核对再挂接（不重发），不再静默停在半截并只把状态改成「错误」。`AgentScreen` 补流级错误原因渲染：`error` 帧的 `errorText` 原样显示，无具体原因时显示「流在完成前中断，结果可能不完整」（中英文案齐全）。`tools/stream_cut_proxy.py` 增 `--inject-error`（截断点注入 error 帧并以 `[DONE]` 收尾）用于验证该 UI。**真机四种形态均按口径表现**：RST 两次截断 → 完成；FIN 两次截断 → `stream ended without completion marker; reconcile instead of resend` → `reconcile landed` → 重挂 → 完成；注入 error 帧 → `状态：错误` + `model-overloaded-injected`（且不触发重挂）；`--cuts 20` 触发 `stream retry exhausted after 9 failures` → `状态：错误` + 兜底文案。新增 3 个单测（FIN 缺标记重挂、`[DONE]` 不重挂、完成标记映射），主检查 `testDebugUnitTest` + `lintDebug` + `assembleDebug` 全绿。证据 `docs/evidence/agt-009/xiaomi-14-pro/result.md`。
 
+- 2026-10-25 发送路径断流恢复改为就地挂接（AGT-009 收尾）：此前发送被截断后是「核对（`limit=20`）→ `start()` 重置状态 → 重建（`limit=50`）→ 挂接」的二次跳转，同一目标拉两次历史。现改为——核对按 canonical 页大小（`CANONICAL_LIMIT = 50`）拉**一次**，落地判定与正文重建共用该响应（`applyCanonical`）；抽出 `attachLoop()`（`refreshActive` + coordinator `recover`）供 `start()` 与「核对已落地」共用，发送在**同一 job 内**完成核对→重建→挂接，不再重置页面状态；落地判定抽成 `AgentPartLogic.hasLandedMessage` 并补单测。真机 FIN 两次截断实测：`GET /api/session/messages?limit=50` 只出现一次（原为 20 + 50 两次）、`reconcile landed cmd=…; resume without refetch` 后直接 `attach … after=90`，随后二次断流仍恢复至「完成」；「重新核对」按钮走同一 `reconcile` + `attachLoop`，代理断开→恢复后点按钮仅一次 `limit=50`、结论 `reconcile not landed` 且不误挂接。主检查 `testDebugUnitTest` + `lintDebug` + `assembleDebug` 全绿。证据 `docs/evidence/agt-009/xiaomi-14-pro/result.md` §3.4。遗留：`refreshActive` 与 coordinator 各发一次 `GET /api/chat/active`（可再省一次）；`recovery_actions` 未接。
+
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
 ## 已完成（退出条件满足）

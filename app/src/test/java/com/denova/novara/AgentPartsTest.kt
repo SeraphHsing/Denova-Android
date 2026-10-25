@@ -230,4 +230,21 @@ class AgentPartsTest {
         assertEquals("看这段 结尾", AgentPartLogic.messageText(plain))
         assertEquals("", AgentPartLogic.messageText(message(parts = arrayOf("""{"type":"dynamic-tool"}"""))))
     }
+
+    @Test
+    fun `landing check only looks after the baseline message`() {
+        val baseline = message(id = "u1", role = "user", parts = arrayOf("""{"type":"text","text":"hello"}"""))
+        val sameText = message(id = "u2", role = "user", parts = arrayOf("""{"type":"text","text":"hello"}"""))
+        val answer = message(id = "a1", role = "assistant", parts = arrayOf("""{"type":"text","text":"hi"}"""))
+
+        // 基线之后出现同文用户消息 → 本次命令已落到服务端
+        assertTrue(AgentPartLogic.hasLandedMessage(listOf(baseline, answer, sameText), "u1", "hello"))
+        // 只有基线自身同文 → 未落地，不能把发送前那条算成本次
+        assertFalse(AgentPartLogic.hasLandedMessage(listOf(baseline, answer), "u1", "hello"))
+        // 基线不在本页（历史更长）：退回「最后一条用户消息同文」
+        assertTrue(AgentPartLogic.hasLandedMessage(listOf(answer, sameText), "u-missing", "hello"))
+        assertFalse(AgentPartLogic.hasLandedMessage(listOf(answer, baseline), "u-missing", "bye"))
+        // 空文本永不判落地
+        assertFalse(AgentPartLogic.hasLandedMessage(listOf(sameText), "u1", "   "))
+    }
 }
