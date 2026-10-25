@@ -195,4 +195,7 @@
     <string name="agent_reconcile">Check again</string>
     <string name="agent_waiting_ask">Waiting for answer</string>
     <string name="agent_stream_interrupted">Stream ended before completion; the result may be incomplete</string>
+    <string name="agent_recovery_hint">This run is paused on the server</string>
+    <string name="agent_recovery_resume">Resume</string>
+    <string name="agent_recovery_abort">Abort</string>
 </resources>

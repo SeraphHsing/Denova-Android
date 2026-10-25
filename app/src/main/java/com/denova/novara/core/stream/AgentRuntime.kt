@@ -82,6 +82,26 @@ fun decideAgentRecovery(active: AgentActiveView?, streamError: GameStreamError?)
     return AgentRecoveryDecision.Settled
 }
 
+/** `recovery_actions[].kind` 的线上取值（后端 `execution.RuntimeRecovery*`）。 */
+object AgentRecoveryKind {
+    /** 还原显示流（运行中但未挂接）：由挂接路径自动消费，不暴露成按钮。 */
+    const val START_TURN = "start_turn"
+
+    /** 从暂停点继续执行（`suspended`）：只能由用户触发。 */
+    const val RESUME = "resume"
+
+    /** 中止暂停中的运行：只能由用户触发。 */
+    const val ABORT = "abort"
+}
+
+/**
+ * 需要用户点按的恢复动作（`resume` / `abort`）。
+ * `start_turn` 由挂接路径自动消费——服务端拿它还原显示流，重复提交会与当前 owner 冲突。
+ */
+fun AgentActiveView.userRecoveryActions(): List<RecoveryAction> = recoveryActions.filter {
+    it.kind == AgentRecoveryKind.RESUME || it.kind == AgentRecoveryKind.ABORT
+}
+
 /** Agent 流 + 恢复的传输抽象；OkHttp 实现在 network 包，测试用 fake 注入。 */
 interface AgentStreamTransport {
     suspend fun agentActive(sessionId: String): AgentActiveView

@@ -17,24 +17,36 @@ class AgentStreamRecoveryCoordinator(
     private val reloadCanonical: suspend () -> Unit,
 ) {
 
-    fun recover(sessionId: String): Flow<AgentUiFrame> = flow {
+    /**
+     * @param seed 调用方刚刚拿到的 active 投影（例如 `refreshActive()` 的返回值）。
+     *   首轮直接复用，省掉一次重复的 `GET /api/chat/active`；后续重挂仍现取，
+     *   保证游标与任务身份始终是服务端最新值。
+     */
+    fun recover(sessionId: String, seed: AgentActiveView? = null): Flow<AgentUiFrame> = flow {
         var transferFailures = 0
+        var pendingActive = seed
         while (true) {
-            // `agentActive` 本身也可能因断网失败：与流中断走同一条重试预算，
-            // 否则「断线后第一次探测失败」会直接把整个恢复链结束（AGT-009 的关键路径）。
-            val active = try {
-                transport.agentActive(sessionId)
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                transferFailures++
-                if (transferFailures > maxTransferRetries) {
-                    DenovaLog.w("Agent", "active probe failed $transferFailures times; give up session=$sessionId", e)
-                    return@flow
+            val active: AgentActiveView
+            if (pendingActive != null) {
+                active = pendingActive
+                pendingActive = null
+            } else {
+                // `agentActive` 本身也可能因断网失败：与流中断走同一条重试预算，
+                // 否则「断线后第一次探测失败」会直接把整个恢复链结束（AGT-009 的关键路径）。
+                active = try {
+                    transport.agentActive(sessionId)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    transferFailures++
+                    if (transferFailures > maxTransferRetries) {
+                        DenovaLog.w("Agent", "active probe failed $transferFailures times; give up session=$sessionId", e)
+                        return@flow
+                    }
+                    DenovaLog.w("Agent", "active probe failed (attempt $transferFailures/$maxTransferRetries)", e)
+                    kotlinx.coroutines.delay(retryDelayMillis)
+                    continue
                 }
-                DenovaLog.w("Agent", "active probe failed (attempt $transferFailures/$maxTransferRetries)", e)
-                kotlinx.coroutines.delay(retryDelayMillis)
-                continue
             }
             when (val decision = decideAgentRecovery(active, null)) {
                 is AgentRecoveryDecision.Attach -> {

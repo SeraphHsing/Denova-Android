@@ -46,6 +46,7 @@ import com.denova.novara.core.stream.AgentImagePart
 import com.denova.novara.core.stream.AgentMessageView
 import com.denova.novara.core.stream.AgentPartLogic
 import com.denova.novara.core.stream.AgentReasoningPart
+import com.denova.novara.core.stream.AgentRecoveryKind
 import com.denova.novara.core.stream.AgentTextPart
 import com.denova.novara.core.stream.AgentToolPart
 import com.denova.novara.core.stream.AgentUnknownPart
@@ -591,6 +592,37 @@ fun AgentScreen(
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(start = 8.dp),
                 )
+            }
+        }
+
+        // 冷恢复（`recovery_actions`）：suspended 的运行在服务端只能靠服务端给出的 resume / abort
+        // 推进（AGT-009），客户端原样回传身份，不另发新命令；`start_turn` 由挂接路径自动消费。
+        if (state.recoveryActions.isNotEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.agent_recovery_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                state.recoveryActions.forEach { action ->
+                    OutlinedButton(
+                        onClick = { viewModel.runRecoveryAction(action) },
+                        enabled = !state.recoveryActionPending,
+                        modifier = Modifier.padding(start = 8.dp),
+                    ) {
+                        Text(
+                            stringResource(
+                                when (action.kind) {
+                                    AgentRecoveryKind.RESUME -> R.string.agent_recovery_resume
+                                    else -> R.string.agent_recovery_abort
+                                },
+                            ),
+                        )
+                    }
+                }
             }
         }
         state.error?.let {

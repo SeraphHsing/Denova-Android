@@ -34,9 +34,11 @@ import com.denova.novara.core.stream.AgentUiFrame
 import com.denova.novara.core.stream.AgentUiReducer
 import com.denova.novara.core.stream.AgentUiState
 import com.denova.novara.core.stream.GameStreamError
+import com.denova.novara.core.stream.RecoveryAction
 import com.denova.novara.core.stream.buildAgentHistoryNarrative
 import com.denova.novara.core.stream.collectWithIdleGuard
 import com.denova.novara.core.stream.completesTurn
+import com.denova.novara.core.stream.userRecoveryActions
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -80,6 +82,13 @@ data class AgentScreenState(
     val reconciling: Boolean = false,
     /** 核对结论文案（已确认收到 / 服务端未收到）。 */
     val reconcileNotice: String = "",
+    /**
+     * 服务端投影给的恢复动作（`recovery_actions`）：`running` 给 `start_turn`（由挂接自动处理），
+     * `suspended` 给 `resume` / `abort`——后者只能由用户点按推进，客户端不得另发新命令。
+     */
+    val recoveryActions: List<RecoveryAction> = emptyList(),
+    /** 恢复动作提交中（禁用按钮，避免重复下发）。 */
+    val recoveryActionPending: Boolean = false,
 )
 
 /** 写作 Agent ViewModel：绑定 client → 恢复协调器 → 投影；发送先落命令事务再 POST。 */
@@ -164,10 +173,11 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
      * 再交给恢复协调器（active → 挂接 → 断线重挂）。
      * [start] 与「发送被截断后核对已落地」共用，避免后者为同一目标再走一次状态重置。
      */
-    private suspend fun attachLoop(sessionId: String) {
+    private suspend fun attachLoop(sessionId: String, seed: AgentActiveView? = null) {
         val c = coordinator ?: return
-        refreshActive()
-        c.recover(sessionId).collect { onFrame(it) }
+        // 优先用调用方已有的投影（恢复回执 / 刚探测的 active），同一时刻只问一次服务端。
+        val active = seed ?: refreshActive()
+        c.recover(sessionId, seed = active).collect { onFrame(it) }
     }
 
     /** 追加一段正文引用；同一文件同一区间同一内容只保留一条。 */
@@ -424,6 +434,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 } else {
                     state.pendingAsks
                 },
+                // 只暴露需要用户点按的 resume / abort；start_turn 由挂接路径自动消费。
+                recoveryActions = view.userRecoveryActions(),
             )
             view
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -431,6 +443,58 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         } catch (e: Exception) {
             DenovaLog.w("Agent", "refresh active failed", e)
             null
+        }
+    }
+
+    /**
+     * 执行服务端投影的恢复动作（`POST /api/chat/recovery`，AGT-009 冷恢复）。
+     *
+     * 只提交 `active.recovery_actions` 里原样给出的 `action_id` / `command_id` / `operation_id`：
+     * 服务端据此校验动作是否仍然当前（`agent_runtime.recovery_changed`），客户端不得自己拼身份，
+     * 也不得用新命令代替恢复动作。回执里的 `recovery_action` 与请求不一致时按「动作已变化」处理。
+     */
+    fun runRecoveryAction(action: RecoveryAction) {
+        val c = client ?: return
+        val current = _state.value
+        val sessionId = current.sessionId.trim()
+        if (sessionId.isBlank() || current.recoveryActionPending) return
+        _state.value = current.copy(recoveryActionPending = true, error = null)
+        viewModelScope.launch {
+            try {
+                val receipt = c.agentRecover(sessionId, action)
+                val echoed = receipt.recoveryAction
+                if (echoed != null &&
+                    (echoed.kind != action.kind || echoed.commandId != action.commandId || echoed.operationId != action.operationId)
+                ) {
+                    DenovaLog.w("Agent", "recovery action changed kind=${action.kind} -> ${echoed.kind}")
+                    _state.value = _state.value.copy(
+                        recoveryActionPending = false,
+                        error = "恢复动作已变化，请重新挂接",
+                    )
+                    refreshActive()
+                    return@launch
+                }
+                DenovaLog.i("Agent", "recovery ${action.kind} ok task=${receipt.taskId ?: "-"} session=$sessionId")
+                // 恢复成功即已由服务端接管：清掉旧动作，随后按回执身份重新挂接拿结果。
+                _state.value = _state.value.copy(recoveryActionPending = false, recoveryActions = emptyList())
+                // 回执直接给了显示任务：用它挂接，别再用 active 探测——中止之后 active 往往已经清空，
+                // 探测会判成 settled，导致「已停止」的收尾内容读不到。
+                val seed = receipt.taskId?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                    AgentActiveView(active = true, taskId = it, streamCursor = receipt.streamCursor)
+                }
+                attachLoop(sessionId, seed)
+                finishStream()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Agent", "recovery ${action.kind} failed", e)
+                _state.value = _state.value.copy(
+                    recoveryActionPending = false,
+                    error = "恢复失败：${e.message ?: "网络错误"}",
+                )
+                // 动作可能已被服务端改掉：用最新投影覆盖按钮，而不是盲目重试。
+                refreshActive()
+            }
         }
     }
 

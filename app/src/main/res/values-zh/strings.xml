@@ -195,4 +195,7 @@
     <string name="agent_reconcile">重新核对</string>
     <string name="agent_waiting_ask">等待回答</string>
     <string name="agent_stream_interrupted">流在完成前中断，结果可能不完整</string>
+    <string name="agent_recovery_hint">这次运行在服务端已暂停</string>
+    <string name="agent_recovery_resume">继续</string>
+    <string name="agent_recovery_abort">中止</string>
 </resources>

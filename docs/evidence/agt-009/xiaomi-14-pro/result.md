@@ -150,6 +150,43 @@ I Agent: attach task=task-bb2660c3de54acbb0d39a661d49d9494-22 cursor=351 attempt
 
 终态 `状态：完成`。即：干净 FIN 现在与 RST 走同一条恢复路径，而不是「静默停在半截 + 状态：错误」。
 
+## 4.5 冷恢复动作（`recovery_actions`）与 active 去重
+
+服务端投影在 `suspended` 时给 `resume` + `abort`，`running` 时给 `start_turn`。`start_turn` 由挂接路径自动消费、不做按钮（重复提交会与当前 display owner 冲突，与 Web `recoveryActionsToSubmit` 同口径）；`resume` / `abort` 只能由用户点按。客户端只把投影原样给出的 `action_id` / `command_id` / `operation_id` 回传 `POST /api/chat/recovery`，不自己拼身份、不另发新命令。
+
+暂停后的界面文本：
+
+```text
+状态：完成
+已暂停
+这次运行在服务端已暂停   [继续] [中止]
+```
+
+「继续」（`kind=resume`）：
+
+```text
+21:45:39 POST /api/chat/recovery -> 202
+21:45:39 GET /api/chat/stream?session_id=default&task_id=...-2e&after=0 -> 200
+I Agent: recovery resume ok task=task-bb2660c3de54acbb0d39a661d49d9494-2e
+I Agent: attach task=task-bb2660c3de54acbb0d39a661d49d9494-2e cursor=0 attempt=0
+```
+
+「中止」（`kind=abort`）：
+
+```text
+21:44:58 POST /api/chat/recovery -> 202
+21:44:59 GET /api/chat/stream?session_id=default&task_id=...-2c&after=0 -> 200
+21:44:59 GET /api/chat/active          ← finishStream 的按钮门控刷新
+I Agent: recovery abort ok task=task-bb2660c3de54acbb0d39a661d49d9494-2c
+I Agent: attach task=task-bb2660c3de54acbb0d39a661d49d9494-2c cursor=0 attempt=0
+```
+
+中止后直接用回执的 `task_id` 挂接，不再先探测 active：中止一旦落地，服务端常常已清空 active，探测会判成 settled，导致「已停止」的收尾内容读不到。
+
+active 去重：`refreshActive()` 拿到的投影作为 `recover(sessionId, seed = …)` 的首轮输入，挂接前只探测一次（改动前同一时刻会连续发两次 `GET /api/chat/active`）；恢复动作则有回执身份可用，探测次数为 0。
+
+观察（未改）：暂停 / 中止后状态行显示「完成」（终端帧为 `abort` → DONE），与旁边的「已暂停」并列时略显歧义，属阶段标签口径问题，留待 AGT-005 复核。
+
 ## 5. 流级错误原因与放弃恢复后的兜底文案
 
 `--inject-error`（在截断点改注入一条 `error` 帧并以 `[DONE]` 收尾）：
@@ -173,6 +210,6 @@ W Agent: stream retry exhausted after 9 failures session=default
 - 通过：附接 → 断流 → 重读 canonical → 重挂 → 再断流 → 再重挂 → 完成，全程无重复正文，命令不重复下发；发送回包丢失时不自动重发，核对结论以服务端 canonical 历史为准。
 - 通过：干净 EOF（FIN）按「缺完成标记」判为截断，发送路径与挂接路径都进入恢复链；流级错误原因与「放弃恢复」的兜底文案都渲染在状态行下方。
 - 缺口：
-  1. 预算耗尽后只有兜底文案，没有「手动重新挂接」以外的恢复入口（`recovery_actions` 未接）。
-  2. 终态判定把 `error` 帧当完成：若服务端在 `error` 之后仍继续产出内容，客户端不会重挂（按当前后端收尾行为这是正确取舍，协议变化时需复核）。
-  3. `refreshActive` 与 coordinator 的 active 探测各发一次 `GET /api/chat/active`，同一时刻有两次重复探测（不影响正确性，属可再省一次的优化）。
+  1. 终态判定把 `error` 帧当完成：若服务端在 `error` 之后仍继续产出内容，客户端不会重挂（按当前后端收尾行为这是正确取舍，协议变化时需复核）。
+  2. 暂停 / 中止后状态行仍显示「完成」（终端帧 `abort` → DONE），阶段标签口径待 AGT-005 复核。
+  3. 中止后的收尾内容依赖回执 `task_id` 挂接；若回执不带 `task_id` 则退回 active 探测，此时可能判成 settled（当前后端 202 必带 `task_id`）。

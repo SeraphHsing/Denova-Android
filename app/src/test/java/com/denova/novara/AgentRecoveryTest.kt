@@ -12,6 +12,7 @@ import com.denova.novara.core.stream.isTerminal
 import com.denova.novara.core.stream.RecoveryAction
 import com.denova.novara.core.stream.RecoveryReceipt
 import com.denova.novara.core.stream.decideAgentRecovery
+import com.denova.novara.core.stream.userRecoveryActions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -27,9 +28,14 @@ class AgentRecoveryTest {
         val streamCalls = mutableListOf<Pair<String, String?>>()
         val streamSessions = mutableListOf<String>()
         val streams = mutableListOf<Flow<AgentUiFrame>>()
+        var activeCalls = 0
+            private set
         private var index = 0
 
-        override suspend fun agentActive(sessionId: String): AgentActiveView = activeResult
+        override suspend fun agentActive(sessionId: String): AgentActiveView {
+            activeCalls++
+            return activeResult
+        }
 
         override fun agentStream(sessionId: String, taskId: String, after: String?): Flow<AgentUiFrame> {
             streamSessions.add(sessionId)
@@ -178,6 +184,45 @@ class AgentRecoveryTest {
         assertEquals(listOf(partial, finish, AgentUiFrame.Done), frames)
         assertEquals(1, reloads)
         assertEquals(2, transport.streamCalls.size)
+    }
+
+    @Test
+    fun `user recovery actions expose only resume and abort`() {
+        // start_turn 由挂接路径自动消费：把它做成按钮会与当前 owner 冲突（Web 同口径）。
+        val resume = RecoveryAction(actionId = "5", kind = "resume", commandId = "c1", operationId = "o1")
+        val abort = RecoveryAction(actionId = "5", kind = "abort", commandId = "c1", operationId = "o1")
+        val attach = RecoveryAction(kind = "start_turn", commandId = "c1", operationId = "o1")
+        val suspended = AgentActiveView(active = false, phase = "suspended", recoveryActions = listOf(resume, attach, abort))
+
+        assertEquals(listOf(resume, abort), suspended.userRecoveryActions())
+        assertEquals(emptyList<RecoveryAction>(), AgentActiveView().userRecoveryActions())
+    }
+
+    @Test
+    fun `seeded active projection skips the first probe`() = runBlocking {
+        // attachLoop 刚用 refreshActive 拿过投影：首轮直接复用，避免同一时刻两次 GET /api/chat/active。
+        val transport = FakeTransport(AgentActiveView(active = true, taskId = "t1", streamCursor = 5))
+        transport.streams.add(flowOf(AgentUiFrame.Done))
+        val coordinator = AgentStreamRecoveryCoordinator(transport, retryDelayMillis = 0) {}
+
+        coordinator.recover("s1", seed = AgentActiveView(active = true, taskId = "t1", streamCursor = 5)).toList()
+
+        assertEquals(0, transport.activeCalls)
+        assertEquals(listOf("t1" to "5"), transport.streamCalls)
+    }
+
+    @Test
+    fun `seed is consumed once and later retries probe the server`() = runBlocking {
+        // 重挂时游标与任务身份必须来自最新投影：seed 只用于首轮。
+        val transport = FakeTransport(AgentActiveView(active = true, taskId = "t2", streamCursor = 7))
+        transport.streams.add(flow<AgentUiFrame> { throw GameStreamError(502, "agent_stream.rehydrate_required", "x") })
+        transport.streams.add(flowOf(AgentUiFrame.Done))
+        val coordinator = AgentStreamRecoveryCoordinator(transport, retryDelayMillis = 0) {}
+
+        coordinator.recover("s1", seed = AgentActiveView(active = true, taskId = "t1", streamCursor = 5)).toList()
+
+        assertEquals(1, transport.activeCalls)
+        assertEquals(listOf("t1" to "5", "t2" to "7"), transport.streamCalls)
     }
 
     @Test
