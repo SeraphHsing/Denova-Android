@@ -41,11 +41,21 @@ Editor: preview asset ok path=assets/redpanda.png mime=image/png bytes=511916
 
 `<table>` 统一包进 `.table-scroll { overflow-x:auto }`（单测断言包裹结果）。本夹具 6 列在 1440px 下未溢出，所以真机没有触发滚动；宽度不足时的滚动行为只有 CSS 与单测证据，没有真机截图。
 
-## 5. 中文输入法（WRI-008）—— 未完成真机验收
+## 5. 中文输入法（WRI-008）—— 真机通过（人工输入）
 
-已实现：`BasicTextField.onValueChange` 把 `TextFieldValue.composition != null` 传下去，`EditorSession.edit(text, composing)` 在组合态只更新本地正文、取消待发的自动保存，组合结束后第一次回调才排保存。JVM 用例 `editing during IME composition does not autosave` 覆盖「组合态不落盘 + 提交后落盘」。
+实现：`BasicTextField.onValueChange` 把 `TextFieldValue.composition != null` 传下去，`EditorSession.edit(text, composing)` 在组合态只更新本地正文、取消待发的自动保存，组合结束后第一次回调才排保存；JVM 用例 `editing during IME composition does not autosave` 覆盖两个分支。
 
-真机未能构造组合态：`adb shell input text` 直接注入字符，sogou 中文模式切换只能靠点击键盘「中/英」键，脚本点击不稳定，实测始终以英文直出（日志显示输入后立即 `saved …`，说明组合态未发生）。因此本条**不计入已完成**，需要在真机上用中文输入法手动输入一段拼音（候选未落定时观察不出现「已保存」）后再回写。
+真机验证（`ime-check.md`，内容只有一行提示语，29 字符）：
+
+| 时刻 | 状态 | 证据 |
+|---|---|---|
+| 01:23:42 | 最后一次落盘（`be325c5d…`，29 字符） | `Editor: saved …` |
+| 01:23:5x–01:24:4x | 输入法切到中文拼音，编辑区显示 `ni'ha'd` → `ni'ha'c`，候选条列出「你哈才 / 你哈 / 你 / …」 | `ime-composing-no-save.png`；**期间无任何 `saved` 日志**，界面也没出现新的「已保存」 |
+| 01:24:45 | 空格提交候选，正文变成 `你哈才` | `saved path=ime-check.md revision=sha256:c1b6ea60…`，服务端读到 `…# 输入法组合态检查\n\n请在这里用中文输入法敲一句拼音。\n你哈才`（32 字符） |
+
+即：**组合期间完全不落盘、提交后立刻落盘**，与 `expected_server_effect`「未提交组合态不误发送」一致。截图 `ime-composing-no-save.png` / `ime-committed-saved.png`。
+
+组合态由人工输入完成（脚本路径不可用）：`adb shell input text` 直接注入字符、不经过输入法组合；键盘中英切换只能点屏幕键，脚本实测始终英文直出。验证用的临时文件已从项目删除。
 
 ## 6. 部署问题（阻塞项）
 
