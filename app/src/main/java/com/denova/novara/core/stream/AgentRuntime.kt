@@ -13,6 +13,21 @@ data class AgentOperationView(
     val reason: String? = null,
 )
 
+/**
+ * `active.queue[]` 的一项（后端 `AgentRuntimeQueuedCommand`）。
+ * 队列投影只来自 `GET /api/chat/active`，不走 SSE；`steer_requested` 为服务端已受理转向的标记。
+ */
+@Serializable
+data class AgentQueuedCommand(
+    @SerialName("command_id") val commandId: String = "",
+    @SerialName("operation_id") val operationId: String = "",
+    /** `follow_up` / `next_turn`。 */
+    val delivery: String = "",
+    val message: String = "",
+    @SerialName("message_truncated") val messageTruncated: Boolean = false,
+    @SerialName("steer_requested") val steerRequested: Boolean = false,
+)
+
 /** `GET /api/chat/active`（写作 Agent）的活动投影。 */
 @Serializable
 data class AgentActiveView(
@@ -36,6 +51,8 @@ data class AgentActiveView(
     /** 尚未解决的提问（AGT-004）：页面恢复时据此重新露出待答卡片，回答/取消后消失。 */
     @SerialName("pending_asks") val pendingAsks: List<AgentAskInteraction> = emptyList(),
     @SerialName("recovery_actions") val recoveryActions: List<RecoveryAction> = emptyList(),
+    /** 已受理、尚未执行的追加命令（AGT-006 / AGT-007）。 */
+    val queue: List<AgentQueuedCommand> = emptyList(),
 )
 
 /** 恢复请求体（`POST /api/chat/recovery`）。 */

@@ -198,4 +198,11 @@
     <string name="agent_recovery_hint">This run is paused on the server</string>
     <string name="agent_recovery_resume">Resume</string>
     <string name="agent_recovery_abort">Abort</string>
+
+    <!-- 追加与队列（AGT-006 / AGT-007） -->
+    <string name="agent_send">Send</string>
+    <string name="agent_sending">Sending…</string>
+    <string name="agent_append">Follow up</string>
+    <string name="agent_appending">Queueing…</string>
+    <string name="agent_queue_hint">Queued for this run</string>
 </resources>

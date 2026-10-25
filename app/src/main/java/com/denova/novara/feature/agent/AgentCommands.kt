@@ -1,6 +1,8 @@
 package com.denova.novara.feature.agent
 
+import com.denova.novara.core.network.AgentCommandInput
 import com.denova.novara.core.network.AgentCommandRequest
+import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
 
 /**
@@ -17,6 +19,7 @@ object AgentCommands {
 
     const val TYPE_ABORT = "abort"
     const val TYPE_SUSPEND = "suspend"
+    const val TYPE_FOLLOW_UP = "follow_up"
 
     /** 与 Web 一致的停止原因。 */
     const val ABORT_REASON_USER = "user_requested"
@@ -26,6 +29,35 @@ object AgentCommands {
 
     /** 暂停 / 停止按钮是否可用：只有拿到明确的当前操作身份才允许下发命令。 */
     fun canControl(view: AgentActiveView?): Boolean = activeOperationId(view).isNotEmpty()
+
+    /**
+     * 输入是否应作为追加（`follow_up`）提交而不是开新一轮（AGT-006）。
+     *
+     * 对齐 Web `useAgentChat` 的判定：运行中或服务端已暂停时，输入进入该操作的队列，
+     * 由它在下一个轮次边界执行；此时再发 `POST /api/chat` 会与正在跑的操作抢同一个会话。
+     * 判据只用服务端投影里的 `active_operation_id`——客户端不能凭自己的流状态猜。
+     */
+    fun shouldFollowUp(operationId: String?): Boolean = !operationId.isNullOrBlank()
+
+    /** 追加命令：正文与引用随 `input` 下发，目标是用户当前看到的那个操作。 */
+    fun followUp(
+        commandId: String,
+        sessionId: String,
+        operationId: String,
+        message: String,
+        references: List<String> = emptyList(),
+        selections: List<TextSelectionRef> = emptyList(),
+    ): AgentCommandRequest = AgentCommandRequest(
+        sessionId = sessionId,
+        type = TYPE_FOLLOW_UP,
+        commandId = commandId,
+        targetOperationId = operationId,
+        input = AgentCommandInput(
+            message = message.trim(),
+            references = references,
+            selections = selections,
+        ),
+    )
 
     /** 暂停命令：不携带 reason，语义是让当前操作进入 suspended。 */
     fun suspend(commandId: String, sessionId: String, operationId: String): AgentCommandRequest =

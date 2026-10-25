@@ -113,19 +113,30 @@ data class TextSelectionRef(
 )
 
 /**
- * Agent 运行时命令（`POST /api/chat/commands`，AGT-005）。
+ * Agent 运行时命令（`POST /api/chat/commands`，AGT-005 / AGT-006 / AGT-007）。
  *
  * `target_operation_id` 是必填项：必须来自当前 active 投影（[com.denova.novara.core.stream.AgentActiveView.activeOperationId]），
  * 服务端据此判断目标是否仍是用户看到的那个操作，避免把命令打到已经换代的运行上。
+ * 队列控制（`steer_queued` / `cancel_queued`）额外必填 `target_command_id`，且只改那一项、不重投其输入。
  */
 @Serializable
 data class AgentCommandRequest(
     @SerialName("session_id") val sessionId: String,
-    /** `abort`（停止）或 `suspend`（暂停）。 */
+    /** `abort` / `suspend` / `follow_up` / `steer_queued` / `cancel_queued`。 */
     val type: String,
     @SerialName("command_id") val commandId: String,
     @SerialName("target_operation_id") val targetOperationId: String,
+    /** 追加 / 转向的正文与引用；`abort` / `suspend` / 队列控制不携带。 */
+    val input: AgentCommandInput? = null,
     val reason: String? = null,
+)
+
+/** 追加命令的输入体，字段形状对齐后端 `agentchat.ChatRequest` 的常用子集。 */
+@Serializable
+data class AgentCommandInput(
+    val message: String,
+    val references: List<String> = emptyList(),
+    val selections: List<TextSelectionRef> = emptyList(),
 )
 
 /** 回答提问的请求体（`POST /api/session/asks/:id/answer`）。 */

@@ -803,6 +803,28 @@ fun AgentScreen(
             }
         }
 
+        // 追加队列（AGT-006）：投影只来自 `active.queue`，运行结束后服务端清空、此处自动收起。
+        if (state.queue.isNotEmpty()) {
+            Text(
+                stringResource(R.string.agent_queue_hint),
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+            )
+            state.queue.forEach { item ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "• ${item.message.ifBlank { item.commandId }}",
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             OutlinedTextField(
                 value = input,
@@ -817,8 +839,19 @@ fun AgentScreen(
                     viewModel.send(sessionId.trim(), input, refs, selections)
                     input = ""
                 },
-                enabled = !state.sending && sessionId.isNotBlank() && input.isNotBlank(),
-            ) { Text(if (state.sending) "发送中…" else "发送") }
+                enabled = !state.sending && !state.appending &&
+                    sessionId.isNotBlank() && input.isNotBlank(),
+            ) {
+                Text(
+                    when {
+                        state.appending -> stringResource(R.string.agent_appending)
+                        state.sending -> stringResource(R.string.agent_sending)
+                        // 有当前操作时按钮语义是「追加」，不再开新一轮（AGT-006）。
+                        state.activeOperationId.isNotBlank() -> stringResource(R.string.agent_append)
+                        else -> stringResource(R.string.agent_send)
+                    },
+                )
+            }
         }
     }
 }

@@ -198,4 +198,11 @@
     <string name="agent_recovery_hint">这次运行在服务端已暂停</string>
     <string name="agent_recovery_resume">继续</string>
     <string name="agent_recovery_abort">中止</string>
+
+    <!-- 追加与队列（AGT-006 / AGT-007） -->
+    <string name="agent_send">发送</string>
+    <string name="agent_sending">发送中…</string>
+    <string name="agent_append">追加</string>
+    <string name="agent_appending">追加中…</string>
+    <string name="agent_queue_hint">本轮已追加</string>
 </resources>

@@ -29,6 +29,7 @@ import com.denova.novara.core.stream.AgentAskResolution
 import com.denova.novara.core.stream.AgentUiChunk
 import com.denova.novara.core.stream.ApprovalOption
 import com.denova.novara.core.stream.AgentPhase
+import com.denova.novara.core.stream.AgentQueuedCommand
 import com.denova.novara.core.stream.AgentStreamRecoveryCoordinator
 import com.denova.novara.core.stream.AgentUiFrame
 import com.denova.novara.core.stream.AgentUiReducer
@@ -89,6 +90,10 @@ data class AgentScreenState(
     val recoveryActions: List<RecoveryAction> = emptyList(),
     /** 恢复动作提交中（禁用按钮，避免重复下发）。 */
     val recoveryActionPending: Boolean = false,
+    /** 已受理、尚未执行的追加命令（`active.queue`，AGT-006 / AGT-007）。 */
+    val queue: List<AgentQueuedCommand> = emptyList(),
+    /** 追加命令提交中：只禁用输入区，不影响正在跑的流与暂停 / 停止。 */
+    val appending: Boolean = false,
 )
 
 /** 写作 Agent ViewModel：绑定 client → 恢复协调器 → 投影；发送先落命令事务再 POST。 */
@@ -208,6 +213,12 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val client = client ?: return
         val text = message.trim()
         if (text.isEmpty() || sessionId.isBlank()) return
+        // 已有当前操作（运行中 / 服务端已暂停）：输入进该操作的队列，不再开新一轮（AGT-006）。
+        val operationId = _state.value.activeOperationId.trim()
+        if (AgentCommands.shouldFollowUp(operationId)) {
+            appendFollowUp(sessionId, operationId, text, references, selections)
+            return
+        }
         val commandId = UUID.randomUUID().toString()
         val request = SendChatRequest(
             commandId = commandId,
@@ -306,6 +317,64 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 markUncertain(commandId, text, baseline)
             }
             finishStream()
+        }
+    }
+
+    /**
+     * 追加输入到当前操作（`follow_up`，AGT-006）。
+     *
+     * 不开新的流、也不取消正在跑的 `sendJob`：命令由服务端在该运行的轮次边界执行，
+     * 结果仍由当前挂接的流送达。目标身份只取服务端投影里的 `active_operation_id`。
+     */
+    private fun appendFollowUp(
+        sessionId: String,
+        operationId: String,
+        text: String,
+        references: List<String>,
+        selections: List<TextSelectionRef>,
+    ) {
+        val client = client ?: return
+        if (_state.value.appending) return
+        val commandId = UUID.randomUUID().toString()
+        val request = AgentCommands.followUp(commandId, sessionId, operationId, text, references, selections)
+        _state.value = _state.value.copy(appending = true, error = null)
+        viewModelScope.launch {
+            try {
+                commands.save(
+                    CommandRecord(
+                        commandId = commandId,
+                        target = "chat:$sessionId",
+                        payload = json.encodeToString(AgentCommandRequest.serializer(), request),
+                        status = CommandStatus.SUBMITTING,
+                        createdAt = System.currentTimeMillis(),
+                    ),
+                )
+                DenovaLog.i(
+                    "Agent",
+                    "follow-up session=$sessionId cmd=$commandId target=$operationId refs=${references.size}",
+                )
+                client.submitAgentCommand(request)
+                commands.updateStatus(commandId, CommandStatus.ACCEPTED)
+                // 服务端受理即代表正文与引用已交付；失败时保留引用，便于原样重发。
+                _selections.value = emptyList()
+                // 队列投影只来自 active：受理后刷新一次，追加项才会出现在队列区。
+                refreshActive()
+            } catch (e: DenovaApiException) {
+                val rejected = e.status in 400..499
+                commands.updateStatus(commandId, if (rejected) CommandStatus.REJECTED else CommandStatus.UNCERTAIN)
+                DenovaLog.w("Agent", "follow-up failed code=${e.code} status=${e.status}")
+                _state.value = _state.value.copy(error = AgentCommands.errorMessage(e.code, e.message))
+                // 目标已换代：按服务端投影纠正，不重发到旧操作。
+                if (AgentCommands.isTargetGone(e.code)) refreshActive()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
+                DenovaLog.w("Agent", "follow-up uncertain", e)
+                _state.value = _state.value.copy(error = e.message ?: "操作失败")
+            } finally {
+                _state.value = _state.value.copy(appending = false)
+            }
         }
     }
 
@@ -436,6 +505,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 },
                 // 只暴露需要用户点按的 resume / abort；start_turn 由挂接路径自动消费。
                 recoveryActions = view.userRecoveryActions(),
+                // 队列只来自 active 投影：运行结束后服务端会清空，界面据此收起队列区。
+                queue = view.queue,
             )
             view
         } catch (e: kotlinx.coroutines.CancellationException) {
