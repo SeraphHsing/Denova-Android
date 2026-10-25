@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +40,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
 import com.denova.novara.core.stream.AgentApprovalLogic
@@ -667,10 +671,13 @@ fun AgentScreen(
             }
         }
         if (state.ui.thinking.isNotBlank()) {
+            // 推理正文可能很长且不可滚动：不限制行数会把消息区与输入区挤出屏幕（真机上「追加」按钮因此点不到）。
             Text(
                 "思考：${state.ui.thinking}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
         }
@@ -811,34 +818,55 @@ fun AgentScreen(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
             )
             state.queue.forEach { item ->
+                // 队列项控制（AGT-007）：转向只改该项执行方式，删除只移除该项；提交中只禁本行。
+                val label = "• ${item.message.ifBlank { item.commandId }}"
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        "• ${item.message.ifBlank { item.commandId }}",
+                        text = if (item.steerRequested) {
+                            stringResource(R.string.agent_queue_item_steered, label)
+                        } else {
+                            label
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 2,
                         modifier = Modifier.weight(1f),
                     )
+                    TextButton(
+                        onClick = { viewModel.steerQueuedCommand(item.commandId) },
+                        enabled = state.queueActionPendingCommandId.isBlank(),
+                    ) { Text(stringResource(R.string.agent_queue_steer)) }
+                    TextButton(
+                        onClick = { viewModel.cancelQueuedCommand(item.commandId) },
+                        enabled = state.queueActionPendingCommandId.isBlank(),
+                    ) { Text(stringResource(R.string.agent_queue_delete)) }
                 }
             }
         }
 
+        // 输入区提交：与按钮同一入口，参数一致（IME「发送」动作也走这里）。
+        val submitComposer = {
+            if (input.isNotBlank() && sessionId.isNotBlank() && !state.sending && !state.appending) {
+                val refs = if (initialFile.isNotBlank()) listOf(initialFile) else emptyList()
+                viewModel.send(sessionId.trim(), input, refs, selections)
+                input = ""
+            }
+        }
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
                 label = { Text("消息") },
                 singleLine = true,
+                // 键盘「发送」键与右侧按钮等价（终端输入同样以 IME 动作提交）。
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { submitComposer() }),
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
             OutlinedButton(
-                onClick = {
-                    val refs = if (initialFile.isNotBlank()) listOf(initialFile) else emptyList()
-                    viewModel.send(sessionId.trim(), input, refs, selections)
-                    input = ""
-                },
+                onClick = submitComposer,
                 enabled = !state.sending && !state.appending &&
                     sessionId.isNotBlank() && input.isNotBlank(),
             ) {

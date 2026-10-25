@@ -3,6 +3,7 @@ package com.denova.novara
 import com.denova.novara.core.network.AgentCommandRequest
 import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
+import com.denova.novara.core.stream.AgentQueuedCommand
 import com.denova.novara.feature.agent.AgentCommands
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -11,13 +12,22 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** AGT-006 追加与转向：`active.queue` 投影、follow_up 分流与命令线格式。 */
+/** AGT-006 追加与转向、AGT-007 队列项控制：`active.queue` 投影、门控与命令线格式。 */
 class AgentQueueTest {
 
     private val json = Json {
         ignoreUnknownKeys = true
         coerceInputValues = true
     }
+
+    private fun viewWithQueue(raw: String): AgentActiveView =
+        json.decodeFromString(AgentActiveView.serializer(), raw)
+
+    private val runningWithQueue = """
+        {"active":true,"phase":"running","active_operation_id":"op-42",
+         "queue":[{"command_id":"cmd-1","operation_id":"op-42","delivery":"follow_up","message":"一"},
+                  {"command_id":"cmd-2","operation_id":"op-42","delivery":"follow_up","message":"二"}]}
+    """.trimIndent()
 
     @Test
     fun `active projection carries queued commands`() {
@@ -88,5 +98,78 @@ class AgentQueueTest {
         // 未启用的可选字段必须缺省，否则服务端会把空字段当成显式值。
         assertFalse(body.contains("target_command_id"))
         assertFalse(body.contains("reason"))
+    }
+
+    @Test
+    fun `queue item lookup is by command id`() {
+        val view = viewWithQueue(runningWithQueue)
+        assertEquals("二", AgentCommands.queuedItem(view, "cmd-2")?.message)
+        assertNull(AgentCommands.queuedItem(view, "cmd-9"))
+        assertNull(AgentCommands.queuedItem(view, "  "))
+        assertNull(AgentCommands.queuedItem(null, "cmd-1"))
+    }
+
+    @Test
+    fun `steer requires item bound to the current operation`() {
+        val view = viewWithQueue(runningWithQueue)
+        assertTrue(AgentCommands.canSteerQueued(view, AgentCommands.queuedItem(view, "cmd-1")))
+        // 操作已换代：同一个 command_id 不再是当前操作的队列项，不能转向。
+        val next = viewWithQueue(
+            runningWithQueue.replace("\"active_operation_id\":\"op-42\"", "\"active_operation_id\":\"op-43\""),
+        )
+        assertFalse(AgentCommands.canSteerQueued(next, AgentCommands.queuedItem(next, "cmd-1")))
+        // 没有当前操作（已结束）：转向无从谈起。
+        val idle = viewWithQueue("""{"active":false,"phase":"idle"}""")
+        assertFalse(AgentCommands.canSteerQueued(idle, AgentCommands.queuedItem(view, "cmd-1")))
+        assertFalse(AgentCommands.canSteerQueued(view, null))
+    }
+
+    @Test
+    fun `cancel only needs the item to stay queued`() {
+        val view = viewWithQueue(runningWithQueue)
+        assertTrue(AgentCommands.canCancelQueued(view, AgentCommands.queuedItem(view, "cmd-2")))
+        // 队列已清空（项已执行或已被别处删除）时不得再发删除。
+        val idle = viewWithQueue("""{"active":false,"phase":"idle"}""")
+        assertFalse(AgentCommands.canCancelQueued(idle, AgentCommands.queuedItem(view, "cmd-2")))
+        assertFalse(AgentCommands.canCancelQueued(view, null))
+        assertFalse(AgentCommands.canCancelQueued(view, AgentQueuedCommand(commandId = "cmd-3")))
+    }
+
+    @Test
+    fun `steer request targets one queued item without input`() {
+        val request = AgentCommands.steerQueued("cmd-9", "default", "op-42", "cmd-1")
+        assertEquals("steer_queued", request.type)
+        assertEquals("cmd-1", request.targetCommandId)
+        assertEquals("op-42", request.targetOperationId)
+        assertNull(request.input)
+        assertNull(request.reason)
+    }
+
+    @Test
+    fun `cancel request carries reason and target item`() {
+        val deleted = AgentCommands.cancelQueued("cmd-10", "default", "op-42", "cmd-1")
+        assertEquals("cancel_queued", deleted.type)
+        assertEquals("cmd-1", deleted.targetCommandId)
+        assertEquals(AgentCommands.CANCEL_REASON_DELETED, deleted.reason)
+        val edited = AgentCommands.cancelQueued(
+            "cmd-11",
+            "default",
+            "op-42",
+            "cmd-1",
+            AgentCommands.CANCEL_REASON_EDITOR,
+        )
+        assertEquals("returned_to_editor", edited.reason)
+    }
+
+    @Test
+    fun `queue control body carries target command id`() {
+        val body = Json.encodeToString(
+            AgentCommandRequest.serializer(),
+            AgentCommands.cancelQueued("cmd-10", "default", "op-42", "cmd-1"),
+        )
+        assertTrue(body.contains("\"type\":\"cancel_queued\""))
+        assertTrue(body.contains("\"target_command_id\":\"cmd-1\""))
+        assertTrue(body.contains("\"reason\":\"user_deleted\""))
+        assertFalse(body.contains("input"))
     }
 }

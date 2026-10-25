@@ -205,4 +205,10 @@
     <string name="agent_append">追加</string>
     <string name="agent_appending">追加中…</string>
     <string name="agent_queue_hint">本轮已追加</string>
+    <string name="agent_queue_steer">转向</string>
+    <string name="agent_queue_delete">删除</string>
+    <string name="agent_queue_item_steered">%1$s · 已请求转向</string>
+
+    <!-- 调试抽屉入口（仅 debug 构建） -->
+    <string name="drawer_debug">调试日志</string>
 </resources>

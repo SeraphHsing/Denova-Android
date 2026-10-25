@@ -10,8 +10,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -25,7 +23,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -155,6 +152,15 @@ class MainActivity : AppCompatActivity() {
                                                         drawerState.close()
                                                     }
                                                 }
+                                            },
+                                            onOpenDebug = if (BuildConfig.DEBUG) {
+                                                // 抽屉入口先关闭抽屉再打开面板，避免面板被抽屉遮住。
+                                                {
+                                                    scope.launch { drawerState.close() }
+                                                    showDebug = true
+                                                }
+                                            } else {
+                                                null
                                             },
                                         ) { destination ->
                                             scope.launch { drawerState.close() }
@@ -330,16 +336,7 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    // 仅 debug 构建显示调试入口与面板。
-                    if (BuildConfig.DEBUG) {
-                        Button(
-                            onClick = { showDebug = true },
-                            shape = CircleShape,
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                        ) {
-                            Text("Debug")
-                        }
-                    }
+                    // 调试面板仍覆盖在最上层，入口在左抽屉（见 AppDrawer 的 onOpenDebug）。
                     if (showDebug) {
                         DebugPanelScreen(
                             viewModel = debugViewModel,

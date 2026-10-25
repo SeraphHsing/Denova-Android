@@ -126,6 +126,8 @@ data class AgentCommandRequest(
     val type: String,
     @SerialName("command_id") val commandId: String,
     @SerialName("target_operation_id") val targetOperationId: String,
+    /** 队列控制的目标项（`active.queue[].command_id`）；其余命令必须缺省。 */
+    @SerialName("target_command_id") val targetCommandId: String? = null,
     /** 追加 / 转向的正文与引用；`abort` / `suspend` / 队列控制不携带。 */
     val input: AgentCommandInput? = null,
     val reason: String? = null,

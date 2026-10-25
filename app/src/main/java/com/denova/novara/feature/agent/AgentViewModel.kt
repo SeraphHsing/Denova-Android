@@ -42,6 +42,7 @@ import com.denova.novara.core.stream.completesTurn
 import com.denova.novara.core.stream.userRecoveryActions
 import java.util.UUID
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -94,6 +95,8 @@ data class AgentScreenState(
     val queue: List<AgentQueuedCommand> = emptyList(),
     /** 追加命令提交中：只禁用输入区，不影响正在跑的流与暂停 / 停止。 */
     val appending: Boolean = false,
+    /** 队列项操作提交中：只禁用该行，避免两项互相阻塞（AGT-007）。 */
+    val queueActionPendingCommandId: String = "",
 )
 
 /** 写作 Agent ViewModel：绑定 client → 恢复协调器 → 投影；发送先落命令事务再 POST。 */
@@ -106,6 +109,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private var coordinator: AgentStreamRecoveryCoordinator? = null
     private var streamJob: Job? = null
     private var sendJob: Job? = null
+    private var queueTicker: Job? = null
 
     private val _state = MutableStateFlow(AgentScreenState())
     val state: StateFlow<AgentScreenState> = _state.asStateFlow()
@@ -508,12 +512,27 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 // 队列只来自 active 投影：运行结束后服务端会清空，界面据此收起队列区。
                 queue = view.queue,
             )
+            // 队列项会在轮次边界被服务端消费，而消费不走 SSE；队列非空时按固定间隔与服务端对齐，
+            // 否则已执行的项会一直显示成「已请求转向」。
+            if (view.queue.isNotEmpty()) ensureQueueTicker()
             view
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             DenovaLog.w("Agent", "refresh active failed", e)
             null
+        }
+    }
+
+    /** 队列非空期间与 active 对齐；队列清空后自行退出，不做常驻轮询。 */
+    private fun ensureQueueTicker() {
+        if (queueTicker?.isActive == true) return
+        queueTicker = viewModelScope.launch {
+            while (_state.value.queue.isNotEmpty()) {
+                delay(QUEUE_REFRESH_MS)
+                if (_state.value.queue.isEmpty()) break
+                refreshActive()
+            }
         }
     }
 
@@ -641,6 +660,94 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = _state.value.copy(commandSubmitting = false)
             }
         }
+    }
+
+    /** 让队列项提前执行（`steer_queued`）。 */
+    fun steerQueuedCommand(commandId: String) =
+        submitQueueControl(AgentCommands.TYPE_STEER_QUEUED, commandId)
+
+    /** 删除队列项（`cancel_queued` + `reason=user_deleted`）。 */
+    fun cancelQueuedCommand(commandId: String) =
+        submitQueueControl(AgentCommands.TYPE_CANCEL_QUEUED, commandId, AgentCommands.CANCEL_REASON_DELETED)
+
+    /**
+     * 队列项控制（AGT-007）：先用 active 投影确认该项仍在队列里——不信本地列表，
+     * 因为队列可能已被执行或被另一端改掉；确认后落本地事务再 POST。
+     * 成功按回执乐观更新该行，随后重取投影（暂停态转向会让服务端恢复执行）。
+     */
+    private fun submitQueueControl(type: String, targetCommandId: String, reason: String = "") {
+        val client = client ?: return
+        val sessionId = _state.value.sessionId.trim()
+        if (sessionId.isBlank() || _state.value.queueActionPendingCommandId.isNotBlank()) return
+        _state.value = _state.value.copy(queueActionPendingCommandId = targetCommandId, error = null)
+        var commandId: String? = null
+        viewModelScope.launch {
+            try {
+                val view = refreshActive()
+                val item = AgentCommands.queuedItem(view, targetCommandId)
+                val allowed = if (type == AgentCommands.TYPE_STEER_QUEUED) {
+                    AgentCommands.canSteerQueued(view, item)
+                } else {
+                    AgentCommands.canCancelQueued(view, item)
+                }
+                if (item == null || !allowed) {
+                    DenovaLog.w("Agent", "queue control skipped type=$type target=$targetCommandId reason=stale queue")
+                    _state.value = _state.value.copy(
+                        error = AgentCommands.errorMessage("agent_runtime.invalid_command"),
+                    )
+                    return@launch
+                }
+                val id = UUID.randomUUID().toString()
+                commandId = id
+                val request = if (type == AgentCommands.TYPE_STEER_QUEUED) {
+                    AgentCommands.steerQueued(id, sessionId, item.operationId, item.commandId)
+                } else {
+                    AgentCommands.cancelQueued(id, sessionId, item.operationId, item.commandId, reason)
+                }
+                commands.save(
+                    CommandRecord(
+                        commandId = id,
+                        target = "chat:$sessionId",
+                        payload = json.encodeToString(AgentCommandRequest.serializer(), request),
+                        status = CommandStatus.SUBMITTING,
+                        createdAt = System.currentTimeMillis(),
+                    ),
+                )
+                DenovaLog.i(
+                    "Agent",
+                    "queue control type=$type target=${item.commandId} cmd=$id op=${item.operationId}",
+                )
+                client.submitAgentCommand(request)
+                commands.updateStatus(id, CommandStatus.ACCEPTED)
+                applyQueueReceipt(type, item)
+                refreshActive()
+            } catch (e: DenovaApiException) {
+                val rejected = e.status in 400..499
+                commandId?.let { commands.updateStatus(it, if (rejected) CommandStatus.REJECTED else CommandStatus.UNCERTAIN) }
+                DenovaLog.w("Agent", "queue control failed type=$type code=${e.code} status=${e.status}")
+                _state.value = _state.value.copy(error = AgentCommands.errorMessage(e.code, e.message))
+                if (AgentCommands.isTargetGone(e.code)) refreshActive()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                commandId?.let { commands.updateStatus(it, CommandStatus.UNCERTAIN) }
+                DenovaLog.w("Agent", "queue control uncertain type=$type", e)
+                _state.value = _state.value.copy(error = e.message ?: "操作失败")
+            } finally {
+                _state.value = _state.value.copy(queueActionPendingCommandId = "")
+            }
+        }
+    }
+
+    /** 乐观更新：删除移除该项，转向只把该项标成 `steer_requested`，不动其它队列项。 */
+    private fun applyQueueReceipt(type: String, item: AgentQueuedCommand) {
+        val current = _state.value
+        val queue = if (type == AgentCommands.TYPE_CANCEL_QUEUED) {
+            current.queue.filterNot { it.commandId == item.commandId }
+        } else {
+            current.queue.map { if (it.commandId == item.commandId) it.copy(steerRequested = true) else it }
+        }
+        _state.value = current.copy(queue = queue)
     }
 
     /** 切换某个问题的选项：单选覆盖、多选切换（纯逻辑在 [AgentAskLogic.toggle]）。 */
@@ -902,6 +1009,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() {
         streamJob?.cancel()
         sendJob?.cancel()
+        queueTicker?.cancel()
         super.onCleared()
     }
 
@@ -911,5 +1019,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
         /** canonical 历史一页的消息数：常规重建与「核对+重建」共用同一口径。 */
         const val CANONICAL_LIMIT = 50
+
+        /** 队列非空时与 active 投影对齐的间隔：队列消费没有 SSE 信号，太慢会让已执行项挂在界面上。 */
+        const val QUEUE_REFRESH_MS = 5_000L
     }
 }

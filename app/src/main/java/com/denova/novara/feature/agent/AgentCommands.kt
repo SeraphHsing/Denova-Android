@@ -4,6 +4,7 @@ import com.denova.novara.core.network.AgentCommandInput
 import com.denova.novara.core.network.AgentCommandRequest
 import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
+import com.denova.novara.core.stream.AgentQueuedCommand
 
 /**
  * 暂停 / 停止命令的纯逻辑（AGT-005）。
@@ -20,6 +21,14 @@ object AgentCommands {
     const val TYPE_ABORT = "abort"
     const val TYPE_SUSPEND = "suspend"
     const val TYPE_FOLLOW_UP = "follow_up"
+    const val TYPE_STEER_QUEUED = "steer_queued"
+    const val TYPE_CANCEL_QUEUED = "cancel_queued"
+
+    /** 队列项被用户删除（对齐 Web `queuedComposerDraftsRef.delete` 的 reason）。 */
+    const val CANCEL_REASON_DELETED = "user_deleted"
+
+    /** 队列项被取回输入框重新编辑。 */
+    const val CANCEL_REASON_EDITOR = "returned_to_editor"
 
     /** 与 Web 一致的停止原因。 */
     const val ABORT_REASON_USER = "user_requested"
@@ -57,6 +66,63 @@ object AgentCommands {
             references = references,
             selections = selections,
         ),
+    )
+
+    /** 在投影里按 `command_id` 找队列项：找不到说明该项已被执行或被别处删除。 */
+    fun queuedItem(view: AgentActiveView?, commandId: String): AgentQueuedCommand? {
+        val id = commandId.trim()
+        if (id.isEmpty()) return null
+        return view?.queue?.firstOrNull { it.commandId == id }
+    }
+
+    /**
+     * 队列项「转向」是否可用（`steer_queued`，AGT-007）。
+     *
+     * 两条都必须满足（对齐 Web `submitQueuedControl`）：目标项仍在队列里且属于当前操作；
+     * 该操作的 `active_operation_id` 仍是投影里的当前操作——否则转向会打到已经换代的运行上。
+     */
+    fun canSteerQueued(view: AgentActiveView?, item: AgentQueuedCommand?): Boolean {
+        if (item == null) return false
+        val operationId = activeOperationId(view)
+        return operationId.isNotEmpty() &&
+            item.operationId == operationId &&
+            view?.queue?.any { it.commandId == item.commandId && it.operationId == operationId } == true
+    }
+
+    /** 队列项「删除」是否可用（`cancel_queued`）：只要该项仍在队列里且操作身份自洽即可。 */
+    fun canCancelQueued(view: AgentActiveView?, item: AgentQueuedCommand?): Boolean {
+        if (item == null || item.operationId.isBlank()) return false
+        return view?.queue?.any { it.commandId == item.commandId && it.operationId == item.operationId } == true
+    }
+
+    /** 转向队列项：只改目标项的执行方式，不重投它的输入。 */
+    fun steerQueued(
+        commandId: String,
+        sessionId: String,
+        operationId: String,
+        targetCommandId: String,
+    ): AgentCommandRequest = AgentCommandRequest(
+        sessionId = sessionId,
+        type = TYPE_STEER_QUEUED,
+        commandId = commandId,
+        targetOperationId = operationId,
+        targetCommandId = targetCommandId,
+    )
+
+    /** 删除队列项：`reason` 区分用户删除与取回编辑，服务端据此记录去向。 */
+    fun cancelQueued(
+        commandId: String,
+        sessionId: String,
+        operationId: String,
+        targetCommandId: String,
+        reason: String = CANCEL_REASON_DELETED,
+    ): AgentCommandRequest = AgentCommandRequest(
+        sessionId = sessionId,
+        type = TYPE_CANCEL_QUEUED,
+        commandId = commandId,
+        targetOperationId = operationId,
+        targetCommandId = targetCommandId,
+        reason = reason,
     )
 
     /** 暂停命令：不携带 reason，语义是让当前操作进入 suspended。 */

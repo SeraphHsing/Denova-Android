@@ -205,4 +205,10 @@
     <string name="agent_append">Follow up</string>
     <string name="agent_appending">Queueing…</string>
     <string name="agent_queue_hint">Queued for this run</string>
+    <string name="agent_queue_steer">Steer</string>
+    <string name="agent_queue_delete">Delete</string>
+    <string name="agent_queue_item_steered">%1$s · steer requested</string>
+
+    <!-- 调试抽屉入口（仅 debug 构建） -->
+    <string name="drawer_debug">Debug log</string>
 </resources>

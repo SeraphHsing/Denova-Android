@@ -61,6 +61,8 @@ fun AppDrawer(
     books: List<BookRecord>,
     currentProjectId: String?,
     onSelectBook: (BookRecord) -> Unit,
+    /** debug 构建的日志入口；为 null 时不显示。放在抽屉里而不是悬浮按钮，避免遮挡底部操作。 */
+    onOpenDebug: (() -> Unit)? = null,
     onNavigate: (AppDestination) -> Unit,
 ) {
     Column(
@@ -140,6 +142,12 @@ fun AppDrawer(
             Text(stringResource(R.string.language), modifier = Modifier.weight(1f))
             LanguageOption("中文", "zh", language, onSelectLanguage)
             LanguageOption("English", "en", language, onSelectLanguage)
+        }
+        if (onOpenDebug != null) {
+            HorizontalDivider()
+            TextButton(onClick = onOpenDebug, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.drawer_debug))
+            }
         }
     }
 }
