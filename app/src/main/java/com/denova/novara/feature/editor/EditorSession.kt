@@ -99,6 +99,12 @@ object ReceiptPolicy {
                     baseContent = outcome.mergedText,
                     saveStatus = SaveStatus.CONFLICT,
                     conflictText = remerged.text,
+                    conflict = ExternalConflict(
+                        localContent = current.content,
+                        externalContent = outcome.mergedText,
+                        externalRevision = outcome.revision,
+                        mergedContent = remerged.text,
+                    ),
                     message = "发现冲突，请手动解决后保存",
                     contentEpoch = current.contentEpoch + 1,
                 ),
@@ -121,6 +127,14 @@ object ReceiptPolicy {
             baseContent = outcome.serverContent,
             saveStatus = SaveStatus.CONFLICT,
             conflictText = outcome.mergedText,
+            conflict = ExternalConflict(
+                localContent = current.content,
+                externalContent = outcome.serverContent,
+                externalRevision = outcome.serverRevision,
+                mergedContent = outcome.mergedText,
+                recoveryId = outcome.preserved?.id,
+                recoveryPath = outcome.preserved?.path,
+            ),
             message = "发现冲突，请手动解决后保存",
         )
 
@@ -309,9 +323,43 @@ class EditorSession(
             (final.saveStatus == SaveStatus.SAVED || final.saveStatus == SaveStatus.MERGED)
     }
 
-    fun resolveConflict() {
-        _state.value = _state.value.copy(conflictText = null, saveStatus = SaveStatus.IDLE)
+    /**
+     * 冲突选择之一：保留本地（对齐 Web `keepLocalVersion`）。
+     *
+     * 清掉冲突态后按当前正文立即保存；因为 [ReceiptPolicy.applyConflict] 已把 base 换成服务器内容，
+     * 这次 PUT 用的是正确 revision，不会盲覆盖。
+     */
+    fun keepLocalVersion() {
+        val s = _state.value
+        if (s.conflict == null && s.saveStatus != SaveStatus.CONFLICT) return
+        _state.value = s.copy(conflictText = null, conflict = null, saveStatus = SaveStatus.IDLE, message = null)
         saveNow()
+    }
+
+    /**
+     * 冲突选择之二：加载外部（服务器）版本（对齐 Web `loadExternalVersion`，WRI-014）。
+     *
+     * 丢弃本地改动：正文换成服务器内容并把它作为新 base，推进 [openEpoch] 作废在途回执，
+     * 同时清掉该文件草稿——否则下次打开会被当成「未提交编辑」又恢复回来。
+     */
+    fun loadExternalVersion() {
+        val s = _state.value
+        val conflict = s.conflict ?: return
+        cancelPendingSaves()
+        openEpoch++
+        _state.value = s.copy(
+            content = conflict.externalContent,
+            baseContent = conflict.externalContent,
+            baseRevision = conflict.externalRevision,
+            saveStatus = SaveStatus.IDLE,
+            conflictText = null,
+            conflict = null,
+            message = "已加载外部版本",
+            contentEpoch = s.contentEpoch + 1,
+        )
+        if (s.filePath.isNotEmpty()) {
+            scope.launch { drafts.clearDraft(fileKey(s)) }
+        }
     }
 
     /**

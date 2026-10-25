@@ -8,7 +8,9 @@ import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.persistence.DraftStore
 import com.denova.novara.core.persistence.EditorTabsStore
+import com.denova.novara.core.save.FallbackConflictArchive
 import com.denova.novara.core.save.FileSaveCoordinator
+import com.denova.novara.core.save.LocalConflictArchive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,8 +18,24 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.io.File
 
 enum class SaveStatus { IDLE, SAVING, SAVED, MERGED, CONFLICT, ERROR }
+
+/**
+ * 外部内容冲突（WRI-013）：冲突材料的四份正文 + 归档回执。
+ *
+ * 对应 Web `ExternalContentConflict`：界面据此给出「保留本地 / 加载外部」二元选择，
+ * [recoveryId] 指向服务端（或本地兜底）落盘的冲突记录，供事后回查。
+ */
+data class ExternalConflict(
+    val localContent: String = "",
+    val externalContent: String = "",
+    val externalRevision: String = "",
+    val mergedContent: String = "",
+    val recoveryId: String? = null,
+    val recoveryPath: String? = null,
+)
 
 data class EditorUiState(
     val projectId: String = "",
@@ -29,6 +47,8 @@ data class EditorUiState(
     val saveStatus: SaveStatus = SaveStatus.IDLE,
     val message: String? = null,
     val conflictText: String? = null,
+    /** 冲突选择（WRI-013）；非空即「等用户选保留本地还是加载外部」。 */
+    val conflict: ExternalConflict? = null,
     /** 外部改写正文（合并结果）时递增，用于让界面重建编辑态。 */
     val contentEpoch: Int = 0,
 )
@@ -75,7 +95,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         }
         this.client = client
         this.serverScope = origin
-        val coordinator = FileSaveCoordinator(client, drafts)
+        // 冲突材料：服务端日志优先，写不进去落本地兜底（对应 Web 的 localStorage 分支）。
+        val archive = FallbackConflictArchive(
+            remote = client,
+            local = LocalConflictArchive(File(getApplication<Application>().filesDir, "conflicts")),
+        )
+        val coordinator = FileSaveCoordinator(client, drafts, archive)
         val s = EditorSession(coordinator, drafts, viewModelScope)
         this.session = s
         collectJob?.cancel()
@@ -200,8 +225,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         session?.saveNow()
     }
 
-    fun resolveConflict() {
-        session?.resolveConflict()
+    /** 冲突选择之一：保留本地（当前合并后的正文）并立即保存。 */
+    fun keepLocalVersion() {
+        session?.keepLocalVersion()
+    }
+
+    /** 冲突选择之二：丢弃本地改动，加载服务器当前版本（WRI-014）。 */
+    fun loadExternalVersion() {
+        session?.loadExternalVersion()
     }
 
     /** 切换书籍前 flush 编辑器草稿（保存并等待）；false 表示保存失败/冲突，应中止切换。 */

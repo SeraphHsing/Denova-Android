@@ -1,7 +1,13 @@
 package com.denova.novara.core.network
 
 import com.denova.novara.core.model.ServerKey
+import com.denova.novara.core.save.AutosaveConflictCodec
+import com.denova.novara.core.save.AutosaveConflictRecord
+import com.denova.novara.core.save.ConflictArchive
+import com.denova.novara.core.save.ConflictStorage
 import com.denova.novara.core.save.FileRemote
+import com.denova.novara.core.save.PreservedConflict
+import com.denova.novara.core.save.PreservedConflictPayload
 import com.denova.novara.core.stream.AgentActiveView
 import com.denova.novara.core.stream.AgentAskAnswer
 import com.denova.novara.core.stream.AgentAskLogic
@@ -220,7 +226,7 @@ class DenovaApiException(
 class DenovaClient(
     private val server: ServerKey,
     private val cookieJar: CookieJar = InMemoryCookieJar(),
-) : FileRemote, GameStreamTransport, AgentStreamTransport {
+) : FileRemote, GameStreamTransport, AgentStreamTransport, ConflictArchive {
 
     companion object {
         /** 退出登录时等待在途请求收尾的上限；超时后照常退出，避免无限卡住。 */
@@ -359,6 +365,26 @@ class DenovaClient(
                 val text = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toException(resp.code, text)
                 json.decodeFromString(SaveFileResponse.serializer(), text)
+            }
+        }
+    }
+
+    /**
+     * 归档冲突材料（WRI-013）：`POST /api/autosave-conflicts`，返回记录 id 与服务端落盘路径。
+     * 请求体按后端 `autosave.Input` 字段名构造，`value` 为 JSON 字符串（对应 Go `json.RawMessage`）。
+     */
+    override suspend fun preserve(record: AutosaveConflictRecord): PreservedConflict {
+        val body = AutosaveConflictCodec.encode(record)
+        val request = Request.Builder()
+            .url(server.baseUrl + "/api/autosave-conflicts")
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                val saved = json.decodeFromString(PreservedConflictPayload.serializer(), text)
+                PreservedConflict(saved.id, saved.path, ConflictStorage.SERVER)
             }
         }
     }

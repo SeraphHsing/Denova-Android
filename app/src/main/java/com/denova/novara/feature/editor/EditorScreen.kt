@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -215,19 +216,30 @@ fun EditorScreen(
             )
         }
         if (uiState.saveStatus == SaveStatus.CONFLICT) {
-            // 冲突态暂停自动保存，必须由用户改完标记后显式放行一次（对齐 Web 的「解决后保存」）。
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            // 冲突态暂停自动保存（对齐 Web `EditorPersistenceNotices`）：
+            // 用户要么保留本地合并结果，要么直接加载服务器版本；两种选择都不会丢冲突材料。
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                 Text(
                     stringResource(R.string.conflict_hint),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+                    modifier = Modifier.padding(top = 8.dp),
                 )
-                OutlinedButton(onClick = { viewModel.resolveConflict() }) {
-                    Text(stringResource(R.string.save_resolved))
+                uiState.conflict?.recoveryId?.let { id ->
+                    Text(
+                        stringResource(R.string.conflict_recovery, id),
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(onClick = { viewModel.keepLocalVersion() }) {
+                        Text(stringResource(R.string.conflict_keep_local))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedButton(onClick = { viewModel.loadExternalVersion() }) {
+                        Text(stringResource(R.string.conflict_load_external))
+                    }
                 }
             }
         }

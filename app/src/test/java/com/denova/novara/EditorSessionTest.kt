@@ -5,6 +5,10 @@ import com.denova.novara.core.network.ProjectFileDocument
 import com.denova.novara.core.network.SaveFileResponse
 import com.denova.novara.core.persistence.Draft
 import com.denova.novara.core.persistence.DraftStorage
+import com.denova.novara.core.save.AutosaveConflictRecord
+import com.denova.novara.core.save.ConflictArchive
+import com.denova.novara.core.save.ConflictStorage
+import com.denova.novara.core.save.PreservedConflict
 import com.denova.novara.core.save.FileRemote
 import com.denova.novara.core.save.FileSaveCoordinator
 import com.denova.novara.core.save.SaveOutcome
@@ -37,6 +41,7 @@ class EditorSessionTest {
         var serverRevision = "r0"
         var conflictOnFirstSave = false
         private var saveCount = 0
+        val savedBaseRevisions = mutableListOf<String>()
 
         override suspend fun readFile(projectId: String, path: String) =
             ProjectFileDocument(path, serverContent, serverRevision)
@@ -51,6 +56,7 @@ class EditorSessionTest {
             if (conflictOnFirstSave && saveCount == 1) {
                 throw DenovaApiException(409, "api.workspace.fileRevisionConflict", "conflict")
             }
+            savedBaseRevisions += baseRevision
             serverContent = content
             serverRevision = "r$saveCount"
             return SaveFileResponse(projectId, path, serverRevision, true, "saved")
@@ -196,7 +202,7 @@ class EditorSessionTest {
         assertEquals(savesAfterConflict, remote.saveCount())
 
         // 手动解决后才保存
-        session.resolveConflict()
+        session.keepLocalVersion()
         advanceUntilIdle()
         assertTrue(remote.saveCount() > savesAfterConflict)
     }
@@ -472,7 +478,7 @@ class EditorSessionTest {
         assertEquals("r2", session.state.value.baseRevision)
 
         session.edit("标题\n段落一\n双方合并结果\n段落三\n结尾")
-        session.resolveConflict()
+        session.keepLocalVersion()
         advanceUntilIdle()
 
         assertEquals("标题\n段落一\n双方合并结果\n段落三\n结尾", remote.serverContent)
@@ -502,7 +508,7 @@ class EditorSessionTest {
         advanceUntilIdle()
         assertEquals(savesAfterConflict, remote.saveCount()) // 冲突未解决不落盘
 
-        session.resolveConflict()
+        session.keepLocalVersion()
         advanceUntilIdle()
         assertTrue(remote.saveCount() > savesAfterConflict)
         assertEquals("标题\n段落一\n段落二本地已解决\n段落三\n结尾", remote.serverContent)
@@ -528,5 +534,127 @@ class EditorSessionTest {
         advanceUntilIdle()
         assertEquals(1, remote.saveCount())
         assertEquals("base 拼音", remote.serverContent)
+    }
+
+    // ---- WRI-013 冲突材料归档 + 保留本地 / 加载外部 ----
+
+    /** 记录归档调用的 fake：断言四份正文与作用域都进了冲突材料。 */
+    private class RecordingArchive : ConflictArchive {
+        val records = mutableListOf<AutosaveConflictRecord>()
+        var fail = false
+
+        override suspend fun preserve(record: AutosaveConflictRecord): PreservedConflict {
+            if (fail) throw IllegalStateException("journal unavailable")
+            records += record
+            return PreservedConflict("autosave-conflict-test", "/data/conflicts/autosave-conflict-test.json", ConflictStorage.SERVER)
+        }
+    }
+
+    private suspend fun conflictSession(
+        remote: FakeRemote,
+        drafts: FakeDrafts,
+        archive: ConflictArchive?,
+        scope: kotlinx.coroutines.CoroutineScope,
+    ): EditorSession {
+        val session = EditorSession(FileSaveCoordinator(remote, drafts, archive), drafts, scope)
+        session.open("p", "f.md", "标题\n段落一\n段落二\n段落三\n结尾", "r0")
+        session.edit("标题\n段落一\n段落二本地\n段落三\n结尾")
+        return session
+    }
+
+    @Test
+    fun `conflict archives all three sides and exposes recovery id`() = runTest {
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二服务器\n段落三\n结尾"
+            serverRevision = "r2"
+        }
+        val archive = RecordingArchive()
+        val session = conflictSession(remote, FakeDrafts(), archive, this)
+        advanceUntilIdle()
+
+        val conflict = session.state.value.conflict
+        assertNotNull(conflict)
+        assertEquals("autosave-conflict-test", conflict?.recoveryId)
+
+        val record = archive.records.single()
+        assertEquals("workspace_file", record.resource)
+        assertEquals("p", record.scope)
+        assertEquals("f.md", record.id)
+        assertEquals("merge_non_overlap_prefer_local", record.strategy)
+        assertEquals("r0", record.base.revision)
+        assertEquals("标题\n段落一\n段落二\n段落三\n结尾", record.base.value)
+        assertEquals("标题\n段落一\n段落二本地\n段落三\n结尾", record.local.value)
+        assertEquals("r2", record.external.revision)
+        assertEquals("标题\n段落一\n段落二服务器\n段落三\n结尾", record.external.value)
+        assertTrue(record.merged.value.contains("<<<<<<<"))
+        assertEquals(listOf(emptyList<String>()), record.conflictPaths)
+    }
+
+    @Test
+    fun `archive failure still leaves the conflict choice available`() = runTest {
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二服务器\n段落三\n结尾"
+            serverRevision = "r2"
+        }
+        val archive = RecordingArchive().apply { fail = true }
+        val session = conflictSession(remote, FakeDrafts(), archive, this)
+        advanceUntilIdle()
+
+        assertEquals(SaveStatus.CONFLICT, session.state.value.saveStatus)
+        assertNotNull(session.state.value.conflict)
+        assertNull(session.state.value.conflict?.recoveryId)
+    }
+
+    @Test
+    fun `keep local writes merged text against the server revision`() = runTest {
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二服务器\n段落三\n结尾"
+            serverRevision = "r2"
+        }
+        val session = conflictSession(remote, FakeDrafts(), RecordingArchive(), this)
+        advanceUntilIdle()
+
+        session.keepLocalVersion()
+        advanceUntilIdle()
+
+        assertNull(session.state.value.conflict)
+        assertEquals(SaveStatus.SAVED, session.state.value.saveStatus)
+        // 冲突后第一次真正落盘的 PUT 必须带服务器 revision，不能拿旧 base 盲覆盖。
+        assertEquals("r2", remote.savedBaseRevisions.first())
+        assertEquals("r2", remote.serverRevision)
+        assertEquals(2, remote.saveCount())
+    }
+
+    @Test
+    fun `load external replaces the body and never pushes the local edit`() = runTest {
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二服务器\n段落三\n结尾"
+            serverRevision = "r2"
+        }
+        val drafts = FakeDrafts()
+        val session = conflictSession(remote, drafts, RecordingArchive(), this)
+        advanceUntilIdle()
+        val savesAfterConflict = remote.saveCount()
+
+        session.loadExternalVersion()
+        advanceUntilIdle()
+
+        assertEquals("标题\n段落一\n段落二服务器\n段落三\n结尾", session.state.value.content)
+        assertEquals("标题\n段落一\n段落二服务器\n段落三\n结尾", session.state.value.baseContent)
+        assertEquals("r2", session.state.value.baseRevision)
+        assertEquals(SaveStatus.IDLE, session.state.value.saveStatus)
+        assertNull(session.state.value.conflict)
+        // 丢弃本地改动：不发 PUT，草稿也清掉，避免下次打开又被当成未提交编辑恢复。
+        assertEquals(savesAfterConflict, remote.saveCount())
+        assertNull(drafts.loadDraft("p\u0000f.md"))
+
+        // 之后继续编辑仍走正常自动保存。
+        session.edit("标题\n段落一\n段落二服务器改\n段落三\n结尾")
+        advanceUntilIdle()
+        assertTrue(remote.saveCount() > savesAfterConflict)
     }
 }
