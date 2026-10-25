@@ -76,6 +76,7 @@
 | ID | 决定 | 依据 | 决定人 / 日期 | 影响与替代操作 |
 |---|---|---|---|---|
 | SD-01 | Web 端（固定基线 `85ec97c`）在挂载工作台时回收所有 `attached=0` 且不在其本地持久化标签中的终端会话，**属基线行为，Android 侧不作对抗**。Android 保证：不静默重建空 PTY、7–25s 内如实提示、只 DELETE 自身会话、被回收后保留最近 64KB 只读历史、进程被杀重启免登录并秒级重挂（ADR-12） | [R06](#4-需要运行证据的事项) 真实 Chrome 实测（对照 + 隔离变量） | Hsing / 2026-10-24 | 影响：PTY 被回收后无法在原 shell 继续操作；替代操作：重新连接新建会话 + 通过「查看历史」回看本地留存输出。范围仅限终端 PTY 生命周期，不影响其余权限表现；不得据此放宽其他判据 |
+| SD-02 | 固定基线**没有「文档内图片上传」**：Web 编辑器的图片能力是「生成插画」与引用项目内相对资源（`assets/…`），后端的上传接口只有 `POST /api/books/cover/upload`、`POST /api/projects/:id/book/lore/items/:id/materials/upload`、`POST /api/update/upload`，**没有项目文件上传**。Android 侧因此不实现上传，改为「从项目 `assets/` 选择既有素材插入」，相对路径 / 渲染 / 失败保留 alt 与基线一致 | 基线源码 `web/src/components/Editor/WritingDocumentEditor.tsx`、`MarkdownContentEditor.tsx`（TipTap + TableKit，无上传入口）；`internal/api/routes.go` 路由清单 | Hsing / 2026-10-26 | 影响：不能从相册直接往正文插图；替代操作：先把图片放进项目 `assets/`（走 Web 端既有入口或外部工作流），再在编辑器「图」里选择。矩阵 WRI-007 的验收口径按此调整（[证据](../evidence/g2c-table-images/xiaomi-14-pro/result.md)），不得据此放宽其它判据 |
 
 ## 5. 平台差异登记
 

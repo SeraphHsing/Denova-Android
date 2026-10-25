@@ -204,6 +204,22 @@ class MainActivity : AppCompatActivity() {
                                                 if (c == null) null
                                                 else com.denova.novara.feature.editor.PreviewAssetLoader(c, pid, path)
                                             },
+                                            // 从项目 assets/ 里挑图片插入（基线没有文档图片上传接口）。
+                                            assetLister = { pid ->
+                                                val c = connectionViewModel.client
+                                                if (c == null) {
+                                                    emptyList()
+                                                } else {
+                                                    runCatching {
+                                                        c.resolveProjectFiles(pid, listOf("assets"), recursive = true)
+                                                            .results.flatMap { it.directories }
+                                                            .flatMap { it.entries }
+                                                            .filter { !it.isDir && it.name.substringAfterLast('.', "").lowercase() in
+                                                                setOf("png", "jpg", "jpeg", "gif", "webp") }
+                                                            .map { it.path }
+                                                    }.getOrDefault(emptyList())
+                                                }
+                                            },
                                         )
                                     }
                                     composable("game") {

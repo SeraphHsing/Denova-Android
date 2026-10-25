@@ -113,6 +113,20 @@ class PreviewAssetLoader(
             return segments.joinToString("/")
         }
 
+        /**
+         * 反向换算：把项目内绝对路径改成相对当前文档的引用（插入图片时写进 Markdown 的形态）。
+         * 与 [resolveAssetPath] 互为逆运算，两边都有单测。
+         */
+        fun relativeAssetPath(documentPath: String, assetPath: String): String {
+            val from = documentPath.substringBeforeLast('/', "").split('/').filter { it.isNotEmpty() }
+            val to = assetPath.split('/').filter { it.isNotEmpty() }
+            if (to.isEmpty()) return assetPath
+            var common = 0
+            while (common < from.size && common < to.size - 1 && from[common] == to[common]) common++
+            val up = List(from.size - common) { ".." }
+            return (up + to.drop(common)).joinToString("/").ifEmpty { assetPath }
+        }
+
         /** 给每个 `<table>` 包一层可横向滚动的容器（WRI-006 宽表格不被裁掉）。 */
         fun wrapTables(html: String): String = html
             .replace("<table>", "<div class=\"table-scroll\"><table>")

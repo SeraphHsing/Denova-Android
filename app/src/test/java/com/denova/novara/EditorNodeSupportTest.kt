@@ -69,6 +69,22 @@ class EditorNodeSupportTest {
     }
 
     @Test
+    fun `relative path for inserted image round-trips through resolve`() {
+        val rel = PreviewAssetLoader.relativeAssetPath("chapters/01.md", "assets/redpanda.png")
+        assertEquals("../assets/redpanda.png", rel)
+        assertEquals(
+            "assets/redpanda.png",
+            PreviewAssetLoader.resolveAssetPath("chapters/01.md", rel),
+        )
+        assertEquals("assets/redpanda.png", PreviewAssetLoader.relativeAssetPath("01.md", "assets/redpanda.png"))
+        assertEquals("d.png", PreviewAssetLoader.relativeAssetPath("a/b/c.md", "a/b/d.png"))
+        assertEquals(
+            "a/b/d.png",
+            PreviewAssetLoader.resolveAssetPath("a/b/c.md", "d.png"),
+        )
+    }
+
+    @Test
     fun `image html keeps alt text so failed loads stay readable`() {
         val html = MarkdownDocument.parse("![封面](assets/cover.png)").toHtml()
         assertTrue(html.contains("<img"))

@@ -62,7 +62,7 @@
 | G1-d | 401 不误退新登录 | 留待 P3 | 请求世代 `RequestGeneration` 已在 P2 落地（`logout` 退休）；端到端需双会话 + 延迟注入，按请求密集路径在 P3 接入 |
 | G2-a | 无编辑往返（源码 / 富文本 / 预览） | 通过 | 三模式切换，返回源码内容与打开时一致 |
 | G2-b | 修改后对照语料 | 通过 | 21 份 fixture + `corpus.md`：预览节点（标题 / 内联 / 两种列表 / 引用 / 代码块 / GFM 表格 / 图片）全部渲染；限定：富文本仅隐藏内联标记，块级标记仍显原文 |
-| G2-c | 实际支持全部基线节点 | 部分（2026-10-26） | 已通过：预览图片带会话取图渲染、GFM 表格模板插入与落盘、H2/列表/引用/链接/图片模板、中文 IME 组合态（组合期间不落盘、提交后落盘，[证据](../evidence/g2c-nodes/xiaomi-14-pro/result.md)）、选区引用（WRI-009）。仍缺：表格行列选择 / 单元格工具栏、图片上传、撤销重做栈 |
+| G2-c | 实际支持全部基线节点 | 通过（2026-10-26） | 预览图片带会话取图渲染、GFM 表格模板插入与落盘、H2/列表/引用/链接/图片模板、中文 IME 组合态（组合期间不落盘、提交后落盘，[证据](../evidence/g2c-nodes/xiaomi-14-pro/result.md)）、选区引用（WRI-009）；**表格行列操作**（光标在表格内出现 行+/行−/列+/列−/删表，逐项真机并读回服务端 revision）与**从项目素材插入图片**（按 SD-02 口径，基线无文档上传接口）已真机通过（[证据](../evidence/g2c-table-images/xiaomi-14-pro/result.md)）。未做：合并单元格 / 列宽拖拽（基线 `resizable:false`）、撤销重做栈 |
 | G2-d | D03 编辑器性能预算实测通过 | 通过 | D03-W 四项上限 2026-10-24 评审通过（[06 §4](06-development-and-validation.md#d03-性能基准与冻结记录)） |
 | G3-a | Web / App 并发案例 | 通过 | 无重叠并发 409 → 三方合并 → 读回两端修改同时保留，并修复「合并结果未采纳导致下次保存覆盖对端」缺陷 |
 | G3-b | 重叠冲突真实双端用例 | 通过（2026-10-25 补测） | 用 `tools/g3_dual_editor.py --heading` 让脚本改写标题行、App 在标题行插入字符，得到真实重叠冲突：`W Editor: conflict count=1`，正文出现 `<<<<<<< 本地修改 / ======= / >>>>>>> 服务器修改`，冲突态「保存」禁用、新增「已解决，保存」放行后写入成功。**同轮修复**：`applyConflict` 之前把带标记的合并结果当 base，导致解决后保存被当成无改动而静默跳过（[证据](../evidence/wri-011/xiaomi-14-pro/result.md)） |
@@ -87,7 +87,7 @@
 
 **P1 退出结论（2026-10-24，项目负责人 Hsing 决定）：P1 退出。** 六关卡均有代码与真机 / 真实服务器往返证据；未满足项 9 条已全部定性（环境受限 2 条：G1-b、G6-a；留待 P3 7 条：G1-d、G2-c、G3-b/c/d、G4-d、G6-b），无未定性缺口，因此不再作为 P1 阻塞。这些条目在补齐前不得在复刻矩阵中标记完成；复核位置：G1-d / G2-c / G3-b·c·d / G4-d 在 P3，G6-b 随 P4-D，G4-d 最终在 P6 发布候选复核。
 
-**P3 回补记录：** 2026-10-25 G3-d 已在 P3 修复并真机补测通过（见上表与 [证据](../evidence/g3-d/xiaomi-14-pro/result.md)）；同日 G3-b、G3-c 随 WRI-011 补测通过（[证据](../evidence/wri-011/xiaomi-14-pro/result.md)），G3 关卡已无留项。2026-10-26 G4-d 以两个不同构建覆盖安装补测通过（[证据](../evidence/g4-d/xiaomi-14-pro/result.md)），G2-c 的图片 / 表格 / IME 组合态部分真机通过（[证据](../evidence/g2c-nodes/xiaomi-14-pro/result.md)）。留待 P3 条目剩 3 条（G1-d、G2-c 的节点操作、G6-b）。
+**P3 回补记录：** 2026-10-25 G3-d 已在 P3 修复并真机补测通过（见上表与 [证据](../evidence/g3-d/xiaomi-14-pro/result.md)）；同日 G3-b、G3-c 随 WRI-011 补测通过（[证据](../evidence/wri-011/xiaomi-14-pro/result.md)），G3 关卡已无留项。2026-10-26 G4-d 以两个不同构建覆盖安装补测通过（[证据](../evidence/g4-d/xiaomi-14-pro/result.md)），G2-c 的图片 / 表格 / IME 组合态与行列操作真机通过（[证据](../evidence/g2c-nodes/xiaomi-14-pro/result.md)、[证据](../evidence/g2c-table-images/xiaomi-14-pro/result.md)）。留待 P3 条目剩 2 条（G1-d、G6-b）。
 
 ## 4. P2：工程基础与公共界面
 

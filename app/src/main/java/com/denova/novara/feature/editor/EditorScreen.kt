@@ -14,14 +14,18 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
@@ -38,11 +42,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.res.stringResource
@@ -56,7 +66,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.denova.novara.R
 import com.denova.novara.core.editor.MarkdownDocument
+import com.denova.novara.core.editor.MarkdownTable
 import com.denova.novara.core.network.TextSelectionRef
+import kotlinx.coroutines.launch
 
 private enum class EditorMode { SOURCE, RICH, PREVIEW }
 
@@ -79,6 +91,8 @@ fun EditorScreen(
     onQuoteSelection: (projectId: String, selection: TextSelectionRef) -> Unit = { _, _ -> },
     /** 预览图片加载器工厂（WRI-007）；为空时预览只渲染语义、不拉取资源。 */
     loaderFactory: ((projectId: String, documentPath: String) -> PreviewAssetLoader?)? = null,
+    /** 项目内可用图片素材（WRI-007 插入）；为空时「图」按钮只插手填模板。 */
+    assetLister: (suspend (projectId: String) -> List<String>)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val tabsState by viewModel.tabs.collectAsState()
@@ -86,6 +100,21 @@ fun EditorScreen(
     var projectId by remember { mutableStateOf(currentProjectId) }
     var filePath by remember { mutableStateOf("") }
     var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
+    val scope = rememberCoroutineScope()
+    var imagePicker by remember { mutableStateOf(false) }
+    var imageCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
+    var imageLoading by remember { mutableStateOf(false) }
+    // 光标在当前表格内时才显示行列操作（对齐 Web 里表格作为节点、按单元格操作的行为）。
+    val tableBlock = remember(textFieldValue.text, textFieldValue.selection) {
+        MarkdownTable.locate(textFieldValue.text, textFieldValue.selection.start)
+    }
+
+    /** 应用一次表格改写：正文与光标一起换掉，再交给会话走自动保存。 */
+    fun applyTable(edit: MarkdownTable.Edit?) {
+        if (edit == null) return
+        textFieldValue = TextFieldValue(edit.text, TextRange(edit.caret))
+        viewModel.updateContent(edit.text)
+    }
     // 资源加载依赖「哪个项目 / 哪个文档」：换文件就重建，相对路径按该文档目录解析。
     val assetLoader = remember(uiState.projectId, uiState.filePath, loaderFactory) {
         val pid = uiState.projectId.ifBlank { currentProjectId }
@@ -248,7 +277,35 @@ fun EditorScreen(
                 FormatButton(">") { textFieldValue = insertBlock(textFieldValue, "> 引用\n"); viewModel.updateContent(textFieldValue.text) }
                 FormatButton("表") { textFieldValue = insertBlock(textFieldValue, TABLE_TEMPLATE); viewModel.updateContent(textFieldValue.text) }
                 FormatButton("链") { textFieldValue = insertBlock(textFieldValue, "[链接文字](assets/)\n"); viewModel.updateContent(textFieldValue.text) }
-                FormatButton("图") { textFieldValue = insertBlock(textFieldValue, "![图片说明](assets/)\n"); viewModel.updateContent(textFieldValue.text) }
+                FormatButton("图") {
+                    // 有素材列表时先选文件（WRI-007 的「从项目素材插入」），否则退回手填模板。
+                    val lister = assetLister
+                    if (lister == null) {
+                        textFieldValue = insertBlock(textFieldValue, "![图片说明](assets/)\n")
+                        viewModel.updateContent(textFieldValue.text)
+                    } else {
+                        val pid = uiState.projectId.ifBlank { currentProjectId }
+                        imagePicker = true
+                        imageLoading = true
+                        imageCandidates = emptyList()
+                        scope.launch {
+                            imageCandidates = runCatching { lister(pid) }.getOrDefault(emptyList())
+                            imageLoading = false
+                        }
+                    }
+                }
+            }
+            if (tableBlock != null) {
+                // 光标在表格内：行列增删与删表（WRI-006），改完立刻回到正文并触发自动保存。
+                val caretStart = textFieldValue.selection.start
+                val text = textFieldValue.text
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                    FormatButton("行+") { applyTable(MarkdownTable.insertRow(text, caretStart, below = true)) }
+                    FormatButton("行−") { applyTable(MarkdownTable.deleteRow(text, caretStart)) }
+                    FormatButton("列+") { applyTable(MarkdownTable.insertColumn(text, caretStart, right = true)) }
+                    FormatButton("列−") { applyTable(MarkdownTable.deleteColumn(text, caretStart)) }
+                    FormatButton("删表") { applyTable(MarkdownTable.deleteTable(text, caretStart)) }
+                }
             }
         }
 
@@ -261,7 +318,9 @@ fun EditorScreen(
                     viewModel.updateContent(it.text, composing = it.composition != null)
                 },
                 textStyle = TextStyle(fontSize = 16.sp),
-                modifier = Modifier.fillMaxSize().padding(12.dp),
+                modifier = Modifier.fillMaxSize().padding(12.dp).tableTabKeys(textFieldValue) {
+                    applyTable(it)
+                },
             )
             EditorMode.RICH -> BasicTextField(
                 value = textFieldValue,
@@ -272,7 +331,9 @@ fun EditorScreen(
                 },
                 visualTransformation = MarkdownVisualTransformation(),
                 textStyle = TextStyle(fontSize = 16.sp),
-                modifier = Modifier.fillMaxSize().padding(12.dp),
+                modifier = Modifier.fillMaxSize().padding(12.dp).tableTabKeys(textFieldValue) {
+                    applyTable(it)
+                },
             )
             EditorMode.PREVIEW -> MarkdownPreview(
                 source = uiState.content,
@@ -280,6 +341,69 @@ fun EditorScreen(
                 modifier = Modifier.fillMaxSize(),
             )
         }
+
+        if (imagePicker) {
+            // 从项目素材里选一张插入（不新增上传接口：基线只有书籍封面 / 资料库素材上传）。
+            AlertDialog(
+                onDismissRequest = { imagePicker = false },
+                title = { Text(stringResource(R.string.editor_pick_image)) },
+                text = {
+                    when {
+                        imageLoading -> Text(stringResource(R.string.loading))
+                        imageCandidates.isEmpty() -> Text(stringResource(R.string.editor_image_empty))
+                        else -> LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                            items(imageCandidates, key = { it }) { path ->
+                                Text(
+                                    path,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            val rel = PreviewAssetLoader
+                                                .relativeAssetPath(uiState.filePath, path)
+                                            val name = path.substringAfterLast('/')
+                                            textFieldValue = insertBlock(
+                                                textFieldValue,
+                                                "![$name]($rel)\n",
+                                            )
+                                            viewModel.updateContent(textFieldValue.text)
+                                            imagePicker = false
+                                        }
+                                        .padding(vertical = 8.dp),
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { imagePicker = false }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                },
+            )
+        }
+    }
+}
+
+/**
+ * 表格内 Tab 跳到下一个单元格（对齐 Web TipTap 表格的默认行为）。
+ * 不在表格里时不消费事件，保持焦点移动的原生行为。
+ */
+@Composable
+private fun Modifier.tableTabKeys(
+    value: TextFieldValue,
+    onEdit: (MarkdownTable.Edit?) -> Unit,
+): Modifier = this.onPreviewKeyEvent { event ->
+    if (event.type == KeyEventType.KeyDown && event.key == Key.Tab) {
+        val edit = MarkdownTable.nextCell(value.text, value.selection.start)
+        if (edit == null) {
+            false
+        } else {
+            onEdit(edit)
+            true
+        }
+    } else {
+        false
     }
 }
 
