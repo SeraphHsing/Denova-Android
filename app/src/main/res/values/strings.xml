@@ -194,4 +194,5 @@
     <string name="agent_uncertain_hint">Checking with the server…</string>
     <string name="agent_reconcile">Check again</string>
     <string name="agent_waiting_ask">Waiting for answer</string>
+    <string name="agent_stream_interrupted">Stream ended before completion; the result may be incomplete</string>
 </resources>

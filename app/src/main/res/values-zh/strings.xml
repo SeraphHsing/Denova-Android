@@ -194,4 +194,5 @@
     <string name="agent_uncertain_hint">正在向服务端核对…</string>
     <string name="agent_reconcile">重新核对</string>
     <string name="agent_waiting_ask">等待回答</string>
+    <string name="agent_stream_interrupted">流在完成前中断，结果可能不完整</string>
 </resources>

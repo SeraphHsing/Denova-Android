@@ -596,6 +596,24 @@ fun AgentScreen(
         state.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
         }
+        // 流级错误原因（AGT-009）：服务端 error 帧的 errorText；没有具体原因时说明「为什么是错误」，
+        // 否则用户只看到「状态：错误」而不知道这一轮为什么没跑完。
+        run {
+            val streamError = state.ui.errorText?.takeIf { it.isNotBlank() }
+            val fallback = if (state.ui.phase == AgentPhase.ERROR && streamError == null) {
+                stringResource(R.string.agent_stream_interrupted)
+            } else {
+                null
+            }
+            (streamError ?: fallback)?.let { reason ->
+                Text(
+                    reason,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
+        }
         // 发送结果不明（AGT-008）：明确标出 uncertain，并提供「重新核对」；不会自动重发新命令。
         if (state.uncertainCommandId.isNotBlank() || state.reconcileNotice.isNotBlank()) {
             Row(

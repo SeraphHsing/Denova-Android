@@ -7,6 +7,8 @@ import com.denova.novara.core.stream.AgentStreamTransport
 import com.denova.novara.core.stream.AgentUiChunk
 import com.denova.novara.core.stream.AgentUiFrame
 import com.denova.novara.core.stream.GameStreamError
+import com.denova.novara.core.stream.completesTurn
+import com.denova.novara.core.stream.isTerminal
 import com.denova.novara.core.stream.RecoveryAction
 import com.denova.novara.core.stream.RecoveryReceipt
 import com.denova.novara.core.stream.decideAgentRecovery
@@ -157,6 +159,50 @@ class AgentRecoveryTest {
         assertEquals(2, reloads)
         assertEquals(3, transport.streamCalls.size)
         assertEquals(listOf(AgentUiFrame.Done), frames)
+    }
+
+    @Test
+    fun `clean eof without completion marker rehydrates and reattaches`() = runBlocking {
+        // AGT-009 补：读到的是一次干净 EOF（FIN）但既没有 [DONE] 也没有 finish/abort/error，
+        // 说明流被切断；必须按中断重挂，不能把半截结果当成这一轮完成。
+        val transport = FakeTransport(AgentActiveView(active = true, taskId = "t1"))
+        val partial = AgentUiFrame.Chunk(AgentUiChunk(type = "text-delta", delta = "half"))
+        val finish = AgentUiFrame.Chunk(AgentUiChunk(type = "finish"))
+        transport.streams.add(flowOf(partial))
+        transport.streams.add(flowOf(finish, AgentUiFrame.Done))
+        var reloads = 0
+        val coordinator = AgentStreamRecoveryCoordinator(transport, retryDelayMillis = 0) { reloads++ }
+
+        val frames = coordinator.recover("s1").toList()
+
+        assertEquals(listOf(partial, finish, AgentUiFrame.Done), frames)
+        assertEquals(1, reloads)
+        assertEquals(2, transport.streamCalls.size)
+    }
+
+    @Test
+    fun `done marker ends recovery without reattaching`() = runBlocking {
+        val transport = FakeTransport(AgentActiveView(active = true, taskId = "t1"))
+        transport.streams.add(flowOf(AgentUiFrame.Chunk(AgentUiChunk(type = "finish")), AgentUiFrame.Done))
+        var reloads = 0
+        val coordinator = AgentStreamRecoveryCoordinator(transport, retryDelayMillis = 0) { reloads++ }
+
+        val frames = coordinator.recover("s1").toList()
+
+        assertEquals(2, frames.size)
+        assertEquals(1, transport.streamCalls.size)
+        assertEquals(0, reloads)
+    }
+
+    @Test
+    fun `completion markers cover done and terminal chunk types`() {
+        assertTrue(AgentUiFrame.Done.completesTurn())
+        assertTrue(AgentUiChunk(type = "finish").isTerminal)
+        assertTrue(AgentUiChunk(type = "abort").isTerminal)
+        assertTrue(AgentUiChunk(type = "error").isTerminal)
+        // 内容帧不是完成标记：只有它出现就结束的流一律按截断处理。
+        assertEquals(false, AgentUiChunk(type = "text-delta").isTerminal)
+        assertEquals(false, AgentUiFrame.Chunk(AgentUiChunk(type = "text-delta")).completesTurn())
     }
 
     @Test

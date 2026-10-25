@@ -32,7 +32,7 @@ python tools/stream_cut_proxy.py --listen 0.0.0.0:18098 --target http://192.168.
 | 必需参数 | `session_id`（缺失 400 `agent_runtime.invalid_binding`）+ `task_id`（缺失 400） | 两者必带（**本次修复点**） |
 | 任务匹配 | `ActiveTaskForSession(session) != task_id` → 409 `agent_runtime.rehydrate_required` | 走 rehydrate 分支：重读 canonical 后重挂 |
 | 游标 | `after`（十进制 uint64，取自 active 的 `stream_cursor`）；Web 只在「规范历史恢复后的首个连接」带 | 每次重挂前 `reloadCanonical()`，再带最新 `stream_cursor` |
-| 断线判定 | 读流异常 → 重读 canonical + 重挂，最多 8 次 | `transferFailures` 与 active 探测共用一个预算，超限 `stream retry exhausted` |
+| 断线判定 | 读流异常 → 重读 canonical + 重挂，最多 8 次；**干净 EOF 只要缺完成标记（`[DONE]` / finish / abort / error）同样按断线处理** | `transferFailures` 与 active 探测共用一个预算，超限 `stream retry exhausted`；`AgentUiFrame.completesTurn()` 统一判定 |
 | 文本不重复 | Web 按 part 稳定身份合并 | `reloadCanonical` 重建消息部件并清空流式正文（`ui.content` / `ui.thinking`），重挂后的增量接在历史之后 |
 
 ## 3. 实测结果
@@ -99,10 +99,53 @@ I Agent: attach task=task-bb2660c3de54acbb0d39a661d49d9494-21 cursor=411 attempt
 
 终态：`状态：完成`，正文完整显示，`agent-execution-summary · completed`，无重复段落（每次重挂前 `reloadCanonical` 清空流式正文，历史由 canonical 重建）。
 
-## 4. 结论与剩余缺口
+## 4. 干净 EOF 判定（`--cut-mode close`）
+
+FIN 断开不会抛异常，客户端读到的是一次「正常结束」。判定依据是完成标记而不是异常：服务端收尾固定写 `finish`（中止 `abort`、失败 `error`）再写 `data: [DONE]`，所以「`[DONE]` 与 finish/abort/error 都没出现就结束」等于被切断。实现为 `AgentUiFrame.completesTurn()`（`Done` 或终态 chunk），coordinator 与发送路径共用。
+
+`--cuts 2 --cut-mode close`（首响应 + 重挂各截断一次）实测：
+
+```text
+20:46:20 POST /api/chat -> 200
+20:46:20 cut stream /api/chat after 1200 bytes (cuts left=1)
+20:46:22 stream cut after 1200 bytes mode=close
+20:46:22 GET /api/session/messages?session_id=default&limit=20     ← 核对
+20:46:23 GET /api/chat/stream?session_id=default&task_id=...-22&after=154
+20:46:23 cut stream ... after 1200 bytes (cuts left=0)
+20:46:24 GET /api/chat/stream?session_id=default&task_id=...-22&after=351 -> 200
+I Agent: stream ended without completion marker; reconcile instead of resend
+I Agent: reconcile landed cmd=d2daa4eb-7e50-4110-96b9-3967704458de
+I Agent: attach task=task-bb2660c3de54acbb0d39a661d49d9494-22 cursor=154 attempt=0
+W Agent: stream interrupted (attempt 1/8); rehydrate + reattach
+W Agent: ...Coordinator$TruncatedAgentStream: agent stream ended without completion marker
+I Agent: attach task=task-bb2660c3de54acbb0d39a661d49d9494-22 cursor=351 attempt=1
+```
+
+终态 `状态：完成`。即：干净 FIN 现在与 RST 走同一条恢复路径，而不是「静默停在半截 + 状态：错误」。
+
+## 5. 流级错误原因与放弃恢复后的兜底文案
+
+`--inject-error`（在截断点改注入一条 `error` 帧并以 `[DONE]` 收尾）：
+
+```text
+20:49:24 inject error frame at 1200 bytes: model-overloaded-injected
+```
+
+界面（`uiautomator` 文本）：`状态：错误` + `model-overloaded-injected`，且**没有**触发核对/重挂（`error` 属终态帧，客户端不会在明确的错误上打转）。
+
+恢复预算耗尽（`--cuts 20`，连续失败超过 8 次）时：
+
+```text
+W Agent: stream retry exhausted after 9 failures session=default
+```
+
+界面：`状态：错误` + `流在完成前中断，结果可能不完整`（无服务端 `errorText` 时的兜底说明）。
+
+## 6. 结论与剩余缺口
 
 - 通过：附接 → 断流 → 重读 canonical → 重挂 → 再断流 → 再重挂 → 完成，全程无重复正文，命令不重复下发；发送回包丢失时不自动重发，核对结论以服务端 canonical 历史为准。
-- 缺口（本次未改，需单独定案）：
-  1. **干净 EOF 不判为中断**：`collectWithIdleGuard` 正常返回后，只要没有 terminal 帧就只看 `finishStream` 的 RUNNING→ERROR 兜底，既不重挂也不提示「可恢复」；`reset` 形态（抛异常）才会进入恢复链。要覆盖需按「未收到 `finish`/`abort` 帧」判定截断。
-  2. **流级错误原因不显示**：`AgentUiState.errorText`（`error` 帧的 `errorText`）没有任何渲染点，用户只看得到「状态：错误」。
-  3. 发送路径的断流恢复依赖「核对 → `start()` → 重挂」二次跳转，`sendJob` 本身不会重挂；本场景验证通过，但多一次 canonical 全量拉取。
+- 通过：干净 EOF（FIN）按「缺完成标记」判为截断，发送路径与挂接路径都进入恢复链；流级错误原因与「放弃恢复」的兜底文案都渲染在状态行下方。
+- 缺口：
+  1. 发送路径的断流恢复依赖「核对 → `start()` → 重挂」二次跳转，`sendJob` 本身不会重挂；本场景验证通过，但多一次 canonical 全量拉取。
+  2. 预算耗尽后只有兜底文案，没有「手动重新挂接」以外的恢复入口（`recovery_actions` 未接）。
+  3. 终态判定把 `error` 帧当完成：若服务端在 `error` 之后仍继续产出内容，客户端不会重挂（按当前后端收尾行为这是正确取舍，协议变化时需复核）。

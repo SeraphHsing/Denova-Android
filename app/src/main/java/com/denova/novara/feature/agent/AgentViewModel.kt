@@ -35,6 +35,7 @@ import com.denova.novara.core.stream.AgentUiState
 import com.denova.novara.core.stream.GameStreamError
 import com.denova.novara.core.stream.buildAgentHistoryNarrative
 import com.denova.novara.core.stream.collectWithIdleGuard
+import com.denova.novara.core.stream.completesTurn
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -215,6 +216,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             sessionId = sessionId,
             sending = true,
             error = null,
+            // 上一轮的错误原因不能挂在新的这一轮上。
+            ui = _state.value.ui.copy(errorText = null),
             reconcileNotice = "",
             uncertainCommandId = "",
             uncertainMessage = "",
@@ -223,6 +226,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             commands.save(record)
             try {
                 var accepted = false
+                var completed = false
                 val idleTerminated = client.postChat(request).collectWithIdleGuard(
                     isTaskFinished = {
                         try {
@@ -234,6 +238,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     },
                     onEvent = { frame ->
+                        if (frame.completesTurn()) completed = true
                         if (!accepted) {
                             accepted = true
                             commands.updateStatus(commandId, CommandStatus.ACCEPTED)
@@ -246,14 +251,22 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         onFrame(frame)
                     },
                 )
-                if (!accepted) {
-                    commands.updateStatus(commandId, CommandStatus.ACCEPTED)
-                    _state.value = _state.value.copy(sending = false)
-                    _selections.value = emptyList()
-                }
-                if (idleTerminated) {
-                    DenovaLog.w("Agent", "stream idle timeout; task finished")
-                    _state.value = _state.value.copy(error = "流空闲超时，任务可能已结束")
+                // 读流干净结束但没有完成标记（AGT-009）：FIN 也可能是被切断，此时既不能判成功
+                // 也不能重发——按「结果不明」核对，服务端收到就挂接补结果。
+                if (!completed && !idleTerminated && !_state.value.abortPending) {
+                    commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
+                    DenovaLog.w("Agent", "stream ended without completion marker; reconcile instead of resend")
+                    markUncertain(commandId, text, baseline)
+                } else {
+                    if (!accepted) {
+                        commands.updateStatus(commandId, CommandStatus.ACCEPTED)
+                        _state.value = _state.value.copy(sending = false)
+                        _selections.value = emptyList()
+                    }
+                    if (idleTerminated) {
+                        DenovaLog.w("Agent", "stream idle timeout; task finished")
+                        _state.value = _state.value.copy(error = "流空闲超时，任务可能已结束")
+                    }
                 }
             } catch (e: GameStreamError) {
                 val rejected = e.status in 400..499 && e.code != null && e.code != "agent_runtime.stream_attached"

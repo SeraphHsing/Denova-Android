@@ -43,12 +43,17 @@ class AgentStreamRecoveryCoordinator(
                         "attach task=${decision.taskId} cursor=${decision.after ?: "-"} attempt=$transferFailures",
                     )
                     try {
+                        var completed = false
                         transport.agentStream(sessionId, decision.taskId, decision.after).collect { frame ->
                             if (frame is AgentUiFrame.Chunk && isRehydrateChunk(frame.chunk)) {
                                 throw AgentRehydrateSignal
                             }
+                            if (frame.completesTurn()) completed = true
                             emit(frame)
                         }
+                        // 干净 EOF 不等于正常结束（AGT-009）：没收到 `[DONE]` 或终态帧就是被切断，
+                        // 交给下面的重挂分支处理，否则半截结果会被当成完成。
+                        if (!completed) throw TruncatedAgentStream
                         return@flow
                     } catch (_: AgentRehydrateSignal) {
                         transferFailures = 0
@@ -108,6 +113,9 @@ class AgentStreamRecoveryCoordinator(
         chunk.type == REHYDRATE_CHUNK_TYPE
 
     private object AgentRehydrateSignal : Exception()
+
+    /** 读流在没有完成标记的情况下结束（`[DONE]` 与 finish/abort/error 都没出现）：按断流处理。 */
+    private object TruncatedAgentStream : Exception("agent stream ended without completion marker")
 
     private companion object {
         const val REHYDRATE_CHUNK_TYPE = "task_rehydrate_required"

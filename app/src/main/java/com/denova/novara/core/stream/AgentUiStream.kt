@@ -32,6 +32,19 @@ sealed interface AgentUiFrame {
 }
 
 /**
+ * 终态帧：服务端跑完一轮会先写 `finish`（用户中止为 `abort`、运行失败为 `error`），再写 `data: [DONE]`。
+ * 这两个信号都没收到就说明读流在中途被切断——即使读到的是一次干净 EOF（FIN），也不能当作本轮完成。
+ */
+val AgentUiChunk.isTerminal: Boolean
+    get() = type == "finish" || type == "abort" || type == "error"
+
+/** 这一帧是否携带「本轮已结束」的语义：`[DONE]` 标记，或 finish / abort / error 终态帧。 */
+fun AgentUiFrame.completesTurn(): Boolean = when (this) {
+    is AgentUiFrame.Done -> true
+    is AgentUiFrame.Chunk -> chunk.isTerminal
+}
+
+/**
  * Agent UI message 流解析器：`data: <json>` 帧，`data: [DONE]` 结束。
  * 复用 [SseParser] 的分帧（该流没有 id/event 行）；未知 type 也原样返回，由上层决定忽略。
  */
