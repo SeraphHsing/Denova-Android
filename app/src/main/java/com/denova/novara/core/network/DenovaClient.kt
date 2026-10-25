@@ -558,6 +558,102 @@ class DenovaClient(
         }
     }
 
+    /**
+     * 创建版本（VER-001）：`POST .../versions`，body 只有 `message`。
+     *
+     * 工作区没有变更时服务端返回「当前工作区没有可保存的变更」，原样冒泡给界面提示。
+     */
+    suspend fun versionCreate(projectId: String, message: String): VersionCommandResult {
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/versions")
+            .build()
+        val body = json.encodeToString(
+            VersionCreateRequest.serializer(),
+            VersionCreateRequest(message = message.trim()),
+        )
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(
+                Request.Builder().url(url).post(body.toRequestBody(jsonMediaType)).build(),
+            ).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(VersionCommandResult.serializer(), text)
+            }
+        }
+    }
+
+    /** 版本 diff（VER-002）：`GET .../versions/:id/diff?comparison=&path=`。 */
+    suspend fun versionDiff(
+        projectId: String,
+        versionId: String,
+        comparison: String = "workspace",
+        path: String = "",
+    ): VersionDiff {
+        val builder = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/versions/$versionId/diff")
+            .addQueryParameter("comparison", comparison)
+        if (path.isNotBlank()) builder.addQueryParameter("path", path)
+        val url = builder.build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(VersionDiff.serializer(), text)
+            }
+        }
+    }
+
+    /** 恢复计划（VER-002）：`POST .../versions/:id/restore-plan`，`paths` 为空即整本书范围。 */
+    suspend fun versionRestorePlan(
+        projectId: String,
+        versionId: String,
+        paths: List<String>,
+    ): VersionRestorePlan = postVersionRestore(
+        projectId = projectId,
+        versionId = versionId,
+        action = "restore-plan",
+        paths = paths,
+        decode = { json.decodeFromString(VersionRestorePlan.serializer(), it) },
+    )
+
+    /** 执行恢复（VER-002）：只回传用户确认过的路径，服务端据此实际恢复。 */
+    suspend fun versionRestore(
+        projectId: String,
+        versionId: String,
+        paths: List<String>,
+    ): VersionRestoreResult = postVersionRestore(
+        projectId = projectId,
+        versionId = versionId,
+        action = "restore",
+        paths = paths,
+        decode = { json.decodeFromString(VersionRestoreResult.serializer(), it) },
+    )
+
+    private suspend fun <T> postVersionRestore(
+        projectId: String,
+        versionId: String,
+        action: String,
+        paths: List<String>,
+        decode: (String) -> T,
+    ): T {
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/versions/$versionId/$action")
+            .build()
+        val body = json.encodeToString(
+            VersionRestoreRequest.serializer(),
+            VersionRestoreRequest(paths = paths),
+        )
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(
+                Request.Builder().url(url).post(body.toRequestBody(jsonMediaType)).build(),
+            ).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                decode(text)
+            }
+        }
+    }
+
     /** 撤销变更分组：`POST .../changes/groups/:gid/undo`。 */
     suspend fun undoChangeGroup(projectId: String, groupId: String): WorkspaceChangeMutationResult =
         postChangeMutation(projectId, "groups/$groupId/undo")

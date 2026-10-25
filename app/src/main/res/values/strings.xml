@@ -215,6 +215,23 @@
     <string name="agent_history_load_older">Load earlier messages</string>
     <string name="agent_new_messages">New messages — tap to jump to bottom</string>
 
+    <!-- Version create and restore (VER-001 / VER-002) -->
+    <string name="versions_create_hint">Version note (optional)</string>
+    <string name="versions_create">Create</string>
+    <string name="versions_creating">Creating…</string>
+    <string name="versions_back">Back</string>
+    <string name="versions_diff_loading">Loading diff…</string>
+    <string name="versions_select_all">Select all</string>
+    <string name="versions_selected_count">%1$d/%2$d files selected</string>
+    <string name="versions_restore_plan">Preview restore plan</string>
+    <string name="versions_plan_loading">Computing…</string>
+    <string name="versions_restore_confirm">Restore</string>
+    <string name="versions_restoring">Restoring…</string>
+    <string name="versions_plan_scope_workspace">Scope: whole book</string>
+    <string name="versions_plan_scope_paths">Scope: %1$d files</string>
+    <string name="versions_plan_backup">A backup version will be created first</string>
+    <string name="versions_plan_dirty">Workspace has unsaved changes</string>
+
     <!-- Context and todo (AGT-012) -->
     <string name="agent_context_open">Context</string>
     <string name="agent_context_title">Context</string>

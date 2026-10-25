@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -231,11 +232,24 @@ fun ChangesContent(
 }
 
 /**
- * 版本入口（WRI-016 的「版本」部分）：只读 `GET /versions/status` + `GET /versions`。
- * 创建 / diff / 恢复属 VER-001、VER-002，这里不做写操作，也不放会误导的按钮。
+ * 版本：列表与状态（WRI-016）+ 创建（VER-001）+ diff 预览与恢复（VER-002）。
+ *
+ * 恢复必须先「预览恢复计划」再「确认恢复」：计划由服务端算，界面只回传用户勾选的路径。
  */
 @Composable
-fun VersionsContent(state: VersionsUiState, onRefresh: () -> Unit) {
+fun VersionsContent(
+    state: VersionsUiState,
+    onRefresh: () -> Unit,
+    onCreateTextChange: (String) -> Unit = {},
+    onCreate: () -> Unit = {},
+    onOpenVersion: (String) -> Unit = {},
+    onCloseVersion: () -> Unit = {},
+    onTogglePath: (String) -> Unit = {},
+    onToggleAll: () -> Unit = {},
+    onLoadPlan: () -> Unit = {},
+    onConfirmRestore: () -> Unit = {},
+    onDismissAction: () -> Unit = {},
+) {
     val muted = MaterialTheme.colorScheme.outline
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -244,9 +258,35 @@ fun VersionsContent(state: VersionsUiState, onRefresh: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(stringResource(R.string.versions_title), style = MaterialTheme.typography.labelLarge)
-            TextButton(onClick = onRefresh, enabled = !state.loading) {
-                Text(stringResource(R.string.refresh))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (state.selectedVersionId.isNotBlank()) {
+                    TextButton(onClick = onCloseVersion) { Text(stringResource(R.string.versions_back)) }
+                }
+                TextButton(onClick = onRefresh, enabled = !state.loading) {
+                    Text(stringResource(R.string.refresh))
+                }
             }
+        }
+        state.actionMessage?.let { message ->
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onDismissAction() }
+                    .padding(vertical = 4.dp),
+            )
+        }
+        state.actionError?.let { message ->
+            Text(
+                message,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onDismissAction() }
+                    .padding(vertical = 4.dp),
+            )
         }
         when {
             state.projectId.isBlank() -> Text(
@@ -264,67 +304,217 @@ fun VersionsContent(state: VersionsUiState, onRefresh: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
-            else -> {
-                val status = state.status
-                if (status != null) {
+            state.selectedVersionId.isNotBlank() -> VersionDetailContent(
+                state = state,
+                muted = muted,
+                onTogglePath = onTogglePath,
+                onToggleAll = onToggleAll,
+                onLoadPlan = onLoadPlan,
+                onConfirmRestore = onConfirmRestore,
+            )
+            else -> VersionListContent(
+                state = state,
+                muted = muted,
+                onCreateTextChange = onCreateTextChange,
+                onCreate = onCreate,
+                onOpenVersion = onOpenVersion,
+            )
+        }
+    }
+}
+
+/** 版本列表（WRI-016 入口 + VER-001 创建）：点某一项进入 diff 预览。 */
+@Composable
+private fun VersionListContent(
+    state: VersionsUiState,
+    muted: Color,
+    onCreateTextChange: (String) -> Unit,
+    onCreate: () -> Unit,
+    onOpenVersion: (String) -> Unit,
+) {
+    val status = state.status
+    if (status != null) {
+        Text(
+            if (status.clean) stringResource(R.string.versions_clean) else
+                stringResource(R.string.versions_dirty, status.changes.size),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (status.clean) muted else MaterialTheme.colorScheme.error,
+        )
+        status.latest?.let {
+            // message 自身已带「自动版本：…」这类来源前缀，不再二次加标签。
+            Text(
+                it.message.ifBlank { it.id.take(12) },
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        Text(
+            if (status.auto.timedEnabled) {
+                stringResource(R.string.versions_auto_timed, status.auto.timedIntervalMinutes)
+            } else {
+                stringResource(R.string.versions_auto_off)
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = muted,
+        )
+    }
+    // 创建版本（VER-001）：说明可留空，服务端会写默认说明；没有变更时由服务端拒绝并给出原因。
+    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = state.createText,
+            onValueChange = onCreateTextChange,
+            label = { Text(stringResource(R.string.versions_create_hint)) },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onCreate, enabled = !state.creating) {
+            Text(
+                if (state.creating) stringResource(R.string.versions_creating)
+                else stringResource(R.string.versions_create),
+            )
+        }
+    }
+    if (state.versions.isEmpty()) {
+        Text(
+            stringResource(R.string.versions_none), color = muted,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(vertical = 8.dp),
+        )
+    } else {
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(state.versions, key = { it.id }) { entry ->
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenVersion(entry.id) }
+                        .padding(vertical = 4.dp),
+                ) {
                     Text(
-                        if (status.clean) stringResource(R.string.versions_clean) else
-                            stringResource(R.string.versions_dirty, status.changes.size),
+                        entry.message.ifBlank { entry.id.take(12) },
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (status.clean) muted else MaterialTheme.colorScheme.error,
                     )
-                    status.latest?.let {
-                        // message 自身已带「自动版本：…」这类来源前缀，不再二次加标签。
-                        Text(
-                            it.message.ifBlank { it.id.take(12) },
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
                     Text(
-                        if (status.auto.timedEnabled) {
-                            stringResource(R.string.versions_auto_timed, status.auto.timedIntervalMinutes)
-                        } else {
-                            stringResource(R.string.versions_auto_off)
-                        },
+                        entry.createdAt + " · " + entry.source + " · " +
+                            stringResource(R.string.versions_files, entry.fileCount, entry.totalBytes),
                         style = MaterialTheme.typography.labelSmall,
                         color = muted,
                     )
                 }
-                if (state.versions.isEmpty()) {
-                    Text(
-                        stringResource(R.string.versions_none), color = muted,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(vertical = 8.dp),
-                    )
-                } else {
-                    LazyColumn(Modifier.fillMaxSize()) {
-                        items(state.versions, key = { it.id }) { entry ->
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                            ) {
-                                Text(
-                                    entry.message.ifBlank { entry.id.take(12) },
-                                    style = MaterialTheme.typography.bodySmall,
-                                )
-                                Text(
-                                    entry.createdAt + " · " + entry.source + " · " +
-                                        stringResource(R.string.versions_files, entry.fileCount, entry.totalBytes),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = muted,
-                                )
-                            }
-                        }
-                        item(key = "readonly-hint") {
+            }
+        }
+    }
+}
+
+/**
+ * 版本详情（VER-002）：勾选要恢复的路径 → 预览服务端计划 → 确认恢复。
+ *
+ * 计划没拿到之前「确认恢复」不可点：恢复是破坏性写操作，必须让用户先看到范围与备份提示。
+ */
+@Composable
+private fun VersionDetailContent(
+    state: VersionsUiState,
+    muted: Color,
+    onTogglePath: (String) -> Unit,
+    onToggleAll: () -> Unit,
+    onLoadPlan: () -> Unit,
+    onConfirmRestore: () -> Unit,
+) {
+    val diff = state.diff
+    val total = diff?.changes?.size ?: 0
+    Text(
+        stringResource(R.string.versions_selected_count, state.selectedPaths.size, total),
+        style = MaterialTheme.typography.bodySmall,
+        color = muted,
+    )
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = onToggleAll, enabled = total > 0) {
+            Text(stringResource(R.string.versions_select_all))
+        }
+        TextButton(
+            onClick = onLoadPlan,
+            enabled = total > 0 && state.selectedPaths.isNotEmpty() && !state.planLoading && !state.restoring,
+        ) {
+            Text(
+                if (state.planLoading) stringResource(R.string.versions_plan_loading)
+                else stringResource(R.string.versions_restore_plan),
+            )
+        }
+        TextButton(
+            onClick = onConfirmRestore,
+            enabled = state.plan != null && !state.restoring,
+        ) {
+            Text(
+                if (state.restoring) stringResource(R.string.versions_restoring)
+                else stringResource(R.string.versions_restore_confirm),
+            )
+        }
+    }
+    when {
+        state.diffLoading -> Text(
+            stringResource(R.string.versions_diff_loading), color = muted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        state.diffError != null -> Text(
+            state.diffError, color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        diff == null -> Text(
+            stringResource(R.string.versions_none), color = muted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        else -> LazyColumn(Modifier.fillMaxSize()) {
+            state.plan?.let { plan ->
+                item(key = "restore-plan") {
+                    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(
+                            if (plan.scope == "workspace") {
+                                stringResource(R.string.versions_plan_scope_workspace)
+                            } else {
+                                stringResource(R.string.versions_plan_scope_paths, plan.paths.size)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        if (plan.willCreateBackup) {
                             Text(
-                                stringResource(R.string.versions_readonly_hint),
+                                stringResource(R.string.versions_plan_backup),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = muted,
-                                modifier = Modifier.padding(vertical = 8.dp),
                             )
                         }
+                        if (plan.currentDirty) {
+                            Text(
+                                stringResource(R.string.versions_plan_dirty),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        plan.warnings.forEach { warning ->
+                            Text(
+                                warning,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                        HorizontalDivider()
                     }
+                }
+            }
+            items(diff.changes, key = { it.path }) { change ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onTogglePath(change.path) }
+                        .padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(
+                        checked = change.path in state.selectedPaths,
+                        onCheckedChange = { onTogglePath(change.path) },
+                    )
+                    Text(
+                        "${change.status} · ${change.path}",
+                        style = MaterialTheme.typography.labelSmall,
+                        maxLines = 2,
+                    )
                 }
             }
         }

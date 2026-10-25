@@ -215,6 +215,23 @@
     <string name="agent_history_load_older">加载更早的消息</string>
     <string name="agent_new_messages">有新消息，点此回到底部</string>
 
+    <!-- 版本创建与恢复（VER-001 / VER-002） -->
+    <string name="versions_create_hint">版本说明（可留空）</string>
+    <string name="versions_create">创建版本</string>
+    <string name="versions_creating">创建中…</string>
+    <string name="versions_back">返回列表</string>
+    <string name="versions_diff_loading">正在加载差异…</string>
+    <string name="versions_select_all">全选</string>
+    <string name="versions_selected_count">已选 %1$d/%2$d 个文件</string>
+    <string name="versions_restore_plan">预览恢复计划</string>
+    <string name="versions_plan_loading">正在计算…</string>
+    <string name="versions_restore_confirm">确认恢复</string>
+    <string name="versions_restoring">恢复中…</string>
+    <string name="versions_plan_scope_workspace">范围：整本书</string>
+    <string name="versions_plan_scope_paths">范围：%1$d 个文件</string>
+    <string name="versions_plan_backup">恢复前会先创建备份版本</string>
+    <string name="versions_plan_dirty">当前工作区有未保存改动</string>
+
     <!-- 上下文与 Todo（AGT-012） -->
     <string name="agent_context_open">上下文</string>
     <string name="agent_context_title">上下文</string>

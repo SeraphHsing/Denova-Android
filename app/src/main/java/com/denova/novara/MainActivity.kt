@@ -329,6 +329,15 @@ class MainActivity : AppCompatActivity() {
                                                     versionsViewModel.load(currentProjectId, force = true)
                                                 }
                                             },
+                                            onCreateTextChange = versionsViewModel::setCreateText,
+                                            onCreate = versionsViewModel::createVersion,
+                                            onOpenVersion = versionsViewModel::openVersion,
+                                            onCloseVersion = versionsViewModel::closeVersion,
+                                            onTogglePath = versionsViewModel::togglePath,
+                                            onToggleAll = versionsViewModel::toggleAllPaths,
+                                            onLoadPlan = versionsViewModel::loadPlan,
+                                            onConfirmRestore = versionsViewModel::confirmRestore,
+                                            onDismissAction = versionsViewModel::clearActionResult,
                                         )
                                     }
                                 }
