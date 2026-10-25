@@ -72,7 +72,7 @@
 | G4-a | 重连恢复 | 通过 | 两套流断线后按游标 / `stream_cursor` 重挂，身份与结果一致 |
 | G4-b | 后台恢复 | 通过 | HOME 40s 后回前台自动重挂，服务端 turn 仍 `done` |
 | G4-c | 进程恢复 | 通过 | `force-stop` 重启重登重挂，canonical 基线重建（含持久化 Cookie 免登录） |
-| G4-d | 跨包（升级安装） | 留待 P3 | 未单独验证；随 P3 首个可覆盖安装的构建执行，P6 发布候选复核 |
+| G4-d | 跨包（升级安装） | 通过（2026-10-26） | 旧构建（`17e2bac`）造未提交草稿（延迟代理把保存拖到 4s，1.5s 后 `force-stop`，Room `drafts` 出现 `g4d-draft.md …DRAFTUP`）→ `adb install -r` 覆盖安装 HEAD 构建 → 冷启动免重登（`status ok authenticated=true`）、编辑器恢复原标签与项目/路径、正文含 `DRAFTUP`、`drafts` 表跨包可读（旧 `g3d-a.md` 草稿仍在）。未覆盖：换签名安装（系统会拒绝）、`versionCode` 降级（两包同版本号）（[证据](../evidence/g4-d/xiaomi-14-pro/result.md)） |
 | G4-e | 命令持久化与发送边界 | 通过 | 先落 `SUBMITTING` 本地事务再发送，ACCEPTED / REJECTED（409 busy）/ UNCERTAIN 分支真机验证 |
 | G4-f | D03 流与恢复性能预算 | 通过 | 可见延迟、投影耗时、PSS、恢复至可操作 / 全量就绪四项 2026-10-24 评审通过 |
 | G5-a | 完整输入与屏幕结果对应 | 通过 | 提示符、回显、中文 UTF-8 / 宽字、`stty size` 与画布一致、ANSI 16 / 256 / truecolor、全屏、Ctrl-C、回看 |
@@ -87,7 +87,7 @@
 
 **P1 退出结论（2026-10-24，项目负责人 Hsing 决定）：P1 退出。** 六关卡均有代码与真机 / 真实服务器往返证据；未满足项 9 条已全部定性（环境受限 2 条：G1-b、G6-a；留待 P3 7 条：G1-d、G2-c、G3-b/c/d、G4-d、G6-b），无未定性缺口，因此不再作为 P1 阻塞。这些条目在补齐前不得在复刻矩阵中标记完成；复核位置：G1-d / G2-c / G3-b·c·d / G4-d 在 P3，G6-b 随 P4-D，G4-d 最终在 P6 发布候选复核。
 
-**P3 回补记录：** 2026-10-25 G3-d 已在 P3 修复并真机补测通过（见上表与 [证据](../evidence/g3-d/xiaomi-14-pro/result.md)）；同日 G3-b、G3-c 随 WRI-011 补测通过（[证据](../evidence/wri-011/xiaomi-14-pro/result.md)），G3 关卡已无留项。留待 P3 条目剩 4 条（G1-d、G2-c、G4-d、G6-b）。
+**P3 回补记录：** 2026-10-25 G3-d 已在 P3 修复并真机补测通过（见上表与 [证据](../evidence/g3-d/xiaomi-14-pro/result.md)）；同日 G3-b、G3-c 随 WRI-011 补测通过（[证据](../evidence/wri-011/xiaomi-14-pro/result.md)），G3 关卡已无留项。2026-10-26 G4-d 以两个不同构建覆盖安装补测通过（[证据](../evidence/g4-d/xiaomi-14-pro/result.md)），G2-c 的图片 / 表格 / IME 组合态部分真机通过（[证据](../evidence/g2c-nodes/xiaomi-14-pro/result.md)）。留待 P3 条目剩 3 条（G1-d、G2-c 的节点操作、G6-b）。
 
 ## 4. P2：工程基础与公共界面
 
