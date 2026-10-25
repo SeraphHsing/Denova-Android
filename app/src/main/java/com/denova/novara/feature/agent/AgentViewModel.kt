@@ -17,6 +17,7 @@ import com.denova.novara.core.network.SendChatRequest
 import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
 import com.denova.novara.core.stream.AgentApprovalLogic
+import com.denova.novara.core.stream.AgentContextAnalysis
 import com.denova.novara.core.stream.AgentMessage
 import com.denova.novara.core.stream.mergeOlderMessages
 import com.denova.novara.core.stream.AgentImagePart
@@ -109,6 +110,10 @@ data class AgentScreenState(
     val newMessagesPending: Boolean = false,
     /** 输入区草稿：放到状态里，队列项「取回编辑」才能把正文填回输入框。 */
     val composerDraft: String = "",
+    /** 上下文分析（AGT-012）：加载态、错误与最近一次结果。 */
+    val contextLoading: Boolean = false,
+    val contextError: String? = null,
+    val contextAnalysis: AgentContextAnalysis? = null,
 )
 
 /** 写作 Agent ViewModel：绑定 client → 恢复协调器 → 投影；发送先落命令事务再 POST。 */
@@ -1051,6 +1056,49 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         if (_state.value.composerDraft != text) {
             _state.value = _state.value.copy(composerDraft = text)
         }
+    }
+
+    /**
+     * 取一次上下文分析（AGT-012）：用量、压缩计划。
+     *
+     * 分析的是「下一轮会带上什么」，服务端要求 message 非空，用与 Web 相同的探针文本；
+     * 探针不写进会话历史、也不触发运行，因此可以随时点开查看。
+     */
+    fun loadContextAnalysis() {
+        val client = client ?: return
+        val sessionId = _state.value.sessionId.trim()
+        if (sessionId.isBlank()) return
+        _state.value = _state.value.copy(contextLoading = true, contextError = null)
+        viewModelScope.launch {
+            try {
+                val analysis = client.contextAnalysis(sessionId)
+                if (_state.value.sessionId.trim() != sessionId) return@launch
+                _state.value = _state.value.copy(contextAnalysis = analysis, contextLoading = false)
+                DenovaLog.i(
+                    "Agent",
+                    "context analysis tokens=${analysis.tokenEstimate} window=${analysis.contextWindowTokens} " +
+                        "usage=${analysis.usagePercent}% compaction=${analysis.compactionState} messages=${analysis.messageCount}",
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Agent", "context analysis failed", e)
+                _state.value = _state.value.copy(
+                    contextLoading = false,
+                    // 会话被运行占用时服务端直接 409 busy：给一句能照着做的提示，而不是把英文错误甩给用户。
+                    contextError = if (e.message?.contains("busy") == true) {
+                        "会话正被当前运行占用，暂停结束或空闲后再看上下文"
+                    } else {
+                        e.message ?: "上下文分析失败"
+                    },
+                )
+            }
+        }
+    }
+
+    /** 关闭面板时清结果：下一次打开重新取，避免展示上一次会话的用量。 */
+    fun clearContextAnalysis() {
+        _state.value = _state.value.copy(contextAnalysis = null, contextError = null, contextLoading = false)
     }
 
     /**

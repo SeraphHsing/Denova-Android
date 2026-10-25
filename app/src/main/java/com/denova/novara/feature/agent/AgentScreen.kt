@@ -26,6 +26,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -46,6 +48,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.core.stream.AgentContextAnalysis
+import com.denova.novara.core.stream.AgentContextLogic
+import com.denova.novara.core.stream.AgentTodoItem
+import com.denova.novara.core.stream.CompactionState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.denova.novara.core.stream.AgentApprovalLogic
@@ -529,6 +535,7 @@ fun AgentScreen(
     val selections by viewModel.selections.collectAsState()
     val askSelections by viewModel.askSelections.collectAsState()
     var sessionId by remember { mutableStateOf("") }
+    var showContextPanel by remember { mutableStateOf(false) }
 
     // 进入页面自动回到会话（AGT-013）：优先上次挂接的会话，其次服务端 active / 最近会话。
     // 进程被杀后重启也能直接落回同一会话，pending ask 与任务入口由服务端投影恢复。
@@ -601,6 +608,15 @@ fun AgentScreen(
             ) {
                 Text(stringResource(if (state.abortPending) R.string.agent_stopping else R.string.agent_stop))
             }
+            // 上下文分析（AGT-012）：用量与压缩计划随时可查，不需要先把消息发出去。
+            OutlinedButton(
+                onClick = {
+                    showContextPanel = true
+                    viewModel.loadContextAnalysis()
+                },
+                enabled = sessionId.isNotBlank() && !state.contextLoading,
+                modifier = Modifier.padding(start = 8.dp),
+            ) { Text(stringResource(R.string.agent_context_open)) }
             val phaseLabel = when (state.runtimePhase) {
                 "suspended" -> stringResource(R.string.agent_suspended)
                 "" -> ""
@@ -988,5 +1004,118 @@ fun AgentScreen(
                 )
             }
         }
+
+        if (showContextPanel) {
+            AgentContextDialog(
+                loading = state.contextLoading,
+                error = state.contextError,
+                analysis = state.contextAnalysis,
+                todos = AgentContextLogic.latestTodos(state.messages.flatMap { it.parts }),
+                onDismiss = {
+                    showContextPanel = false
+                    viewModel.clearContextAnalysis()
+                },
+            )
+        }
     }
+}
+
+/**
+ * 上下文面板（AGT-012）：用量、压缩计划与 `todo` 工具当前清单。
+ *
+ * Todo 只读展示工具调用里的清单——客户端不维护第二份可写运行时待办，写回仍由 Agent 自己调工具完成。
+ */
+@Composable
+private fun AgentContextDialog(
+    loading: Boolean,
+    error: String?,
+    analysis: AgentContextAnalysis?,
+    todos: List<AgentTodoItem>,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.agent_context_close)) }
+        },
+        title = { Text(stringResource(R.string.agent_context_title)) },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                when {
+                    loading -> Text(
+                        stringResource(R.string.agent_context_loading),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    error != null -> Text(
+                        error,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    analysis != null -> {
+                        Text(
+                            stringResource(
+                                R.string.agent_context_usage,
+                                analysis.tokenEstimate,
+                                analysis.contextWindowTokens,
+                                analysis.usagePercent,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            stringResource(R.string.agent_context_messages, analysis.messageCount),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            when (analysis.compactionState) {
+                                CompactionState.ACTIVE -> stringResource(R.string.agent_context_compaction_active)
+                                CompactionState.NEXT_TURN -> stringResource(R.string.agent_context_compaction_next)
+                                CompactionState.NONE -> stringResource(R.string.agent_context_compaction_none)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        analysis.compaction?.let { compaction ->
+                            Text(
+                                stringResource(
+                                    R.string.agent_context_compaction_size,
+                                    compaction.tokensBefore,
+                                    compaction.tokensAfter,
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            if (compaction.summary.isNotBlank()) {
+                                Text(
+                                    compaction.summary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 6,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+                if (todos.isNotEmpty()) {
+                    HorizontalDivider()
+                    Text(
+                        stringResource(
+                            R.string.agent_context_todos,
+                            todos.count { it.done },
+                            todos.size,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    todos.forEach { todo ->
+                        Text(
+                            text = "${if (todo.done) "✓" else if (todo.running) "▶" else "○"} ${todo.step}",
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+        },
+    )
 }

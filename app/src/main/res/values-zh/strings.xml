@@ -215,6 +215,19 @@
     <string name="agent_history_load_older">加载更早的消息</string>
     <string name="agent_new_messages">有新消息，点此回到底部</string>
 
+    <!-- 上下文与 Todo（AGT-012） -->
+    <string name="agent_context_open">上下文</string>
+    <string name="agent_context_title">上下文</string>
+    <string name="agent_context_close">关闭</string>
+    <string name="agent_context_loading">正在分析上下文…</string>
+    <string name="agent_context_usage">用量：%1$d / %2$d tokens（%3$d%%）</string>
+    <string name="agent_context_messages">消息：%1$d 条</string>
+    <string name="agent_context_compaction_active">压缩：已生效</string>
+    <string name="agent_context_compaction_next">压缩：下一轮会压缩</string>
+    <string name="agent_context_compaction_none">压缩：未触发</string>
+    <string name="agent_context_compaction_size">压缩前 %1$d → 压缩后 %2$d tokens</string>
+    <string name="agent_context_todos">待办：%1$d/%2$d 完成</string>
+
     <!-- 调试抽屉入口（仅 debug 构建） -->
     <string name="drawer_debug">调试日志</string>
 </resources>

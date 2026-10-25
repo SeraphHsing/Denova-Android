@@ -6,6 +6,9 @@ import com.denova.novara.core.stream.AgentActiveView
 import com.denova.novara.core.stream.AgentAskAnswer
 import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.stream.AgentAskResolution
+import com.denova.novara.core.stream.AgentContextAnalysis
+import com.denova.novara.core.stream.AgentContextAnalysisRequest
+import com.denova.novara.core.stream.CONTEXT_ANALYSIS_PROBE
 import com.denova.novara.core.stream.AgentMessagesPage
 import com.denova.novara.core.stream.AgentRecoveryRequest
 import com.denova.novara.core.stream.AgentStreamTransport
@@ -776,6 +779,30 @@ class DenovaClient(
                 val text = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toException(resp.code, text)
                 json.decodeFromString(AgentCommandReceipt.serializer(), text)
+            }
+        }
+    }
+
+    /**
+     * 上下文分析（AGT-012）。
+     *
+     * 服务端要求 `message` 非空（分析的是「下一轮会带上什么」），因此用与 Web 相同的探针文本，
+     * 不会写进会话历史、也不触发运行。
+     */
+    suspend fun contextAnalysis(sessionId: String, message: String = CONTEXT_ANALYSIS_PROBE): AgentContextAnalysis {
+        val body = json.encodeToString(
+            AgentContextAnalysisRequest.serializer(),
+            AgentContextAnalysisRequest(sessionId = sessionId, message = message),
+        )
+        val call = Request.Builder()
+            .url(agentChatUrl("context-analysis"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(call).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentContextAnalysis.serializer(), text)
             }
         }
     }

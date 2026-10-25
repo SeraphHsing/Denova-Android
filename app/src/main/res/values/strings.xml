@@ -215,6 +215,19 @@
     <string name="agent_history_load_older">Load earlier messages</string>
     <string name="agent_new_messages">New messages — tap to jump to bottom</string>
 
+    <!-- Context and todo (AGT-012) -->
+    <string name="agent_context_open">Context</string>
+    <string name="agent_context_title">Context</string>
+    <string name="agent_context_close">Close</string>
+    <string name="agent_context_loading">Analyzing context…</string>
+    <string name="agent_context_usage">Usage: %1$d / %2$d tokens (%3$d%%)</string>
+    <string name="agent_context_messages">Messages: %1$d</string>
+    <string name="agent_context_compaction_active">Compaction: active</string>
+    <string name="agent_context_compaction_next">Compaction: will run next turn</string>
+    <string name="agent_context_compaction_none">Compaction: not triggered</string>
+    <string name="agent_context_compaction_size">Before %1$d → after %2$d tokens</string>
+    <string name="agent_context_todos">Todo: %1$d/%2$d done</string>
+
     <!-- 调试抽屉入口（仅 debug 构建） -->
     <string name="drawer_debug">Debug log</string>
 </resources>
