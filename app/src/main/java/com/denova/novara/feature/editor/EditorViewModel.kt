@@ -189,10 +189,11 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         persist()
     }
 
-    fun updateContent(text: String) {
+    /** [composing] 来自 `TextFieldValue.composition != null`，组合态不排自动保存（WRI-008）。 */
+    fun updateContent(text: String, composing: Boolean = false) {
         val s = session ?: return
         EditorPerf.markEditStart()
-        s.edit(text)
+        s.edit(text, composing)
     }
 
     fun save() {

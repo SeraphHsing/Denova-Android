@@ -38,7 +38,7 @@ HOP_BY_HOP = {
     "content-length",
 }
 
-CONFIG = {"target": "", "put_delay_ms": 0}
+CONFIG = {"target": "", "put_delay_ms": 0, "status_delay_ms": 0}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -53,8 +53,14 @@ class Handler(BaseHTTPRequestHandler):
         headers = {k: v for k, v in self.headers.items() if k.lower() not in HOP_BY_HOP}
         path = self.path
         is_save = self.command == "PUT" and "/files/file" in path
+        is_status = self.command == "GET" and path.startswith("/api/auth/status")
         if is_save and CONFIG["put_delay_ms"]:
             delay = CONFIG["put_delay_ms"] / 1000.0
+            self.log_message("delaying %s %s by %.1fs", self.command, path, delay)
+            time.sleep(delay)
+        # AUTH-004：把连接状态探测拖慢，用于构造「迟到 status / 迟到 401」的时间窗口。
+        if is_status and CONFIG["status_delay_ms"]:
+            delay = CONFIG["status_delay_ms"] / 1000.0
             self.log_message("delaying %s %s by %.1fs", self.command, path, delay)
             time.sleep(delay)
         url = CONFIG["target"].rstrip("/") + path
@@ -88,15 +94,18 @@ def main() -> None:
     ap.add_argument("--listen", default="0.0.0.0:18099")
     ap.add_argument("--target", default="http://192.168.2.102:18081")
     ap.add_argument("--put-delay-ms", type=int, default=3000)
+    ap.add_argument("--status-delay-ms", type=int, default=0)
     args = ap.parse_args()
 
     host, _, port = args.listen.rpartition(":")
     CONFIG["target"] = args.target
     CONFIG["put_delay_ms"] = args.put_delay_ms
+    CONFIG["status_delay_ms"] = args.status_delay_ms
     server = ThreadingHTTPServer((host or "0.0.0.0", int(port)), Handler)
     print(
         f"proxy listening on {args.listen} -> {args.target} "
-        f"(PUT /files/file delayed {args.put_delay_ms}ms)",
+        f"(PUT /files/file delayed {args.put_delay_ms}ms, "
+        f"GET /api/session/status delayed {args.status_delay_ms}ms)",
         flush=True,
     )
     server.serve_forever()

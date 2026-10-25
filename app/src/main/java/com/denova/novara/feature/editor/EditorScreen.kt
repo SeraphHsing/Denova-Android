@@ -60,6 +60,9 @@ import com.denova.novara.core.network.TextSelectionRef
 
 private enum class EditorMode { SOURCE, RICH, PREVIEW }
 
+/** 表格模板（WRI-006）：2 行 3 列，插入后每个单元格都可直接编辑。 */
+private const val TABLE_TEMPLATE = "| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n|  |  |  |\n"
+
 /**
  * Markdown 编辑器（G2/G3）：打开文件 → 源码/富文本/预览三模式 → 防抖自动保存 + 冲突提示。
  */
@@ -74,6 +77,8 @@ fun EditorScreen(
     onProjectIdChange: (String) -> Unit = {},
     onOpenAgent: (projectId: String, filePath: String) -> Unit = { _, _ -> },
     onQuoteSelection: (projectId: String, selection: TextSelectionRef) -> Unit = { _, _ -> },
+    /** 预览图片加载器工厂（WRI-007）；为空时预览只渲染语义、不拉取资源。 */
+    loaderFactory: ((projectId: String, documentPath: String) -> PreviewAssetLoader?)? = null,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val tabsState by viewModel.tabs.collectAsState()
@@ -81,6 +86,12 @@ fun EditorScreen(
     var projectId by remember { mutableStateOf(currentProjectId) }
     var filePath by remember { mutableStateOf("") }
     var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
+    // 资源加载依赖「哪个项目 / 哪个文档」：换文件就重建，相对路径按该文档目录解析。
+    val assetLoader = remember(uiState.projectId, uiState.filePath, loaderFactory) {
+        val pid = uiState.projectId.ifBlank { currentProjectId }
+        if (pid.isBlank() || uiState.filePath.isBlank()) null
+        else loaderFactory?.invoke(pid, uiState.filePath)
+    }
 
     // 书籍切换（当前项目切换）后同步项目 ID 到输入框。
     LaunchedEffect(currentProjectId) {
@@ -229,24 +240,43 @@ fun EditorScreen(
                 FormatButton("</>") { textFieldValue = wrapSelection(textFieldValue, "`"); viewModel.updateContent(textFieldValue.text) }
                 FormatButton("S") { textFieldValue = wrapSelection(textFieldValue, "~~"); viewModel.updateContent(textFieldValue.text) }
             }
+            // 结构插入（WRI-005 标题/列表/引用、WRI-006 表格、WRI-007 图片与链接）：
+            // 都是往光标处插 Markdown 模板，序列化仍以源文本为准，不引入第二套富文本模型。
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                FormatButton("H2") { textFieldValue = insertBlock(textFieldValue, "## 标题\n"); viewModel.updateContent(textFieldValue.text) }
+                FormatButton("•") { textFieldValue = insertBlock(textFieldValue, "- 列表项\n"); viewModel.updateContent(textFieldValue.text) }
+                FormatButton(">") { textFieldValue = insertBlock(textFieldValue, "> 引用\n"); viewModel.updateContent(textFieldValue.text) }
+                FormatButton("表") { textFieldValue = insertBlock(textFieldValue, TABLE_TEMPLATE); viewModel.updateContent(textFieldValue.text) }
+                FormatButton("链") { textFieldValue = insertBlock(textFieldValue, "[链接文字](assets/)\n"); viewModel.updateContent(textFieldValue.text) }
+                FormatButton("图") { textFieldValue = insertBlock(textFieldValue, "![图片说明](assets/)\n"); viewModel.updateContent(textFieldValue.text) }
+            }
         }
 
         when (mode) {
             EditorMode.SOURCE -> BasicTextField(
                 value = textFieldValue,
-                onValueChange = { textFieldValue = it; EditorPerf.markEditStart(); viewModel.updateContent(it.text) },
+                onValueChange = {
+                    textFieldValue = it
+                    EditorPerf.markEditStart()
+                    viewModel.updateContent(it.text, composing = it.composition != null)
+                },
                 textStyle = TextStyle(fontSize = 16.sp),
                 modifier = Modifier.fillMaxSize().padding(12.dp),
             )
             EditorMode.RICH -> BasicTextField(
                 value = textFieldValue,
-                onValueChange = { textFieldValue = it; EditorPerf.markEditStart(); viewModel.updateContent(it.text) },
+                onValueChange = {
+                    textFieldValue = it
+                    EditorPerf.markEditStart()
+                    viewModel.updateContent(it.text, composing = it.composition != null)
+                },
                 visualTransformation = MarkdownVisualTransformation(),
                 textStyle = TextStyle(fontSize = 16.sp),
                 modifier = Modifier.fillMaxSize().padding(12.dp),
             )
             EditorMode.PREVIEW -> MarkdownPreview(
                 source = uiState.content,
+                loader = assetLoader,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -411,33 +441,56 @@ private fun wrapSelection(value: TextFieldValue, delimiter: String): TextFieldVa
     return TextFieldValue(newText, TextRange(newStart, newEnd))
 }
 
+/** 在光标处插入块级模板（标题/列表/引用/表格/图片/链接）：需要独占一行，插完光标停在末尾。 */
+private fun insertBlock(value: TextFieldValue, block: String): TextFieldValue {
+    val text = value.text
+    val at = value.selection.start.coerceIn(0, text.length)
+    val prefix = if (at > 0 && text[at - 1] != '\n') "\n" else ""
+    val insert = prefix + block
+    val newText = text.substring(0, at) + insert + text.substring(at)
+    val caret = at + insert.length
+    return TextFieldValue(newText, TextRange(caret, caret))
+}
+
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun MarkdownPreview(source: String, modifier: Modifier = Modifier) {
-    val html = remember(source) { buildPreviewHtml(source) }
+private fun MarkdownPreview(
+    source: String,
+    loader: PreviewAssetLoader?,
+    modifier: Modifier = Modifier,
+) {
+    val html = remember(source, loader) { buildPreviewHtml(source, loader) }
+    // base URL 用服务器 origin：data: 文档（base=null）会让 WebView 丢掉 http 子资源请求。
+    val baseUrl = loader?.baseUrl
     AndroidView(
         modifier = modifier,
         factory = { ctx ->
             WebView(ctx).apply {
                 settings.javaScriptEnabled = false
-                loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+                // 图片走项目资源接口，由 OkHttp 代取（WebView 拿不到 OkHttp 的会话 Cookie）。
+                loader?.let { webViewClient = it.webViewClient() }
+                loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", null)
             }
         },
-        update = { it.loadDataWithBaseURL(null, html, "text/html", "utf-8", null) },
+        update = { view ->
+            if (loader != null) view.webViewClient = loader.webViewClient()
+            view.loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", null)
+        },
     )
 }
 
-private fun buildPreviewHtml(markdown: String): String {
-    val body = MarkdownDocument.parse(markdown).toHtml()
+private fun buildPreviewHtml(markdown: String, loader: PreviewAssetLoader?): String {
+    val raw = MarkdownDocument.parse(markdown).toHtml()
+    val body = loader?.let { it.decorate(it.rewrite(raw)) } ?: raw
+    com.denova.novara.core.logging.DenovaLog.i(
+        "Editor",
+        "preview build images=${Regex("<img").findAll(raw).count()} tables=${Regex("<table>").findAll(raw).count()} " +
+            "loader=${loader?.describe() ?: "none"}",
+    )
     return """
         <html><head><meta charset="utf-8">
         <style>
-        body { font-family: sans-serif; padding: 16px; line-height: 1.6; }
-        table { border-collapse: collapse; }
-        th, td { border: 1px solid #ccc; padding: 6px; }
-        img { max-width: 100%; }
-        pre { background: #f5f5f5; padding: 8px; overflow-x: auto; }
-        blockquote { border-left: 3px solid #ccc; margin: 0; padding-left: 12px; color: #555; }
+        ${PreviewAssetLoader.STYLE}
         </style></head>
         <body>$body</body></html>
     """.trimIndent()

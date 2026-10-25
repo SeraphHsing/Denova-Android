@@ -198,6 +198,12 @@ class MainActivity : AppCompatActivity() {
                                                 val encodedPath = android.net.Uri.encode(selection.fileName)
                                                 navController.navigate("agent?projectId=$pid&filePath=$encodedPath")
                                             },
+                                            // 预览图片走项目资源接口（需要会话 Cookie），交给 OkHttp 代取。
+                                            loaderFactory = { pid, path ->
+                                                val c = connectionViewModel.client
+                                                if (c == null) null
+                                                else com.denova.novara.feature.editor.PreviewAssetLoader(c, pid, path)
+                                            },
                                         )
                                     }
                                     composable("game") {

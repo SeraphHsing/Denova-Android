@@ -76,10 +76,17 @@ class ConnectionViewModel(
         val c = client ?: return
         val current = (state.value as? ConnectionUiState.Unauthenticated)?.server ?: return
         viewModelScope.launch {
+            val gen = c.generation.snapshot()
             try {
                 // D03 恢复耗时埋点：认证往返起点
                 DenovaLog.i("Perf", "login-start")
                 val result = c.login(username.trim(), password)
+                if (!c.generation.isCurrent(gen)) {
+                    DenovaLog.i("Connection", "stale login result ignored gen=$gen")
+                    return@launch
+                }
+                // 新登录成为当前世代：登录前发出的 status / 旧 401 一律作废，避免把新会话顶掉。
+                c.generation.retire()
                 DenovaLog.i("Connection", "login ok local=${result.local}")
                 _actionError.value = null
                 _state.value = ConnectionUiState.Authenticated(current, result.local)
@@ -103,6 +110,7 @@ class ConnectionViewModel(
         viewModelScope.launch {
             try {
                 val result = c.pair(token.trim())
+                c.generation.retire()
                 DenovaLog.i("Connection", "pair ok local=${result.local}")
                 _actionError.value = null
                 _state.value = ConnectionUiState.Authenticated(current, result.local)
@@ -139,9 +147,21 @@ class ConnectionViewModel(
 
     private fun checkStatus(key: ServerKey) {
         viewModelScope.launch {
+            val c = client ?: return@launch
+            // AUTH-004：记下发出时的客户端与世代。换了服务器就是新客户端，旧客户端的迟到结果一律作废；
+            // 同一客户端内再用世代判断（登录成功、退出登录都会推进世代）。
+            val gen = c.generation.snapshot()
+            fun stale() = c !== client || !c.generation.isCurrent(gen)
             _state.value = ConnectionUiState.Checking(key)
             try {
-                val status = client!!.status()
+                val status = c.status()
+                if (stale()) {
+                    DenovaLog.i(
+                        "Connection",
+                        "stale status ignored gen=$gen current=${c.generation.snapshot()} authenticated=${status.authenticated}",
+                    )
+                    return@launch
+                }
                 DenovaLog.i("Connection", "status ok authenticated=${status.authenticated} local=${status.local}")
                 _state.value = if (status.authenticated) {
                     ConnectionUiState.Authenticated(key, status.local)
@@ -149,9 +169,20 @@ class ConnectionViewModel(
                     ConnectionUiState.Unauthenticated(key, status.local)
                 }
             } catch (e: DenovaApiException) {
+                if (stale()) {
+                    DenovaLog.i(
+                        "Connection",
+                        "stale status error ignored gen=$gen current=${c.generation.snapshot()} status=${e.status}",
+                    )
+                    return@launch
+                }
                 DenovaLog.w("Connection", "status failed code=${e.code} status=${e.status}")
                 _state.value = ConnectionUiState.Failed(e.message ?: "无法连接服务器（HTTP ${e.status}）")
             } catch (e: Exception) {
+                if (stale()) {
+                    DenovaLog.i("Connection", "stale status failure ignored gen=$gen")
+                    return@launch
+                }
                 DenovaLog.w("Connection", "status failed", e)
                 _state.value = ConnectionUiState.Failed("无法连接服务器")
             }

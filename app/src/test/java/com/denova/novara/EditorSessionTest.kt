@@ -507,4 +507,26 @@ class EditorSessionTest {
         assertTrue(remote.saveCount() > savesAfterConflict)
         assertEquals("标题\n段落一\n段落二本地已解决\n段落三\n结尾", remote.serverContent)
     }
+
+    // ---- WRI-008 输入法组合态 ----
+
+    @Test
+    fun `editing during IME composition does not autosave`() = runTest {
+        val remote = FakeRemote()
+        val drafts = FakeDrafts()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this, debounceMillis = 50)
+        session.open("p", "f.md", "base", "r0")
+
+        // 拼音候选未落定：只更新本地正文，不排自动保存，避免把半成品写进服务端。
+        session.edit("base 拼", composing = true)
+        advanceTimeBy(500)
+        assertEquals(0, remote.saveCount())
+        assertEquals("base 拼", session.state.value.content)
+
+        // 组合结束的第一次回调恢复自动保存。
+        session.edit("base 拼音", composing = false)
+        advanceUntilIdle()
+        assertEquals(1, remote.saveCount())
+        assertEquals("base 拼音", remote.serverContent)
+    }
 }

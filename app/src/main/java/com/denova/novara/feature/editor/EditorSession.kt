@@ -236,7 +236,13 @@ class EditorSession(
         saveJob = null
     }
 
-    fun edit(newContent: String) {
+    /**
+     * 编辑正文。[composing] 表示输入法仍在组合态（WRI-008）。
+     *
+     * 组合态只更新本地内容、不排自动保存：拼音 / 手写候选还没落定时的中间串写进服务端，
+     * 会给对端和版本历史留下半成品。组合结束（下一次回调 `composing=false`）才排保存。
+     */
+    fun edit(newContent: String, composing: Boolean = false) {
         val s = _state.value
         if (!s.loaded) return
         // 冲突状态下暂停自动保存，等待用户手动解决（resolveConflict），避免盲目覆盖冲突材料。
@@ -245,6 +251,11 @@ class EditorSession(
             return
         }
         _state.value = s.copy(content = newContent, saveStatus = SaveStatus.IDLE)
+        if (composing) {
+            debounceJob?.cancel()
+            debounceJob = null
+            return
+        }
         scheduleSave()
     }
 
