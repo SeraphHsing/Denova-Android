@@ -29,6 +29,7 @@ import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.stream.AgentAskQuestion
 import com.denova.novara.core.stream.AgentAskResolution
+import com.denova.novara.core.stream.SessionScope
 import com.denova.novara.core.stream.AgentUiChunk
 import com.denova.novara.core.stream.ApprovalOption
 import com.denova.novara.core.stream.AgentPhase
@@ -128,6 +129,9 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private var sendJob: Job? = null
     private var queueTicker: Job? = null
 
+    /** 会话世代：切换会话后，旧会话的迟到回包不得改写当前会话（AGT-011）。 */
+    private val sessionScope = SessionScope()
+
     /** canonical 原始消息：分页以 `id` 去重合并后再整体解析，保证视图与合并结果一致。 */
     private var historyRaw: List<AgentMessage> = emptyList()
 
@@ -184,16 +188,22 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = AgentScreenState(sessionId = sessionId, projectId = projectId)
         streamJob?.cancel()
         sendJob?.cancel()
+        val generation = sessionScope.enter(sessionId)
         streamJob = viewModelScope.launch {
             try {
                 // 先加载 canonical 历史作为基线，再挂接流补充增量。
-                reloadCanonical()
-                attachLoop(sessionId)
+                reloadCanonical(generation, sessionId)
+                if (!sessionScope.isCurrent(generation, sessionId)) return@launch
+                attachLoop(sessionId, generation = generation)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // 切换会话导致的取消不是错误：继续向上传播，不得把异常写进新会话的状态。
+                throw e
             } catch (e: Exception) {
+                if (!sessionScope.isCurrent(generation, sessionId)) return@launch
                 DenovaLog.w("Agent", "recover failed", e)
                 _state.value = _state.value.copy(error = e.message)
             }
-            finishStream()
+            if (sessionScope.isCurrent(generation, sessionId)) finishStream(generation, sessionId)
         }
     }
 
@@ -201,12 +211,25 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
      * 挂接流：先同步一次 active（暂停 / 停止按钮只对「当前确实存在的操作」可用，AGT-005），
      * 再交给恢复协调器（active → 挂接 → 断线重挂）。
      * [start] 与「发送被截断后核对已落地」共用，避免后者为同一目标再走一次状态重置。
+     *
+     * [generation] 是会话世代：切换会话后旧流即便还吐帧也不再投影（AGT-011）。
      */
-    private suspend fun attachLoop(sessionId: String, seed: AgentActiveView? = null) {
+    private suspend fun attachLoop(
+        sessionId: String,
+        seed: AgentActiveView? = null,
+        generation: Long = sessionScope.currentGeneration(),
+    ) {
         val c = coordinator ?: return
         // 优先用调用方已有的投影（恢复回执 / 刚探测的 active），同一时刻只问一次服务端。
         val active = seed ?: refreshActive()
-        c.recover(sessionId, seed = active).collect { onFrame(it) }
+        if (!sessionScope.isCurrent(generation, sessionId)) return
+        c.recover(sessionId, seed = active).collect { frame ->
+            if (sessionScope.isCurrent(generation, sessionId)) {
+                onFrame(frame)
+            } else {
+                DenovaLog.w("Agent", "stale frame dropped session=$sessionId")
+            }
+        }
     }
 
     /** 追加一段正文引用；同一文件同一区间同一内容只保留一条。 */
@@ -277,6 +300,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             uncertainCommandId = "",
             uncertainMessage = "",
         )
+        val generation = sessionScope.currentGeneration()
         sendJob = viewModelScope.launch {
             commands.save(record)
             try {
@@ -293,6 +317,11 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     },
                     onEvent = { frame ->
+                        // 期间切到别的会话：这一帧属于旧会话，不得改当前会话的正文与状态（AGT-011）。
+                        if (!sessionScope.isCurrent(generation, sessionId)) {
+                            DenovaLog.w("Agent", "stale send frame dropped session=$sessionId")
+                            return@collectWithIdleGuard
+                        }
                         if (frame.completesTurn()) completed = true
                         if (!accepted) {
                             accepted = true
@@ -314,8 +343,8 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     setUncertain(commandId, text, baseline)
                     // 在本 job 内核对并接管：核对已落地就直接挂接补结果。
                     // 核对用的 canonical 页同时用于重建正文，因此不再二次全量拉取、也不重置页面状态。
-                    if (reconcile(client, sessionId, commandId, text, baseline) is ReconcileOutcome.Landed) {
-                        attachLoop(sessionId)
+                    if (reconcile(client, sessionId, commandId, text, baseline, generation) is ReconcileOutcome.Landed) {
+                        attachLoop(sessionId, generation = generation)
                     }
                 } else {
                     if (!accepted) {
@@ -328,19 +357,24 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                         _state.value = _state.value.copy(error = "流空闲超时，任务可能已结束")
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // 切换会话会取消这次发送：取消不是失败，更不能把错误写进新会话的状态。
+                throw e
             } catch (e: GameStreamError) {
                 val rejected = e.status in 400..499 && e.code != null && e.code != "agent_runtime.stream_attached"
                 commands.updateStatus(commandId, if (rejected) CommandStatus.REJECTED else CommandStatus.UNCERTAIN)
                 DenovaLog.w("Agent", "send failed code=${e.code} status=${e.status}")
+                if (!sessionScope.isCurrent(generation, sessionId)) return@launch
                 _state.value = _state.value.copy(error = e.message)
                 if (!rejected) markUncertain(commandId, text, baseline)
             } catch (e: Exception) {
                 commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
                 DenovaLog.w("Agent", "send uncertain", e)
+                if (!sessionScope.isCurrent(generation, sessionId)) return@launch
                 _state.value = _state.value.copy(error = e.message)
                 markUncertain(commandId, text, baseline)
             }
-            finishStream()
+            finishStream(generation, sessionId)
         }
     }
 
@@ -435,11 +469,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val c = client ?: return
         val s = _state.value
         if (s.uncertainCommandId.isBlank() || s.reconciling) return
+        val generation = sessionScope.currentGeneration()
+        val sessionId = s.sessionId
         viewModelScope.launch {
-            val outcome = reconcile(c, s.sessionId, s.uncertainCommandId, s.uncertainMessage, s.uncertainBaselineId)
+            val outcome = reconcile(c, sessionId, s.uncertainCommandId, s.uncertainMessage, s.uncertainBaselineId, generation)
             if (outcome is ReconcileOutcome.Landed) {
-                attachLoop(s.sessionId)
-                finishStream()
+                attachLoop(sessionId, generation = generation)
+                finishStream(generation, sessionId)
             }
         }
     }
@@ -457,10 +493,16 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         commandId: String,
         message: String,
         baselineId: String,
+        generation: Long = sessionScope.currentGeneration(),
     ): ReconcileOutcome {
         _state.value = _state.value.copy(reconciling = true, reconcileNotice = "正在向服务端核对…")
         return try {
             val page = client.sessionMessages(sessionId, limit = CANONICAL_LIMIT)
+            // 核对期间切了会话：这条命令属于旧会话，结论与新会话无关，丢弃且不改写界面。
+            if (!sessionScope.isCurrent(generation, sessionId)) {
+                DenovaLog.w("Agent", "stale reconcile dropped session=$sessionId cmd=$commandId")
+                return ReconcileOutcome.NotLanded
+            }
             if (AgentPartLogic.hasLandedMessage(page.messages, baselineId, message.trim())) {
                 commands.updateStatus(commandId, CommandStatus.ACCEPTED)
                 DenovaLog.i("Agent", "reconcile landed cmd=$commandId; resume without refetch")
@@ -511,8 +553,14 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val client = client ?: return null
         val sessionId = _state.value.sessionId.trim()
         if (sessionId.isBlank()) return null
+        val generation = sessionScope.currentGeneration()
         return try {
             val view = client.agentActive(sessionId)
+            // 探测期间切了会话：这份投影属于旧会话，写进去会改掉新会话的按钮与队列状态。
+            if (!sessionScope.isCurrent(generation, sessionId)) {
+                DenovaLog.w("Agent", "stale active dropped session=$sessionId")
+                return null
+            }
             val operationId = AgentCommands.activeOperationId(view)
             val state = _state.value
             _state.value = state.copy(
@@ -547,10 +595,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     /** 队列非空期间与 active 对齐；队列清空后自行退出，不做常驻轮询。 */
     private fun ensureQueueTicker() {
         if (queueTicker?.isActive == true) return
+        val sessionId = _state.value.sessionId.trim()
+        val generation = sessionScope.currentGeneration()
         queueTicker = viewModelScope.launch {
-            while (_state.value.queue.isNotEmpty()) {
+            // 会话切换后这个轮询就不再对齐任何东西，直接退出，避免拿旧会话的队列反复写状态。
+            while (sessionScope.isCurrent(generation, sessionId) && _state.value.queue.isNotEmpty()) {
                 delay(QUEUE_REFRESH_MS)
-                if (_state.value.queue.isEmpty()) break
+                if (!sessionScope.isCurrent(generation, sessionId) || _state.value.queue.isEmpty()) break
                 refreshActive()
             }
         }
@@ -593,7 +644,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     AgentActiveView(active = true, taskId = it, streamCursor = receipt.streamCursor)
                 }
                 attachLoop(sessionId, seed)
-                finishStream()
+                finishStream(sessionScope.currentGeneration(), sessionId)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -952,14 +1003,25 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
      * 不再压平成一段文本——文本/推理/工具/图片各自可访问，部件身份由「消息 id#序号」稳定给出。
      * 流式正文清空，避免与历史里的同一段内容重复显示。
      */
-    private suspend fun reloadCanonical() {
+    private suspend fun reloadCanonical(
+        generation: Long = sessionScope.currentGeneration(),
+        sessionId: String = _state.value.sessionId,
+    ) {
         val client = client ?: return
-        val sessionId = _state.value.sessionId
         if (sessionId.isBlank()) return
         try {
             _state.value = _state.value.copy(historyLoading = true, historyError = null)
-            applyCanonical(client.sessionMessages(sessionId, limit = CANONICAL_LIMIT))
+            val page = client.sessionMessages(sessionId, limit = CANONICAL_LIMIT)
+            // 期间换过会话：这份历史属于旧会话，丢弃而不是覆盖新会话（AGT-011）。
+            if (!sessionScope.isCurrent(generation, sessionId)) {
+                DenovaLog.w("Agent", "stale canonical dropped session=$sessionId")
+                return
+            }
+            applyCanonical(page)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
+            if (!sessionScope.isCurrent(generation, sessionId)) return
             DenovaLog.w("Agent", "load canonical history failed", e)
             _state.value = _state.value.copy(
                 historyLoading = false,
@@ -1002,13 +1064,16 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         val sessionId = state.sessionId.trim()
         val before = state.historyNextBefore.trim()
         if (sessionId.isBlank() || !state.historyHasMore || state.historyLoadingMore || before.isEmpty()) return
+        val generation = sessionScope.currentGeneration()
         _state.value = state.copy(historyLoadingMore = true, historyError = null)
         viewModelScope.launch {
             try {
                 val page = client.sessionMessages(sessionId, limit = CANONICAL_LIMIT, before = before)
                 val current = _state.value
                 // 迟到回包只对同一会话、同一游标有效：期间换过会话或已重载历史就丢弃这一页。
-                if (current.sessionId.trim() != sessionId || current.historyNextBefore.trim() != before) {
+                if (!sessionScope.isCurrent(generation, sessionId) ||
+                    current.sessionId.trim() != sessionId || current.historyNextBefore.trim() != before
+                ) {
                     DenovaLog.w("Agent", "older history discarded session=$sessionId before=$before")
                     return@launch
                 }
@@ -1145,7 +1210,15 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun finishStream() {
+    /** 流收尾；[generation] 与 [sessionId] 是发起这次流时的作用域，切换会话后不再改写界面（AGT-011）。 */
+    private fun finishStream(
+        generation: Long = sessionScope.currentGeneration(),
+        sessionId: String = _state.value.sessionId,
+    ) {
+        if (!sessionScope.isCurrent(generation, sessionId)) {
+            DenovaLog.w("Agent", "stale finish dropped session=$sessionId")
+            return
+        }
         val current = _state.value
         val ui = when {
             // 用户主动停止导致的流结束不是错误：如实记为完成，避免把 abort 显示成失败。
