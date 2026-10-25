@@ -31,11 +31,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.denova.novara.BuildConfig
 import com.denova.novara.R
 import com.denova.novara.core.network.WorkspaceChangeComment
 import com.denova.novara.core.network.WorkspaceChangeGroupSummary
 import com.denova.novara.core.network.WorkspaceChangeSet
 import com.denova.novara.core.project.ProjectFileRow
+import com.denova.novara.core.project.ProjectFileTree
 import com.denova.novara.feature.changes.ChangeDiff
 import com.denova.novara.feature.changes.ChangeFileDiff
 import com.denova.novara.feature.changes.ChangesUiState
@@ -84,7 +86,8 @@ fun RightDrawer(
 }
 
 /**
- * 项目目录（WRI-002）：`/files/resolve` 递归文件树。点击目录展开/折叠，点击文件由回调交给编辑器打开。
+ * 项目目录（WRI-002）：`/files/resolve` 递归文件树。点击目录展开/折叠，点击文件由回调交给编辑器打开；
+ * 目录被服务端截断时子项末尾出现「加载更多」，按 `continuation` 续页。
  */
 @Composable
 fun ProjectDirectoryContent(
@@ -92,6 +95,8 @@ fun ProjectDirectoryContent(
     onToggle: (String) -> Unit,
     onOpenFile: (String) -> Unit,
     onRefresh: () -> Unit,
+    onLoadMore: (String) -> Unit = {},
+    onSetDebugBudget: (Int?) -> Unit = {},
 ) {
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -102,6 +107,21 @@ fun ProjectDirectoryContent(
             Text(stringResource(R.string.project_directory), style = MaterialTheme.typography.labelLarge)
             TextButton(onClick = onRefresh, enabled = !state.loading) {
                 Text(stringResource(R.string.refresh))
+            }
+        }
+        // 分页边界探针：服务端默认条目上限（100000）远大于真实项目，
+        // 只有显式小预算才能拿到 children_state=partial，故仅在 debug 构建暴露。
+        if (BuildConfig.DEBUG && state.projectId.isNotBlank()) {
+            val budget = state.entryBudget
+            TextButton(
+                onClick = { onSetDebugBudget(if (budget == null) DEBUG_TREE_BUDGET else null) },
+                enabled = !state.loading,
+            ) {
+                Text(
+                    if (budget == null) stringResource(R.string.project_directory_debug_paging)
+                    else stringResource(R.string.project_directory_debug_paging_on, budget),
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
         }
         val muted = MaterialTheme.colorScheme.outline
@@ -134,15 +154,20 @@ fun ProjectDirectoryContent(
                 items(state.rows, key = { it.node.path }) { row ->
                     ProjectFileRowItem(
                         row = row,
-                        selected = row.node.path == state.selectedPath,
+                        selected = !row.loadMore && row.node.path == state.selectedPath,
+                        loadingMore = row.loadMore && row.node.path.removeSuffix(ProjectFileTree.LOAD_MORE_SUFFIX) in state.loadingMore,
                         onToggle = onToggle,
                         onOpenFile = onOpenFile,
+                        onLoadMore = onLoadMore,
                     )
                 }
             }
         }
     }
 }
+
+/** 分页探针使用的小预算：足够让任何一个多项目录在首页就截断。 */
+private const val DEBUG_TREE_BUDGET = 6
 
 /**
  * 变更审阅（P3 链路）：列出 `/changes/groups`，支持接受 / 拒绝 / 撤销 / 重做。
@@ -918,10 +943,32 @@ private fun ChangeGroupItem(
 private fun ProjectFileRowItem(
     row: ProjectFileRow,
     selected: Boolean,
+    loadingMore: Boolean,
     onToggle: (String) -> Unit,
     onOpenFile: (String) -> Unit,
+    onLoadMore: (String) -> Unit,
 ) {
     val node = row.node
+    if (row.loadMore) {
+        // 「加载更多」是合成行：真实路径 = 去掉后缀的目录路径，点击续页而不是打开文件。
+        val dirPath = node.path.removeSuffix(ProjectFileTree.LOAD_MORE_SUFFIX)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !loadingMore) { onLoadMore(dirPath) }
+                .padding(start = (12 + row.depth * 16).dp, top = 6.dp, bottom = 6.dp, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text(
+                if (loadingMore) stringResource(R.string.project_directory_loading_more) else stringResource(R.string.project_directory_load_more),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                maxLines = 1,
+            )
+        }
+        return
+    }
     Row(
         Modifier
             .fillMaxWidth()

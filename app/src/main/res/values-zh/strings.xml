@@ -47,6 +47,10 @@
     <string name="loading">加载中…</string>
     <string name="project_directory_hint">先在编辑器输入项目 ID</string>
     <string name="project_directory_empty">目录为空</string>
+    <string name="project_directory_load_more">加载更多…</string>
+    <string name="project_directory_loading_more">加载中…</string>
+    <string name="project_directory_debug_paging">调试：强制分页</string>
+    <string name="project_directory_debug_paging_on">调试：分页预算 %1$d</string>
 
     <!-- 书籍切换（P3） -->
     <string name="current_book">当前书籍</string>

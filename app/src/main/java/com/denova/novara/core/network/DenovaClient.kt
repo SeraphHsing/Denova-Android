@@ -389,18 +389,44 @@ class DenovaClient(
         }
     }
 
-    /** 解析项目文件树：`recursive=true` 一次铺开目录（第一版不做懒加载分页）。 */
+    /**
+     * 解析项目文件树：`recursive=true` 时服务端在条目预算内广度优先铺开，
+     * 预算用尽的分支返回 `children_state=partial` + `continuation`，由 [resolveProjectDirectoryPage] 续页。
+     */
     suspend fun resolveProjectFiles(
         projectId: String,
         paths: List<String>,
         recursive: Boolean = true,
+        entryBudget: Int? = null,
+    ): ProjectFileTreeResolveResponse = postResolve(
+        projectId = projectId,
+        targets = paths.map { ProjectFileResolveTarget(it) },
+        recursive = recursive,
+        entryBudget = entryBudget,
+    )
+
+    /** 目录续页（WRI-002）：「加载更多」用上一页给出的 `continuation` 取下一页，游标仅在 revision 未变时有效。 */
+    suspend fun resolveProjectDirectoryPage(
+        projectId: String,
+        path: String,
+        cursor: String,
+        entryBudget: Int? = null,
+    ): ProjectFileTreeResolveResponse = postResolve(
+        projectId = projectId,
+        targets = listOf(ProjectFileResolveTarget(path, cursor)),
+        recursive = true,
+        entryBudget = entryBudget,
+    )
+
+    private suspend fun postResolve(
+        projectId: String,
+        targets: List<ProjectFileResolveTarget>,
+        recursive: Boolean,
+        entryBudget: Int?,
     ): ProjectFileTreeResolveResponse {
         val body = json.encodeToString(
             ProjectFileResolveRequest.serializer(),
-            ProjectFileResolveRequest(
-                targets = paths.map { ProjectFileResolveTarget(it) },
-                recursive = recursive,
-            ),
+            ProjectFileResolveRequest(targets = targets, recursive = recursive, entryBudget = entryBudget),
         )
         val request = Request.Builder()
             .url(projectFilesResolveUrl(projectId))

@@ -321,6 +321,8 @@ class MainActivity : AppCompatActivity() {
                                                 if (currentRoute != "editor") navController.navigate("editor")
                                             },
                                             onRefresh = projectDirectoryViewModel::refresh,
+                                            onLoadMore = projectDirectoryViewModel::loadMore,
+                                            onSetDebugBudget = projectDirectoryViewModel::setDebugEntryBudget,
                                         )
                                     } else if (rightTab == 1) {
                                         ChangesContent(

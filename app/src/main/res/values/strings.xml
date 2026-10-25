@@ -47,6 +47,10 @@
     <string name="loading">Loading…</string>
     <string name="project_directory_hint">Enter a project ID in the editor first</string>
     <string name="project_directory_empty">No files</string>
+    <string name="project_directory_load_more">Load more…</string>
+    <string name="project_directory_loading_more">Loading…</string>
+    <string name="project_directory_debug_paging">Debug: force paging</string>
+    <string name="project_directory_debug_paging_on">Debug: paging budget %1$d</string>
 
     <!-- 书籍切换（P3） -->
     <string name="current_book">Current book</string>
