@@ -86,7 +86,8 @@ fun decideAgentRecovery(active: AgentActiveView?, streamError: GameStreamError?)
 interface AgentStreamTransport {
     suspend fun agentActive(sessionId: String): AgentActiveView
 
-    fun agentStream(taskId: String, after: String?): Flow<AgentUiFrame>
+    /** 挂接写作任务流：服务端要求 `session_id` + `task_id` 同时绑定，缺一即 400。 */
+    fun agentStream(sessionId: String, taskId: String, after: String?): Flow<AgentUiFrame>
 
     suspend fun agentRecover(sessionId: String, action: RecoveryAction): RecoveryReceipt
 }

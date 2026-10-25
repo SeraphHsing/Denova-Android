@@ -23,12 +23,14 @@ class AgentRecoveryTest {
 
     private class FakeTransport(var activeResult: AgentActiveView) : AgentStreamTransport {
         val streamCalls = mutableListOf<Pair<String, String?>>()
+        val streamSessions = mutableListOf<String>()
         val streams = mutableListOf<Flow<AgentUiFrame>>()
         private var index = 0
 
         override suspend fun agentActive(sessionId: String): AgentActiveView = activeResult
 
-        override fun agentStream(taskId: String, after: String?): Flow<AgentUiFrame> {
+        override fun agentStream(sessionId: String, taskId: String, after: String?): Flow<AgentUiFrame> {
+            streamSessions.add(sessionId)
             streamCalls.add(taskId to after)
             return if (index < streams.size) streams[index++] else flowOf()
         }
@@ -89,6 +91,24 @@ class AgentRecoveryTest {
 
         assertEquals(listOf(chunk, AgentUiFrame.Done), frames)
         assertEquals(listOf("t1" to "5"), transport.streamCalls)
+        // 挂接必须带 session 身份：服务端缺 session_id 直接 400，恢复链会在第一步断掉。
+        assertEquals(listOf("s1"), transport.streamSessions)
+        assertEquals(0, reloads)
+    }
+
+    @Test
+    fun `attach rejection without rehydrate code stops recovery`() = runBlocking {
+        // 400 agent_runtime.invalid_binding（如缺 session_id）不属于 rehydrate 语义：重试也没用，直接结束。
+        val transport = FakeTransport(AgentActiveView(active = true, taskId = "t1"))
+        transport.streams.add(flow<AgentUiFrame> { throw GameStreamError(400, "agent_runtime.invalid_binding", "x") })
+        transport.streams.add(flowOf(AgentUiFrame.Done))
+        var reloads = 0
+        val coordinator = AgentStreamRecoveryCoordinator(transport) { reloads++ }
+
+        val frames = coordinator.recover("s1").toList()
+
+        assertEquals(emptyList<AgentUiFrame>(), frames)
+        assertEquals(1, transport.streamCalls.size)
         assertEquals(0, reloads)
     }
 
@@ -120,6 +140,66 @@ class AgentRecoveryTest {
         assertEquals(1, reloads)
         assertEquals(2, transport.streamCalls.size)
         assertEquals(1, frames.size)
+    }
+
+    @Test
+    fun `network interruptions rehydrate and reattach each time`() = runBlocking {
+        // AGT-009：断线两次 → 每次重读 canonical 后重新挂接，第三次正常结束；正文不重复由 reloadCanonical 保证。
+        val transport = FakeTransport(AgentActiveView(active = true, taskId = "t1"))
+        transport.streams.add(flow<AgentUiFrame> { throw java.io.IOException("connection reset") })
+        transport.streams.add(flow<AgentUiFrame> { throw java.io.IOException("connection reset again") })
+        transport.streams.add(flowOf(AgentUiFrame.Done))
+        var reloads = 0
+        val coordinator = AgentStreamRecoveryCoordinator(transport) { reloads++ }
+
+        val frames = coordinator.recover("s1").toList()
+
+        assertEquals(2, reloads)
+        assertEquals(3, transport.streamCalls.size)
+        assertEquals(listOf(AgentUiFrame.Done), frames)
+    }
+
+    @Test
+    fun `active probe failure consumes the same retry budget`() = runBlocking {
+        // 断网后第一次探测 active 就失败：必须重试而不是直接结束恢复链。
+        val transport = object : AgentStreamTransport {
+            var probes = 0
+            override suspend fun agentActive(sessionId: String): AgentActiveView {
+                probes++
+                if (probes == 1) throw java.io.IOException("no route to host")
+                return AgentActiveView(active = true, taskId = "t1")
+            }
+
+            override fun agentStream(sessionId: String, taskId: String, after: String?): Flow<AgentUiFrame> =
+                flowOf(AgentUiFrame.Done)
+
+            override suspend fun agentRecover(sessionId: String, action: RecoveryAction): RecoveryReceipt =
+                throw UnsupportedOperationException()
+        }
+        val coordinator = AgentStreamRecoveryCoordinator(transport, retryDelayMillis = 0) {}
+
+        val frames = coordinator.recover("s1").toList()
+
+        assertEquals(2, transport.probes)
+        assertEquals(listOf(AgentUiFrame.Done), frames)
+    }
+
+    @Test
+    fun `transfer retries stop after the limit`() = runBlocking {
+        val transport = FakeTransport(AgentActiveView(active = true, taskId = "t1"))
+        repeat(4) { transport.streams.add(flow<AgentUiFrame> { throw java.io.IOException("boom $it") }) }
+        var reloads = 0
+        val coordinator = AgentStreamRecoveryCoordinator(
+            transport = transport,
+            maxTransferRetries = 2,
+            retryDelayMillis = 0,
+        ) { reloads++ }
+
+        val frames = coordinator.recover("s1").toList()
+
+        assertTrue(frames.isEmpty())
+        assertEquals(2, reloads)          // 只在预算内重挂
+        assertEquals(3, transport.streamCalls.size)
     }
 
     @Test

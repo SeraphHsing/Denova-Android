@@ -285,6 +285,13 @@ object AgentPartLogic {
         return value?.replace("\n", " ")?.let { if (it.length > 120) it.take(117) + "…" else it }
     }
 
+    /** 一条消息里的纯文本（只取 `text` 部件，按原顺序拼接）——用于核对「这条命令有没有落到服务端」。 */
+    fun messageText(message: AgentMessage): String = message.parts
+        .filter { (it["type"] as? JsonPrimitive)?.contentOrNull == AgentTextPart.TYPE }
+        .mapNotNull { (it["text"] as? JsonPrimitive)?.contentOrNull }
+        .joinToString("")
+        .trim()
+
     /** 格式化 JSON（能解析则两空格缩进），超过 [maxChars] 截断并标注原长。 */
     fun prettyText(raw: String, maxChars: Int = 1200): String {
         if (raw.isBlank()) return ""

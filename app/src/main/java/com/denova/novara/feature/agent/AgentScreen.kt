@@ -509,13 +509,15 @@ fun AgentScreen(
     var sessionId by remember { mutableStateOf("") }
     var input by remember { mutableStateOf("") }
 
-    // 从编辑器进入时自动确保写作会话（无需手动输入 session ID）。
+    // 进入页面自动回到会话（AGT-013）：优先上次挂接的会话，其次服务端 active / 最近会话。
+    // 进程被杀后重启也能直接落回同一会话，pending ask 与任务入口由服务端投影恢复。
     LaunchedEffect(projectId, initialFile) {
         if (sessionId.isBlank()) {
-            val ensured = viewModel.ensureSession()
-            if (ensured != null) {
-                sessionId = ensured
-                viewModel.start(ensured, projectId)
+            val saved = viewModel.savedSessionId().takeIf { it.isNotBlank() }
+            val chosen = saved ?: viewModel.ensureSession()
+            if (chosen != null) {
+                sessionId = chosen
+                viewModel.start(chosen, projectId)
             }
         }
     }
@@ -548,6 +550,9 @@ fun AgentScreen(
             AgentPhase.RUNNING -> "运行中"
             AgentPhase.DONE -> "完成"
             AgentPhase.ERROR -> "错误"
+        }.let { base ->
+            // 有待答提问时任务其实没结束：进程重启后 runtime 可能报 idle，这里按 ask 事实纠正文案。
+            if (state.pendingAsks.isNotEmpty()) stringResource(R.string.agent_waiting_ask) else base
         }
         val activityText = if (state.ui.activity.isNotBlank()) " · ${state.ui.activity}" else ""
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
@@ -590,6 +595,26 @@ fun AgentScreen(
         }
         state.error?.let {
             Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
+        }
+        // 发送结果不明（AGT-008）：明确标出 uncertain，并提供「重新核对」；不会自动重发新命令。
+        if (state.uncertainCommandId.isNotBlank() || state.reconcileNotice.isNotBlank()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.agent_uncertain) + "：" +
+                        state.reconcileNotice.ifBlank { stringResource(R.string.agent_uncertain_hint) },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f),
+                )
+                if (state.uncertainCommandId.isNotBlank()) {
+                    TextButton(onClick = { viewModel.reconcileSend() }, enabled = !state.reconciling) {
+                        Text(stringResource(R.string.agent_reconcile))
+                    }
+                }
+            }
         }
         if (state.ui.thinking.isNotBlank()) {
             Text(

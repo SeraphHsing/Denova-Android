@@ -190,4 +190,8 @@
     <string name="agent_image_missing">Image unavailable: %1$s</string>
     <string name="agent_image_loading">Loading image…</string>
     <string name="agent_live_tail">Streaming</string>
+    <string name="agent_uncertain">Send result unknown</string>
+    <string name="agent_uncertain_hint">Checking with the server…</string>
+    <string name="agent_reconcile">Check again</string>
+    <string name="agent_waiting_ask">Waiting for answer</string>
 </resources>

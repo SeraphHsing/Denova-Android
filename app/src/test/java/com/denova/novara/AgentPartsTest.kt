@@ -214,4 +214,20 @@ class AgentPartsTest {
         assertEquals(null, AgentPartLogic.summarizeToolInput("{}"))
         assertFalse(AgentPartLogic.summarizeToolInput("not json").let { it != null })
     }
+
+    @Test
+    fun `message text joins only text parts for reconciliation`() {
+        val plain = message(
+            id = "u1",
+            role = "user",
+            parts = arrayOf(
+                """{"type":"text","text":"看这段"}""",
+                """{"type":"text","text":" 结尾 "}""",
+                """{"type":"data-agent-ask","data":{"kind":"x"}}""",
+            ),
+        )
+        // 只拼 text 部件并 trim：用于判断「这条命令有没有落到服务端」（AGT-008）
+        assertEquals("看这段 结尾", AgentPartLogic.messageText(plain))
+        assertEquals("", AgentPartLogic.messageText(message(parts = arrayOf("""{"type":"dynamic-tool"}"""))))
+    }
 }

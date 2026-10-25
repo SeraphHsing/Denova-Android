@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 /** 应用唯一的 Preferences DataStore 实例；同文件重复创建会抛「multiple DataStores active」。 */
@@ -17,6 +18,9 @@ class PreferencesStore(private val context: Context) : Preferences {
     private object Keys {
         val DARK_THEME = booleanPreferencesKey("dark_theme")
         val LANGUAGE = stringPreferencesKey("language")
+
+        /** 上次挂接的 Agent 会话：进程被杀后据此回到同一会话（服务端 active 仍是事实源）。 */
+        val LAST_AGENT_SESSION = stringPreferencesKey("last_agent_session")
     }
 
     override val darkTheme: Flow<Boolean> = context.novaraPreferences.data
@@ -32,5 +36,13 @@ class PreferencesStore(private val context: Context) : Preferences {
 
     override suspend fun setLanguage(tag: String) {
         context.novaraPreferences.edit { prefs -> prefs[Keys.LANGUAGE] = tag }
+    }
+
+    /** 上次挂接的 Agent 会话 id（仅记录「回到哪个会话」这个指针，任务状态仍以服务端 active 为准）。 */
+    suspend fun lastAgentSession(): String =
+        context.novaraPreferences.data.map { it[Keys.LAST_AGENT_SESSION] ?: "" }.first()
+
+    suspend fun setLastAgentSession(sessionId: String) {
+        context.novaraPreferences.edit { prefs -> prefs[Keys.LAST_AGENT_SESSION] = sessionId }
     }
 }

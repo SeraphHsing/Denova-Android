@@ -643,7 +643,8 @@ class DenovaClient(
     }.flowOn(Dispatchers.IO)
 
     /**
-     * 写作 Agent UI message 流：`GET /api/chat/stream?task_id=&after=`。
+     * 写作 Agent UI message 流：`GET /api/chat/stream?session_id=&task_id=&after=`。
+     * 服务端先要 `session_id` 再按 `task_id` 精确匹配活跃任务，缺任一个都是 400。
      * 响应为 AI SDK UI message stream（`x-vercel-ai-ui-message-stream: v1`），
      * 不依赖 Last-Event-ID，重连游标通过 `after=` 显式传递。
      */
@@ -784,8 +785,11 @@ class DenovaClient(
         }
     }
 
-    override fun agentStream(taskId: String, after: String?): Flow<AgentUiFrame> = flow {
-        val request = Request.Builder().url(agentStreamUrl(taskId, after)).get().build()
+    override fun agentStream(sessionId: String, taskId: String, after: String?): Flow<AgentUiFrame> = flow {
+        val request = Request.Builder()
+            .url(writingAgentStreamUrl(server.baseUrl, sessionId, taskId, after))
+            .get()
+            .build()
         streamHttpClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) {
                 throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
@@ -1013,13 +1017,6 @@ class DenovaClient(
 
     private fun agentActiveUrl(sessionId: String): HttpUrl =
         agentChatUrl("active").newBuilder().addQueryParameter("session_id", sessionId).build()
-
-    private fun agentStreamUrl(taskId: String, after: String?): HttpUrl =
-        server.baseUrl.toHttpUrl().newBuilder()
-            .addPathSegments("api/chat/stream")
-            .addQueryParameter("task_id", taskId)
-            .apply { if (after != null) addQueryParameter("after", after) }
-            .build()
 
     private fun interactiveHistoryUrl(storyId: String, branchId: String, limit: Int): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder()

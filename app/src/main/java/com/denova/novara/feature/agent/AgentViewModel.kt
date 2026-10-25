@@ -12,6 +12,7 @@ import com.denova.novara.core.network.AgentCommandReceipt
 import com.denova.novara.core.network.AgentCommandRequest
 import com.denova.novara.core.network.DenovaApiException
 import com.denova.novara.core.network.DenovaClient
+import com.denova.novara.core.persistence.PreferencesStore
 import com.denova.novara.core.network.SendChatRequest
 import com.denova.novara.core.network.TextSelectionRef
 import com.denova.novara.core.stream.AgentActiveView
@@ -70,6 +71,13 @@ data class AgentScreenState(
     val historyError: String? = null,
     /** 当前项目作用域：图片部件走 `/files/asset` 需要它。 */
     val projectId: String = "",
+    /** 发送结果不明（AGT-008）：命令 id、原文与发送前的最后一条用户消息 id，用于向服务端核对。 */
+    val uncertainCommandId: String = "",
+    val uncertainMessage: String = "",
+    val uncertainBaselineId: String = "",
+    val reconciling: Boolean = false,
+    /** 核对结论文案（已确认收到 / 服务端未收到）。 */
+    val reconcileNotice: String = "",
 )
 
 /** 写作 Agent ViewModel：绑定 client → 恢复协调器 → 投影；发送先落命令事务再 POST。 */
@@ -77,6 +85,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val commands = CommandStore((application as NovaraApplication).container.database.commandDao())
+    private val prefs = PreferencesStore(application)
     private var client: DenovaClient? = null
     private var coordinator: AgentStreamRecoveryCoordinator? = null
     private var streamJob: Job? = null
@@ -122,11 +131,15 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** 上次挂接的会话 id：进程被杀后据此自动回到同一会话（服务端 active 仍是任务事实源）。 */
+    suspend fun savedSessionId(): String = prefs.lastAgentSession()
+
     /** 挂接 session 的活动 Agent 流。 */
     fun start(sessionId: String, projectId: String = "") {
         val c = coordinator ?: return
         if (sessionId.isBlank()) return
         DenovaLog.i("Agent", "start session=$sessionId project=${projectId.take(12)}")
+        viewModelScope.launch { prefs.setLastAgentSession(sessionId) }
         // 项目作用域随会话一起带入：图片部件要用它拼 `/files/asset`。
         _state.value = AgentScreenState(sessionId = sessionId, projectId = projectId)
         streamJob?.cancel()
@@ -196,7 +209,16 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         streamJob?.cancel()
         streamJob = null
         sendJob?.cancel()
-        _state.value = _state.value.copy(sessionId = sessionId, sending = true, error = null)
+        // 记下发送前的最后一条用户消息：回包丢失时用它判断「服务端到底有没有收到这条命令」。
+        val baseline = _state.value.messages.lastOrNull { it.isUser }?.id.orEmpty()
+        _state.value = _state.value.copy(
+            sessionId = sessionId,
+            sending = true,
+            error = null,
+            reconcileNotice = "",
+            uncertainCommandId = "",
+            uncertainMessage = "",
+        )
         sendJob = viewModelScope.launch {
             commands.save(record)
             try {
@@ -238,12 +260,79 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 commands.updateStatus(commandId, if (rejected) CommandStatus.REJECTED else CommandStatus.UNCERTAIN)
                 DenovaLog.w("Agent", "send failed code=${e.code} status=${e.status}")
                 _state.value = _state.value.copy(error = e.message)
+                if (!rejected) markUncertain(commandId, text, baseline)
             } catch (e: Exception) {
                 commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
                 DenovaLog.w("Agent", "send uncertain", e)
                 _state.value = _state.value.copy(error = e.message)
+                markUncertain(commandId, text, baseline)
             }
             finishStream()
+        }
+    }
+
+    /**
+     * 回包丢失（AGT-008）：**不重发**，标记不确定并立刻向服务端核对。
+     * 新命令会带来重复回答，因此核对只用历史 + active 两个只读接口。
+     */
+    private fun markUncertain(commandId: String, message: String, baselineId: String) {
+        _state.value = _state.value.copy(
+            sending = false,
+            uncertainCommandId = commandId,
+            uncertainMessage = message,
+            uncertainBaselineId = baselineId,
+            error = null,
+            reconcileNotice = "发送结果不明，正在核对…",
+        )
+        reconcileSend()
+    }
+
+    /**
+     * 核对「这条命令到底有没有落到服务端」：以服务端 canonical 历史为准。
+     * 找到发送前最后一条用户消息之后、正文与本次相同的用户消息，即视为服务端已收到；
+     * 收到则只挂接流补结果（等价 handoff），未收到则明确告知，不自动重发。
+     */
+    fun reconcileSend() {
+        val c = client ?: return
+        val s = _state.value
+        if (s.uncertainCommandId.isBlank() || s.reconciling) return
+        val sessionId = s.sessionId
+        val text = s.uncertainMessage.trim()
+        viewModelScope.launch {
+            _state.value = _state.value.copy(reconciling = true, reconcileNotice = "正在向服务端核对…")
+            try {
+                val page = c.sessionMessages(sessionId, limit = 20)
+                val users = page.messages.filter { it.role == AgentPartLogic.ROLE_USER }
+                val baselineIndex = users.indexOfFirst { it.id == s.uncertainBaselineId }
+                val candidate = users.drop(baselineIndex + 1)
+                val landed = candidate.any { AgentPartLogic.messageText(it) == text } ||
+                    (baselineIndex < 0 && users.lastOrNull()?.let { AgentPartLogic.messageText(it) == text } == true)
+                if (landed) {
+                    commands.updateStatus(s.uncertainCommandId, CommandStatus.ACCEPTED)
+                    DenovaLog.i("Agent", "reconcile landed cmd=${s.uncertainCommandId}")
+                    _state.value = _state.value.copy(
+                        reconciling = false,
+                        uncertainCommandId = "",
+                        uncertainMessage = "",
+                        uncertainBaselineId = "",
+                        reconcileNotice = "已确认服务端收到，正在接回结果",
+                    )
+                    // 只挂接，不重发：canonical 历史与流都从服务端取。
+                    start(sessionId, s.projectId)
+                } else {
+                    DenovaLog.w("Agent", "reconcile not landed cmd=${s.uncertainCommandId}")
+                    _state.value = _state.value.copy(
+                        reconciling = false,
+                        reconcileNotice = "服务端未收到该命令；为避免重复回答不会自动重发，请手动重发",
+                    )
+                }
+            } catch (e: Exception) {
+                DenovaLog.w("Agent", "reconcile failed cmd=${s.uncertainCommandId}", e)
+                _state.value = _state.value.copy(
+                    reconciling = false,
+                    reconcileNotice = "核对失败：${e.message ?: "网络错误"}",
+                )
+            }
         }
     }
 
