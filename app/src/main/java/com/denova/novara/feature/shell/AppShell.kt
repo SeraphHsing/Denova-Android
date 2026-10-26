@@ -222,21 +222,19 @@ fun AppDrawer(
                                     MaterialTheme.colorScheme.onSurface
                                 },
                             )
-                            if (!spec.implemented) {
-                                Text(
+                            when {
+                                // 未实现：只标 WIP，不给可点击的视觉暗示（不给 ›，也没有跳转）。
+                                !spec.implemented -> Text(
                                     stringResource(R.string.dest_placeholder),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.outline,
                                 )
-                            }
-                            if (selected) {
-                                Icon(
+                                selected -> Icon(
                                     Icons.Filled.Check,
                                     contentDescription = stringResource(R.string.dest_current),
                                     tint = MaterialTheme.colorScheme.primary,
                                 )
-                            } else {
-                                Icon(
+                                else -> Icon(
                                     Icons.Filled.KeyboardArrowRight,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.outline,
