@@ -657,4 +657,83 @@ class EditorSessionTest {
         advanceUntilIdle()
         assertTrue(remote.saveCount() > savesAfterConflict)
     }
+
+    // ---- 撤销 / 重做（WRI-014） ----
+
+    @Test
+    fun `undo restores body and caret, redo brings the edit back`() = runTest {
+        val drafts = FakeDrafts()
+        var clock = 0L
+        val remote = FakeRemote()
+        val session = EditorSession(FileSaveCoordinator(remote, drafts), drafts, this, now = { clock })
+        session.open("p", "f.md", "abc", "r0")
+        // 打开即基线：没有可撤销的历史。
+        assertFalse(session.state.value.undoAvailable)
+
+        clock += 5_000
+        session.edit("abcd", caret = 3)
+        clock += 5_000
+        session.edit("abcde", caret = 4)
+        assertEquals("abcde", session.state.value.content)
+        assertTrue(session.state.value.undoAvailable)
+
+        clock += 5_000
+        // 两次编辑之间超过合并窗口 → 每一步独立可撤销。
+        assertTrue(session.undo())
+        assertEquals("abcd", session.state.value.content)
+        assertEquals(3, session.state.value.caret)
+        assertTrue(session.state.value.redoAvailable)
+
+        assertTrue(session.undo())
+        assertEquals("abc", session.state.value.content)
+        assertEquals(0, session.state.value.caret)
+
+        assertTrue(session.redo())
+        assertEquals("abcd", session.state.value.content)
+        assertEquals(3, session.state.value.caret)
+    }
+
+    @Test
+    fun `continuous typing collapses into one undo step`() = runTest {
+        val drafts = FakeDrafts()
+        var clock = 0L
+        val session = EditorSession(FileSaveCoordinator(FakeRemote(), drafts), drafts, this, now = { clock })
+        session.open("p", "f.md", "a", "r0")
+
+        // 三次按键都在合并窗口内（700ms）：只应留下「a」这一个基线。
+        clock += 100
+        session.edit("ab", caret = 2)
+        clock += 100
+        session.edit("abc", caret = 3)
+        clock += 100
+        session.edit("abcd", caret = 4)
+
+        assertTrue(session.undo())
+        assertEquals("a", session.state.value.content)
+        // 一步退回突发开始，再撤已无内容。
+        assertFalse(session.state.value.undoAvailable)
+        assertFalse(session.undo())
+    }
+
+    @Test
+    fun `load external clears undo history and resets caret`() = runTest {
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二服务器\n段落三\n结尾"
+            serverRevision = "r2"
+        }
+        val session = conflictSession(remote, FakeDrafts(), RecordingArchive(), this)
+        advanceUntilIdle()
+        assertTrue(session.state.value.undoAvailable)
+
+        session.loadExternalVersion()
+        advanceUntilIdle()
+
+        // 基线 loadExternalVersion 的 resetHistory：被丢弃的本地改动不得再通过撤销回到编辑区。
+        assertFalse(session.state.value.undoAvailable)
+        assertFalse(session.state.value.redoAvailable)
+        assertEquals(0, session.state.value.caret)
+        assertFalse(session.undo())
+        assertEquals("标题\n段落一\n段落二服务器\n段落三\n结尾", session.state.value.content)
+    }
 }

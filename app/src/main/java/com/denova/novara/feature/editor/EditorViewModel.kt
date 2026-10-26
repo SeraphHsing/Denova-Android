@@ -51,6 +51,10 @@ data class EditorUiState(
     val conflict: ExternalConflict? = null,
     /** 外部改写正文（合并结果）时递增，用于让界面重建编辑态。 */
     val contentEpoch: Int = 0,
+    /** 最近一次已知光标位置：撤销 / 重做按快照恢复选区（WRI-014）。 */
+    val caret: Int = 0,
+    val undoAvailable: Boolean = false,
+    val redoAvailable: Boolean = false,
 )
 
 /**
@@ -215,14 +219,24 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     /** [composing] 来自 `TextFieldValue.composition != null`，组合态不排自动保存（WRI-008）。 */
-    fun updateContent(text: String, composing: Boolean = false) {
+    fun updateContent(text: String, composing: Boolean = false, caret: Int = text.length) {
         val s = session ?: return
         EditorPerf.markEditStart()
-        s.edit(text, composing)
+        s.edit(text, composing, caret)
     }
 
     fun save() {
         session?.saveNow()
+    }
+
+    /** 撤销一步（WRI-014）；正文变化后照常自动保存。 */
+    fun undo() {
+        session?.undo()
+    }
+
+    /** 重做一步（WRI-014）。 */
+    fun redo() {
+        session?.redo()
     }
 
     /** 冲突选择之一：保留本地（当前合并后的正文）并立即保存。 */

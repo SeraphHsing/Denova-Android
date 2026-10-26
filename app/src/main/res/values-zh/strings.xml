@@ -31,6 +31,8 @@
     <string name="attach">挂接</string>
     <string name="send">发送</string>
     <string name="editor_title">Novara 编辑器</string>
+    <string name="editor_undo">撤销</string>
+    <string name="editor_redo">重做</string>
     <string name="editor_pick_image">选择项目素材</string>
     <string name="editor_image_empty">assets/ 下没有可用图片</string>
     <string name="cancel">取消</string>

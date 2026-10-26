@@ -1,5 +1,7 @@
 package com.denova.novara.feature.editor
 
+import com.denova.novara.core.editor.EditHistory
+import com.denova.novara.core.editor.EditSnapshot
 import com.denova.novara.core.editor.MergeResult
 import com.denova.novara.core.editor.ThreeWayMerge
 import com.denova.novara.core.logging.DenovaLog
@@ -156,6 +158,8 @@ class EditorSession(
     private val drafts: DraftStorage,
     private val scope: CoroutineScope,
     private val debounceMillis: Long = AUTOSAVE_DEBOUNCE_MILLIS,
+    /** 时钟（毫秒）：撤销栈按时间窗合并连续输入，单测需要可控时间。 */
+    private val now: () -> Long = { System.currentTimeMillis() },
 ) {
     companion object {
         /** 自动保存防抖；也是「最后一次编辑 → 草稿落盘」的固定下限（G2 指标口径）。 */
@@ -167,6 +171,9 @@ class EditorSession(
 
     private val _state = MutableStateFlow(EditorUiState())
     val state: StateFlow<EditorUiState> = _state.asStateFlow()
+
+    /** 撤销 / 重做（WRI-014）：基线在打开、加载外部、采纳合并结果时重设。 */
+    private val history = EditHistory()
 
     /** 防抖计时器：到期后启动一次真正的保存。 */
     private var debounceJob: Job? = null
@@ -197,6 +204,8 @@ class EditorSession(
         // 重新打开同一个文件时正文可能变（例如服务器被别处改回），必须让界面重建编辑态，
         // 否则输入框还留着旧文本，下一次保存会把旧内容写回服务器（contentEpoch 是界面重置键）。
         val epoch = _state.value.contentEpoch + 1
+        // 打开（含重新打开）即新基线：旧文件的编辑历史不得跨文件撤销（WRI-014）。
+        history.reset()
         when (val decision = EditorOpen.decide(serverContent, serverRevision, drafts.loadDraft(key))) {
             is OpenDecision.Server -> {
                 drafts.clearDraft(key) // 清理残留草稿（内容已与服务器一致）
@@ -239,6 +248,7 @@ class EditorSession(
     fun clear() {
         cancelPendingSaves()
         openEpoch++
+        history.reset()
         _state.value = EditorUiState()
     }
 
@@ -256,15 +266,19 @@ class EditorSession(
      * 组合态只更新本地内容、不排自动保存：拼音 / 手写候选还没落定时的中间串写进服务端，
      * 会给对端和版本历史留下半成品。组合结束（下一次回调 `composing=false`）才排保存。
      */
-    fun edit(newContent: String, composing: Boolean = false) {
+    fun edit(newContent: String, composing: Boolean = false, caret: Int = newContent.length) {
         val s = _state.value
         if (!s.loaded) return
+        // 撤销基线取「改动前」的正文与光标：连续输入按时间窗合并成一步（WRI-014）。
+        if (newContent != s.content) {
+            history.record(now(), EditSnapshot(s.content, s.caret))
+        }
         // 冲突状态下暂停自动保存，等待用户手动解决（resolveConflict），避免盲目覆盖冲突材料。
         if (s.saveStatus == SaveStatus.CONFLICT) {
-            _state.value = s.copy(content = newContent)
+            _state.value = withHistoryFlags(s.copy(content = newContent, caret = caret))
             return
         }
-        _state.value = s.copy(content = newContent, saveStatus = SaveStatus.IDLE)
+        _state.value = withHistoryFlags(s.copy(content = newContent, caret = caret, saveStatus = SaveStatus.IDLE))
         if (composing) {
             debounceJob?.cancel()
             debounceJob = null
@@ -272,6 +286,37 @@ class EditorSession(
         }
         scheduleSave()
     }
+
+    /**
+     * 撤销一步（WRI-014）。冲突未解决时不生效：不能靠撤销绕过「保留本地 / 加载外部」的选择。
+     * 撤销后的正文照常走自动保存——服务端仍是事实源，只是内容由用户回退。
+     */
+    fun undo(): Boolean = applySnapshot(history.undo(EditSnapshot(_state.value.content, _state.value.caret)), "已撤销")
+
+    /** 重做一步（WRI-014）。 */
+    fun redo(): Boolean = applySnapshot(history.redo(EditSnapshot(_state.value.content, _state.value.caret)), "已重做")
+
+    private fun applySnapshot(target: EditSnapshot?, message: String): Boolean {
+        val s = _state.value
+        if (target == null || !s.loaded || s.saveStatus == SaveStatus.CONFLICT) return false
+        _state.value = withHistoryFlags(
+            s.copy(
+                content = target.text,
+                // 光标随快照恢复；界面按 contentEpoch 重建编辑态后落到这个位置。
+                caret = target.caret.coerceIn(0, target.text.length),
+                contentEpoch = s.contentEpoch + 1,
+                saveStatus = SaveStatus.IDLE,
+                message = message,
+            ),
+        )
+        DenovaLog.i("Editor", "history $message len=${target.text.length} caret=${target.caret}")
+        scheduleSave()
+        return true
+    }
+
+    /** 撤销 / 重做可用性同步进状态，界面据此置灰按钮。 */
+    private fun withHistoryFlags(state: EditorUiState): EditorUiState =
+        state.copy(undoAvailable = history.canUndo, redoAvailable = history.canRedo)
 
     /**
      * 手动保存（WRI-011）：跳过防抖立刻落盘。
@@ -332,7 +377,12 @@ class EditorSession(
     fun keepLocalVersion() {
         val s = _state.value
         if (s.conflict == null && s.saveStatus != SaveStatus.CONFLICT) return
-        _state.value = s.copy(conflictText = null, conflict = null, saveStatus = SaveStatus.IDLE, message = null)
+        // 冲突选择会改写 base（换成服务器内容），撤销基线随之重设：
+        // 否则「撤销」能把冲突前的旧正文退回来，再保存就覆盖掉服务端内容（WRI-014）。
+        history.reset()
+        _state.value = withHistoryFlags(
+            s.copy(conflictText = null, conflict = null, saveStatus = SaveStatus.IDLE, message = null),
+        )
         saveNow()
     }
 
@@ -347,15 +397,22 @@ class EditorSession(
         val conflict = s.conflict ?: return
         cancelPendingSaves()
         openEpoch++
-        _state.value = s.copy(
-            content = conflict.externalContent,
-            baseContent = conflict.externalContent,
-            baseRevision = conflict.externalRevision,
-            saveStatus = SaveStatus.IDLE,
-            conflictText = null,
-            conflict = null,
-            message = "已加载外部版本",
-            contentEpoch = s.contentEpoch + 1,
+        // 对应基线 `loadExternalVersion` 的 resetHistory：正文换成服务器内容后，
+        // 本地被丢弃的改动不得再通过「撤销」回到编辑区（否则下一次保存会把它写回去）。
+        history.reset()
+        _state.value = withHistoryFlags(
+            s.copy(
+                content = conflict.externalContent,
+                baseContent = conflict.externalContent,
+                baseRevision = conflict.externalRevision,
+                saveStatus = SaveStatus.IDLE,
+                conflictText = null,
+                conflict = null,
+                message = "已加载外部版本",
+                // 选区随基线一起归零：外部正文与本地光标位置没有对应关系。
+                caret = 0,
+                contentEpoch = s.contentEpoch + 1,
+            ),
         )
         if (s.filePath.isNotEmpty()) {
             scope.launch { drafts.clearDraft(fileKey(s)) }
@@ -416,7 +473,9 @@ class EditorSession(
                 kind = "merged"
                 DenovaLog.i("Editor", "merged+saved path=${s.filePath} revision=${outcome.revision}")
                 val r = ReceiptPolicy.applyMerged(snapshot, outcome, _state.value)
-                _state.value = r.state
+                // 合并结果替换正文即新基线：撤销不能退回合并前的本地文本，否则会覆盖服务端改动。
+                history.reset()
+                _state.value = withHistoryFlags(r.state)
                 if (r.reschedule) scheduleSave()
             }
             is SaveOutcome.Conflict -> {

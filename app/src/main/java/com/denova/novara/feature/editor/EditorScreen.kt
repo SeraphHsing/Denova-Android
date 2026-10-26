@@ -131,9 +131,11 @@ fun EditorScreen(
     // D03-W 埋点：本组合已提交绘制，结算「最后一次按键 → 可见」延迟。
     SideEffect { EditorPerf.markDraw() }
 
-    // 外部内容变化（打开文件/合并结果/冲突材料）时重置本地编辑态。
+    // 外部内容变化（打开文件/合并结果/冲突材料/撤销重做）时重置本地编辑态。
+    // 光标按状态里的 caret 落位：撤销要回到记录的位置，加载外部则回到文档开头（WRI-014）。
     LaunchedEffect(uiState.loaded, uiState.filePath, uiState.conflictText, uiState.contentEpoch) {
-        textFieldValue = TextFieldValue(uiState.content)
+        val caret = uiState.caret.coerceIn(0, uiState.content.length)
+        textFieldValue = TextFieldValue(uiState.content, TextRange(caret))
     }
 
     // 从项目目录打开文件时，把项目 ID / 文件路径回填到输入框。
@@ -244,11 +246,24 @@ fun EditorScreen(
             }
         }
 
-        // 模式切换
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        // 模式切换 + 撤销 / 重做（WRI-014）。
+        // 撤销放在这一行而不是顶栏：顶栏已有保存/终端/写作/退出/右抽屉，再塞两个按钮会把
+        // 「写作」「»」挤出屏幕（真机复现过顶栏溢出），模式行还有余量且三模式都可见。
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             ModeButton("源码", mode == EditorMode.SOURCE) { mode = EditorMode.SOURCE }
             ModeButton("富文本", mode == EditorMode.RICH) { mode = EditorMode.RICH }
             ModeButton("预览", mode == EditorMode.PREVIEW) { mode = EditorMode.PREVIEW }
+            Spacer(Modifier.weight(1f))
+            // 可用性来自会话历史栈；加载外部版本 / 采纳合并结果后归零。
+            TextButton(onClick = { viewModel.undo() }, enabled = uiState.undoAvailable) {
+                Text(stringResource(R.string.editor_undo))
+            }
+            TextButton(onClick = { viewModel.redo() }, enabled = uiState.redoAvailable) {
+                Text(stringResource(R.string.editor_redo))
+            }
         }
 
         // 选区引用（WRI-009）：有非空选区时显示「引用到 AI」与定位（file:Lx-Ly）。
@@ -327,7 +342,7 @@ fun EditorScreen(
                 onValueChange = {
                     textFieldValue = it
                     EditorPerf.markEditStart()
-                    viewModel.updateContent(it.text, composing = it.composition != null)
+                    viewModel.updateContent(it.text, composing = it.composition != null, caret = it.selection.start)
                 },
                 textStyle = TextStyle(fontSize = 16.sp),
                 modifier = Modifier.fillMaxSize().padding(12.dp).tableTabKeys(textFieldValue) {
@@ -339,7 +354,7 @@ fun EditorScreen(
                 onValueChange = {
                     textFieldValue = it
                     EditorPerf.markEditStart()
-                    viewModel.updateContent(it.text, composing = it.composition != null)
+                    viewModel.updateContent(it.text, composing = it.composition != null, caret = it.selection.start)
                 },
                 visualTransformation = MarkdownVisualTransformation(),
                 textStyle = TextStyle(fontSize = 16.sp),
