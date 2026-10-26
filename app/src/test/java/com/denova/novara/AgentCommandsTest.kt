@@ -1,5 +1,8 @@
 package com.denova.novara
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import com.denova.novara.core.stream.AgentActiveView
 import com.denova.novara.feature.agent.AgentCommands
 import kotlinx.serialization.json.Json
@@ -80,17 +83,17 @@ class AgentCommandsTest {
 
     @Test
     fun `error messages distinguish phase mismatch and commit`() {
-        assertEquals("当前没有运行中的 Agent", AgentCommands.errorMessage("agent_runtime.invalid_phase"))
+        assertEquals(UiText.of(R.string.cmd_err_invalid_phase), AgentCommands.errorMessage("agent_runtime.invalid_phase"))
         assertEquals(
-            "目标运行已变化，已刷新状态后重试",
+            UiText.of(R.string.cmd_err_target_mismatch),
             AgentCommands.errorMessage("agent_runtime.target_operation_mismatch"),
         )
         assertEquals(
-            "Agent 输出已进入规范提交，本次控制未生效",
+            UiText.of(R.string.cmd_err_commit_won),
             AgentCommands.errorMessage("agent_runtime.commit_won"),
         )
-        assertEquals("自定义失败", AgentCommands.errorMessage("agent_runtime.unknown", "自定义失败"))
-        assertEquals("操作失败", AgentCommands.errorMessage(null, " "))
+        assertEquals(UiText.raw("自定义失败"), AgentCommands.errorMessage("agent_runtime.unknown", "自定义失败"))
+        assertEquals(UiText.of(R.string.cmd_err_action_failed), AgentCommands.errorMessage(null, " "))
     }
 
     @Test

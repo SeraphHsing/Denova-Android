@@ -1,5 +1,8 @@
 package com.denova.novara
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import com.denova.novara.core.network.SessionAskAnswerRequest
 import com.denova.novara.core.network.SessionAskCancelRequest
 import com.denova.novara.core.stream.AgentAskAnswer
@@ -143,14 +146,14 @@ class AgentAskTest {
         )
         assertEquals(AgentAskLogic.STATUS_ANSWERED, answered.status)
         assertFalse(answered.isPending)
-        assertEquals("已回答：继续", AgentAskLogic.statusText(answered))
+        assertEquals(UiText.of(R.string.ask_status_answered_items, "继续"), AgentAskLogic.statusText(answered))
 
         val cancelled = AgentAskLogic.applyResolution(
             ask,
             AgentAskResolution(id = ask.id, status = AgentAskLogic.STATUS_CANCELLED, cancelReason = "user_cancelled"),
         )
-        assertEquals("已取消（user_cancelled）", AgentAskLogic.statusText(cancelled))
-        assertEquals("已取消", AgentAskLogic.statusText(cancelled.copy(cancelReason = null)))
+        assertEquals(UiText.of(R.string.ask_status_cancelled_reason, "user_cancelled"), AgentAskLogic.statusText(cancelled))
+        assertEquals(UiText.of(R.string.ask_status_cancelled), AgentAskLogic.statusText(cancelled.copy(cancelReason = null)))
     }
 
     @Test
@@ -162,7 +165,7 @@ class AgentAskTest {
         val thin = ask().copy(status = AgentAskLogic.STATUS_CANCELLED)
         val merged = AgentAskLogic.merge(cancelled, thin)
         assertEquals(AgentAskLogic.CANCEL_REASON_USER, merged.cancelReason)
-        assertEquals("已取消（user_cancelled）", AgentAskLogic.statusText(merged))
+        assertEquals(UiText.of(R.string.ask_status_cancelled_reason, "user_cancelled"), AgentAskLogic.statusText(merged))
 
         val answered = ask().copy(
             status = AgentAskLogic.STATUS_ANSWERED,
@@ -176,16 +179,16 @@ class AgentAskTest {
         )
         val mergedAnswers = AgentAskLogic.merge(answered, ask().copy(status = AgentAskLogic.STATUS_ANSWERED))
         assertEquals(1, mergedAnswers.answers.size)
-        assertEquals("已回答：继续", AgentAskLogic.statusText(mergedAnswers))
+        assertEquals(UiText.of(R.string.ask_status_answered_items, "继续"), AgentAskLogic.statusText(mergedAnswers))
         // 无历史时原样接受
         assertEquals(thin, AgentAskLogic.merge(null, thin))
     }
 
     @Test
     fun `ask error codes map and stale needs refresh`() {
-        assertEquals("该提问已被处理或已过期", AgentAskLogic.askError("agent_runtime.ask_stale"))
-        assertEquals("答案不符合提问选项", AgentAskLogic.askError("agent_runtime.invalid_ask_answer"))
-        assertEquals("自定义", AgentAskLogic.askError("agent_runtime.unknown", "自定义"))
+        assertEquals(UiText.of(R.string.ask_err_stale), AgentAskLogic.askError("agent_runtime.ask_stale"))
+        assertEquals(UiText.of(R.string.ask_err_invalid_answer), AgentAskLogic.askError("agent_runtime.invalid_ask_answer"))
+        assertEquals(UiText.raw("自定义"), AgentAskLogic.askError("agent_runtime.unknown", "自定义"))
         assertTrue(AgentAskLogic.needsRefresh("agent_runtime.ask_stale"))
         assertTrue(AgentAskLogic.needsRefresh("agent_runtime.ask_not_found"))
         assertFalse(AgentAskLogic.needsRefresh("agent_runtime.invalid_ask_answer"))

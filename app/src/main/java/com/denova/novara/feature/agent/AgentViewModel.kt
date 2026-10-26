@@ -7,6 +7,8 @@ import com.denova.novara.core.command.CommandRecord
 import com.denova.novara.core.command.CommandStatus
 import com.denova.novara.NovaraApplication
 import com.denova.novara.core.command.CommandStore
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.AgentCommandReceipt
 import com.denova.novara.core.network.AgentCommandRequest
@@ -59,7 +61,7 @@ data class AgentScreenState(
     val ui: AgentUiState = AgentUiState(),
     val sending: Boolean = false,
     val connected: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
     /** 暂停 / 停止命令提交中（按钮禁用，避免重复下发）。 */
     val commandSubmitting: Boolean = false,
     /** 服务端 active 投影里的当前操作身份；空表示没有可控操作（AGT-005 门控依据）。 */
@@ -74,11 +76,11 @@ data class AgentScreenState(
     val resolvedAsks: List<AgentAskInteraction> = emptyList(),
     /** 答案 / 取消提交中。 */
     val askSubmitting: Boolean = false,
-    val askError: String? = null,
+    val askError: UiText? = null,
     /** 完整消息部件（AGT-001）：canonical 历史按 part 保留，界面据此渲染文本/推理/工具/图片。 */
     val messages: List<AgentMessageView> = emptyList(),
     val historyLoading: Boolean = false,
-    val historyError: String? = null,
+    val historyError: UiText? = null,
     /** 当前项目作用域：图片部件走 `/files/asset` 需要它。 */
     val projectId: String = "",
     /** 发送结果不明（AGT-008）：命令 id、原文与发送前的最后一条用户消息 id，用于向服务端核对。 */
@@ -87,7 +89,7 @@ data class AgentScreenState(
     val uncertainBaselineId: String = "",
     val reconciling: Boolean = false,
     /** 核对结论文案（已确认收到 / 服务端未收到）。 */
-    val reconcileNotice: String = "",
+    val reconcileNotice: UiText? = null,
     /**
      * 服务端投影给的恢复动作（`recovery_actions`）：`running` 给 `start_turn`（由挂接自动处理），
      * `suspended` 给 `resume` / `abort`——后者只能由用户点按推进，客户端不得另发新命令。
@@ -113,7 +115,7 @@ data class AgentScreenState(
     val composerDraft: String = "",
     /** 上下文分析（AGT-012）：加载态、错误与最近一次结果。 */
     val contextLoading: Boolean = false,
-    val contextError: String? = null,
+    val contextError: UiText? = null,
     val contextAnalysis: AgentContextAnalysis? = null,
 )
 
@@ -170,7 +172,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             }
         } catch (e: Exception) {
             DenovaLog.w("Agent", "ensureSession failed", e)
-            _state.value = _state.value.copy(error = e.message)
+            _state.value = _state.value.copy(error = e.message?.let { UiText.raw(it) })
             null
         }
     }
@@ -201,7 +203,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 if (!sessionScope.isCurrent(generation, sessionId)) return@launch
                 DenovaLog.w("Agent", "recover failed", e)
-                _state.value = _state.value.copy(error = e.message)
+                _state.value = _state.value.copy(error = e.message?.let { UiText.raw(it) })
             }
             if (sessionScope.isCurrent(generation, sessionId)) finishStream(generation, sessionId)
         }
@@ -296,7 +298,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             error = null,
             // 上一轮的错误原因不能挂在新的这一轮上。
             ui = _state.value.ui.copy(errorText = null),
-            reconcileNotice = "",
+            reconcileNotice = null,
             uncertainCommandId = "",
             uncertainMessage = "",
         )
@@ -354,7 +356,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     if (idleTerminated) {
                         DenovaLog.w("Agent", "stream idle timeout; task finished")
-                        _state.value = _state.value.copy(error = "流空闲超时，任务可能已结束")
+                        _state.value = _state.value.copy(error = UiText.of(R.string.agent_flow_idle_timeout))
                     }
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -365,13 +367,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 commands.updateStatus(commandId, if (rejected) CommandStatus.REJECTED else CommandStatus.UNCERTAIN)
                 DenovaLog.w("Agent", "send failed code=${e.code} status=${e.status}")
                 if (!sessionScope.isCurrent(generation, sessionId)) return@launch
-                _state.value = _state.value.copy(error = e.message)
+                _state.value = _state.value.copy(error = e.message?.let { UiText.raw(it) })
                 if (!rejected) markUncertain(commandId, text, baseline)
             } catch (e: Exception) {
                 commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
                 DenovaLog.w("Agent", "send uncertain", e)
                 if (!sessionScope.isCurrent(generation, sessionId)) return@launch
-                _state.value = _state.value.copy(error = e.message)
+                _state.value = _state.value.copy(error = e.message?.let { UiText.raw(it) })
                 markUncertain(commandId, text, baseline)
             }
             finishStream(generation, sessionId)
@@ -429,7 +431,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
                 DenovaLog.w("Agent", "follow-up uncertain", e)
-                _state.value = _state.value.copy(error = e.message ?: "操作失败")
+                _state.value = _state.value.copy(error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.agent_op_failed))
             } finally {
                 _state.value = _state.value.copy(appending = false)
             }
@@ -453,7 +455,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             uncertainMessage = message,
             uncertainBaselineId = baselineId,
             error = null,
-            reconcileNotice = "发送结果不明，正在核对…",
+            reconcileNotice = UiText.of(R.string.agent_reconcile_sending),
         )
     }
 
@@ -495,7 +497,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         baselineId: String,
         generation: Long = sessionScope.currentGeneration(),
     ): ReconcileOutcome {
-        _state.value = _state.value.copy(reconciling = true, reconcileNotice = "正在向服务端核对…")
+        _state.value = _state.value.copy(reconciling = true, reconcileNotice = UiText.of(R.string.agent_reconcile_checking))
         return try {
             val page = client.sessionMessages(sessionId, limit = CANONICAL_LIMIT)
             // 核对期间切了会话：这条命令属于旧会话，结论与新会话无关，丢弃且不改写界面。
@@ -514,14 +516,14 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     uncertainCommandId = "",
                     uncertainMessage = "",
                     uncertainBaselineId = "",
-                    reconcileNotice = "",
+                    reconcileNotice = null,
                 )
                 ReconcileOutcome.Landed(page)
             } else {
                 DenovaLog.w("Agent", "reconcile not landed cmd=$commandId")
                 _state.value = _state.value.copy(
                     reconciling = false,
-                    reconcileNotice = "服务端未收到该命令；为避免重复回答不会自动重发，请手动重发",
+                    reconcileNotice = UiText.of(R.string.agent_reconcile_not_landed),
                 )
                 ReconcileOutcome.NotLanded
             }
@@ -531,9 +533,9 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             DenovaLog.w("Agent", "reconcile failed cmd=$commandId", e)
             _state.value = _state.value.copy(
                 reconciling = false,
-                reconcileNotice = "核对失败：${e.message ?: "网络错误"}",
+                reconcileNotice = UiText.of(R.string.agent_reconcile_failed, e.message ?: ""),
             )
-            ReconcileOutcome.Failed(e.message ?: "网络错误")
+            ReconcileOutcome.Failed(e.message ?: "")
         }
     }
 
@@ -630,7 +632,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     DenovaLog.w("Agent", "recovery action changed kind=${action.kind} -> ${echoed.kind}")
                     _state.value = _state.value.copy(
                         recoveryActionPending = false,
-                        error = "恢复动作已变化，请重新挂接",
+                        error = UiText.of(R.string.agent_recovery_changed),
                     )
                     refreshActive()
                     return@launch
@@ -651,7 +653,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 DenovaLog.w("Agent", "recovery ${action.kind} failed", e)
                 _state.value = _state.value.copy(
                     recoveryActionPending = false,
-                    error = "恢复失败：${e.message ?: "网络错误"}",
+                    error = UiText.of(R.string.agent_recovery_failed, e.message ?: ""),
                 )
                 // 动作可能已被服务端改掉：用最新投影覆盖按钮，而不是盲目重试。
                 refreshActive()
@@ -726,7 +728,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 commandId?.let { commands.updateStatus(it, CommandStatus.UNCERTAIN) }
                 DenovaLog.w("Agent", "control uncertain type=$type", e)
-                _state.value = _state.value.copy(error = e.message ?: "操作失败")
+                _state.value = _state.value.copy(error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.agent_op_failed))
             } finally {
                 _state.value = _state.value.copy(commandSubmitting = false)
             }
@@ -822,7 +824,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 commandId?.let { commands.updateStatus(it, CommandStatus.UNCERTAIN) }
                 DenovaLog.w("Agent", "queue control uncertain type=$type", e)
-                _state.value = _state.value.copy(error = e.message ?: "操作失败")
+                _state.value = _state.value.copy(error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.agent_op_failed))
             } finally {
                 _state.value = _state.value.copy(queueActionPendingCommandId = "")
             }
@@ -866,7 +868,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         if (option == ApprovalOption.ALLOW_WORKSPACE && !AgentApprovalLogic.canAlwaysAllow(ask.approval)) {
             // 服务端没有允许记忆时不发这个选项，避免请求被拒后状态不明。
             DenovaLog.w("Agent", "approve ignored: workspace scope not allowed id=$askId")
-            _state.value = _state.value.copy(askError = "服务端未允许记住该规则")
+            _state.value = _state.value.copy(askError = UiText.of(R.string.agent_remember_not_allowed))
             return
         }
         _state.value = _state.value.copy(askSubmitting = true, askError = null)
@@ -887,7 +889,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 throw e
             } catch (e: Exception) {
                 DenovaLog.w("Agent", "approval uncertain id=$askId", e)
-                _state.value = _state.value.copy(askError = e.message ?: "审批提交失败")
+                _state.value = _state.value.copy(askError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.agent_approval_failed))
             } finally {
                 _state.value = _state.value.copy(askSubmitting = false)
             }
@@ -902,7 +904,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         if (sessionId.isBlank() || _state.value.askSubmitting) return
         val selected = _askSelections.value[askId].orEmpty()
         if (!AgentAskLogic.canSubmit(ask, selected)) {
-            _state.value = _state.value.copy(askError = "每个问题都要选择一个选项")
+            _state.value = _state.value.copy(askError = UiText.of(R.string.agent_answer_all_required))
             return
         }
         val answers = AgentAskLogic.answers(ask, selected)
@@ -921,7 +923,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 throw e
             } catch (e: Exception) {
                 DenovaLog.w("Agent", "ask answer uncertain id=$askId", e)
-                _state.value = _state.value.copy(askError = e.message ?: "回答失败")
+                _state.value = _state.value.copy(askError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.agent_answer_failed))
             } finally {
                 _state.value = _state.value.copy(askSubmitting = false)
             }
@@ -948,7 +950,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 throw e
             } catch (e: Exception) {
                 DenovaLog.w("Agent", "ask cancel uncertain id=$askId", e)
-                _state.value = _state.value.copy(askError = e.message ?: "取消失败")
+                _state.value = _state.value.copy(askError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.agent_cancel_failed))
             } finally {
                 _state.value = _state.value.copy(askSubmitting = false)
             }
@@ -1025,7 +1027,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             DenovaLog.w("Agent", "load canonical history failed", e)
             _state.value = _state.value.copy(
                 historyLoading = false,
-                historyError = e.message ?: "加载消息失败",
+                historyError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.agent_history_load_failed),
             )
         }
     }
@@ -1096,7 +1098,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                 DenovaLog.w("Agent", "load older history failed", e)
                 _state.value = _state.value.copy(
                     historyLoadingMore = false,
-                    historyError = e.message ?: "加载更早消息失败",
+                    historyError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.agent_history_older_failed),
                 )
             }
         }
@@ -1152,9 +1154,9 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     contextLoading = false,
                     // 会话被运行占用时服务端直接 409 busy：给一句能照着做的提示，而不是把英文错误甩给用户。
                     contextError = if (e.message?.contains("busy") == true) {
-                        "会话正被当前运行占用，暂停结束或空闲后再看上下文"
+                        UiText.of(R.string.agent_context_busy)
                     } else {
-                        e.message ?: "上下文分析失败"
+                        e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.agent_context_failed)
                     },
                 )
             }

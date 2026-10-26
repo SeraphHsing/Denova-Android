@@ -1,5 +1,8 @@
 package com.denova.novara.feature.agent
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import com.denova.novara.core.network.AgentCommandInput
 import com.denova.novara.core.network.AgentCommandRequest
 import com.denova.novara.core.network.TextSelectionRef
@@ -149,18 +152,18 @@ object AgentCommands {
      * `invalid_phase` 与 `target_operation_mismatch` 必须分开：前者是「已经没有在跑的操作」，
      * 后者是「你要停的那个操作已经换代」，处理方式不同（后者应刷新 active 再决定）。
      */
-    fun errorMessage(code: String?, fallback: String? = null): String = when (code) {
-        "agent_runtime.invalid_phase" -> "当前没有运行中的 Agent"
-        "agent_runtime.target_operation_mismatch" -> "目标运行已变化，已刷新状态后重试"
-        "agent_runtime.capability_unsupported" -> "当前模型不支持该操作"
-        "agent_runtime.invalid_command" -> "命令参数无效"
-        "agent_runtime.queue_conflict" -> "队列操作与当前状态冲突"
-        "agent_runtime.busy" -> "Agent 正忙，请稍后重试"
-        "agent_runtime.commit_won" -> "Agent 输出已进入规范提交，本次控制未生效"
-        "agent_runtime.context_changed" -> "运行上下文已变化（工作区或项目被切换）"
-        "agent_runtime.no_workspace" -> "尚未选择工作区"
-        "agent_runtime.failed" -> "操作失败，请重试"
-        else -> fallback?.takeIf { it.isNotBlank() } ?: "操作失败"
+    fun errorMessage(code: String?, fallback: String? = null): UiText = when (code) {
+        "agent_runtime.invalid_phase" -> UiText.of(R.string.cmd_err_invalid_phase)
+        "agent_runtime.target_operation_mismatch" -> UiText.of(R.string.cmd_err_target_mismatch)
+        "agent_runtime.capability_unsupported" -> UiText.of(R.string.cmd_err_capability)
+        "agent_runtime.invalid_command" -> UiText.of(R.string.cmd_err_invalid_command)
+        "agent_runtime.queue_conflict" -> UiText.of(R.string.cmd_err_queue_conflict)
+        "agent_runtime.busy" -> UiText.of(R.string.cmd_err_busy)
+        "agent_runtime.commit_won" -> UiText.of(R.string.cmd_err_commit_won)
+        "agent_runtime.context_changed" -> UiText.of(R.string.cmd_err_context_changed)
+        "agent_runtime.no_workspace" -> UiText.of(R.string.cmd_err_no_workspace)
+        "agent_runtime.failed" -> UiText.of(R.string.cmd_err_failed)
+        else -> fallback?.takeIf { it.isNotBlank() }?.let { UiText.raw(it) } ?: UiText.of(R.string.cmd_err_action_failed)
     }
 
     /** 命令失败是否属于「目标已失效」：需要刷新 active，而不是原样重发。 */

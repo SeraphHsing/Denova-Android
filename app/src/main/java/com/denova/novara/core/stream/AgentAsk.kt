@@ -1,5 +1,8 @@
 package com.denova.novara.core.stream
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -136,35 +139,35 @@ object AgentAskLogic {
         )
 
     /** 已解决文案：回答列出选项名，取消显示原因。 */
-    fun statusText(ask: AgentAskInteraction): String = when (ask.status) {
+    fun statusText(ask: AgentAskInteraction): UiText = when (ask.status) {
         STATUS_ANSWERED -> {
             val picked = ask.answers.flatMap { result ->
                 result.selectedOptions.map { it.label.ifBlank { it.id } }
             }.filter { it.isNotBlank() }
-            if (picked.isEmpty()) "已回答" else "已回答：${picked.joinToString("、")}"
+            if (picked.isEmpty()) UiText.of(R.string.ask_status_answered) else UiText.of(R.string.ask_status_answered_items, picked.joinToString("、"))
         }
 
         STATUS_CANCELLED -> ask.cancelReason
             ?.takeIf { it.isNotBlank() }
-            ?.let { "已取消（$it）" }
-            ?: "已取消"
+            ?.let { UiText.of(R.string.ask_status_cancelled_reason, it) }
+            ?: UiText.of(R.string.ask_status_cancelled)
 
-        else -> "等待回答"
+        else -> UiText.of(R.string.ask_status_waiting)
     }
 
     /**
      * 回答 / 取消的错误码 → 文案（码取自后端 `writeAskResolutionError`）。
      * `ask_stale` 表示这个提问已经被别处回答或已过期，必须刷新投影而不是重试。
      */
-    fun askError(code: String?, fallback: String? = null): String = when (code) {
-        "agent_runtime.ask_stale" -> "该提问已被处理或已过期"
-        "agent_runtime.ask_conflict" -> "该提问正在被处理"
-        "agent_runtime.invalid_ask_answer" -> "答案不符合提问选项"
-        "agent_runtime.ask_not_found" -> "找不到该提问"
-        "agent_runtime.definition_mismatch" -> "提问定义已变化，无法按原选项回答"
-        "agent_runtime.no_workspace" -> "尚未选择工作区"
-        "agent_runtime.ask_failed" -> "提交失败，请重试"
-        else -> fallback?.takeIf { it.isNotBlank() } ?: "提交失败"
+    fun askError(code: String?, fallback: String? = null): UiText = when (code) {
+        "agent_runtime.ask_stale" -> UiText.of(R.string.ask_err_stale)
+        "agent_runtime.ask_conflict" -> UiText.of(R.string.ask_err_conflict)
+        "agent_runtime.invalid_ask_answer" -> UiText.of(R.string.ask_err_invalid_answer)
+        "agent_runtime.ask_not_found" -> UiText.of(R.string.ask_err_not_found)
+        "agent_runtime.definition_mismatch" -> UiText.of(R.string.ask_err_definition_mismatch)
+        "agent_runtime.no_workspace" -> UiText.of(R.string.ask_err_no_workspace)
+        "agent_runtime.ask_failed" -> UiText.of(R.string.ask_err_failed)
+        else -> fallback?.takeIf { it.isNotBlank() }?.let { UiText.raw(it) } ?: UiText.of(R.string.ask_err_submit_failed)
     }
 
     /** `ask_stale` 之后需要刷新投影（本地卡片已失效）。 */

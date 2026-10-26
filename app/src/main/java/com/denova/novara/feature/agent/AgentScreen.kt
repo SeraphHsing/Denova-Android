@@ -1,4 +1,6 @@
 package com.denova.novara.feature.agent
+import com.denova.novara.core.i18n.UiText
+import com.denova.novara.core.i18n.resolve
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -668,7 +670,7 @@ fun AgentScreen(
             }
         }
         state.error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
+            Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
         }
         // 流级错误原因（AGT-009）：服务端 error 帧的 errorText；没有具体原因时说明「为什么是错误」，
         // 否则用户只看到「状态：错误」而不知道这一轮为什么没跑完。
@@ -689,14 +691,14 @@ fun AgentScreen(
             }
         }
         // 发送结果不明（AGT-008）：明确标出 uncertain，并提供「重新核对」；不会自动重发新命令。
-        if (state.uncertainCommandId.isNotBlank() || state.reconcileNotice.isNotBlank()) {
+        if (state.uncertainCommandId.isNotBlank() || state.reconcileNotice != null) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     stringResource(R.string.agent_uncertain) + "：" +
-                        state.reconcileNotice.ifBlank { stringResource(R.string.agent_uncertain_hint) },
+                        (state.reconcileNotice ?: com.denova.novara.core.i18n.UiText.of(R.string.agent_uncertain_hint)).resolve(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
                     modifier = Modifier.weight(1f),
@@ -875,7 +877,7 @@ fun AgentScreen(
         }
         state.askError?.let {
             Text(
-                it,
+                it.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = 12.dp),
@@ -890,7 +892,7 @@ fun AgentScreen(
                     ),
                 )
             } else {
-                AgentAskLogic.statusText(ask)
+                AgentAskLogic.statusText(ask).resolve()
             }
             Text(
                 text,
@@ -1034,7 +1036,7 @@ fun AgentScreen(
 @Composable
 private fun AgentContextDialog(
     loading: Boolean,
-    error: String?,
+    error: UiText?,
     analysis: AgentContextAnalysis?,
     todos: List<AgentTodoItem>,
     onDismiss: () -> Unit,
@@ -1056,7 +1058,7 @@ private fun AgentContextDialog(
                         style = MaterialTheme.typography.bodySmall,
                     )
                     error != null -> Text(
-                        error,
+                        error.resolve(),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
                     )
