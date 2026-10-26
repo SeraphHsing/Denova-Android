@@ -48,6 +48,15 @@
     <string name="conn_login">Sign in</string>
     <string name="conn_pair_token">Pair link token</string>
     <string name="conn_pair">Pair</string>
+    <string name="conn_err_invalid_server">Invalid server address</string>
+    <string name="conn_err_bad_credentials">Wrong username or password</string>
+    <string name="conn_err_lan_disabled">LAN access is disabled on the server</string>
+    <string name="conn_err_login_failed">Sign-in failed</string>
+    <string name="conn_err_pairing_invalid">Pairing link is invalid or expired</string>
+    <string name="conn_err_pair_failed">Pairing failed</string>
+    <string name="conn_err_network">Network error, try again</string>
+    <string name="conn_err_unreachable">Cannot reach the server (HTTP %1$d)</string>
+    <string name="conn_err_cannot_connect">Cannot reach the server</string>
     <string name="editor_project_id">Project ID</string>
     <string name="editor_file_path">File path</string>
     <string name="editor_open">Open</string>

@@ -1,5 +1,8 @@
 package com.denova.novara.feature.connection
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,7 +24,7 @@ sealed interface ConnectionUiState {
     data class Checking(val server: ServerKey) : ConnectionUiState
     data class Unauthenticated(val server: ServerKey, val local: Boolean) : ConnectionUiState
     data class Authenticated(val server: ServerKey, val local: Boolean) : ConnectionUiState
-    data class Failed(val message: String) : ConnectionUiState
+    data class Failed(val message: UiText) : ConnectionUiState
 }
 
 /**
@@ -43,8 +46,8 @@ class ConnectionViewModel(
     private val _state = MutableStateFlow<ConnectionUiState>(ConnectionUiState.Empty)
     val state: StateFlow<ConnectionUiState> = _state.asStateFlow()
 
-    private val _actionError = MutableStateFlow<String?>(null)
-    val actionError: StateFlow<String?> = _actionError.asStateFlow()
+    private val _actionError = MutableStateFlow<UiText?>(null)
+    val actionError: StateFlow<UiText?> = _actionError.asStateFlow()
 
     private val _savedServer = MutableStateFlow<String?>(null)
     val savedServer: StateFlow<String?> = _savedServer.asStateFlow()
@@ -63,7 +66,7 @@ class ConnectionViewModel(
         val key = ServerKey.parse(input)
         if (key == null) {
             DenovaLog.w("Connection", "rejected invalid server address")
-            _state.value = ConnectionUiState.Failed("无效的服务器地址")
+            _state.value = ConnectionUiState.Failed(UiText.of(R.string.conn_err_invalid_server))
             return
         }
         DenovaLog.i("Connection", "connecting to ${key.origin}")
@@ -93,13 +96,13 @@ class ConnectionViewModel(
             } catch (e: DenovaApiException) {
                 DenovaLog.w("Connection", "login failed code=${e.code} status=${e.status}")
                 _actionError.value = when (e.code) {
-                    "api.access.invalidCredentials" -> "用户名或密码错误"
-                    "api.access.lanDisabled" -> "服务器未开启局域网访问"
-                    else -> e.message ?: "登录失败"
+                    "api.access.invalidCredentials" -> UiText.of(R.string.conn_err_bad_credentials)
+                    "api.access.lanDisabled" -> UiText.of(R.string.conn_err_lan_disabled)
+                    else -> e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.conn_err_login_failed)
                 }
             } catch (e: Exception) {
                 DenovaLog.w("Connection", "login failed", e)
-                _actionError.value = "网络错误，请重试"
+                _actionError.value = UiText.of(R.string.conn_err_network)
             }
         }
     }
@@ -117,13 +120,13 @@ class ConnectionViewModel(
             } catch (e: DenovaApiException) {
                 DenovaLog.w("Connection", "pair failed code=${e.code} status=${e.status}")
                 _actionError.value = when (e.code) {
-                    "api.access.pairingInvalid" -> "配对链接无效或已过期"
-                    "api.access.lanDisabled" -> "服务器未开启局域网访问"
-                    else -> e.message ?: "配对失败"
+                    "api.access.pairingInvalid" -> UiText.of(R.string.conn_err_pairing_invalid)
+                    "api.access.lanDisabled" -> UiText.of(R.string.conn_err_lan_disabled)
+                    else -> e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.conn_err_pair_failed)
                 }
             } catch (e: Exception) {
                 DenovaLog.w("Connection", "pair failed", e)
-                _actionError.value = "网络错误，请重试"
+                _actionError.value = UiText.of(R.string.conn_err_network)
             }
         }
     }
@@ -177,14 +180,14 @@ class ConnectionViewModel(
                     return@launch
                 }
                 DenovaLog.w("Connection", "status failed code=${e.code} status=${e.status}")
-                _state.value = ConnectionUiState.Failed(e.message ?: "无法连接服务器（HTTP ${e.status}）")
+                _state.value = ConnectionUiState.Failed(e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.conn_err_unreachable, e.status))
             } catch (e: Exception) {
                 if (stale()) {
                     DenovaLog.i("Connection", "stale status failure ignored gen=$gen")
                     return@launch
                 }
                 DenovaLog.w("Connection", "status failed", e)
-                _state.value = ConnectionUiState.Failed("无法连接服务器")
+                _state.value = ConnectionUiState.Failed(UiText.of(R.string.conn_err_cannot_connect))
             }
         }
     }

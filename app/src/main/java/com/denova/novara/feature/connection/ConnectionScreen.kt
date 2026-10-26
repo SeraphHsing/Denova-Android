@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.denova.novara.core.i18n.UiText
+import com.denova.novara.core.i18n.resolve
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -54,7 +56,7 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
             is ConnectionUiState.Failed -> {
                 ServerInput(viewModel, actionError, savedServer)
                 Spacer(Modifier.height(8.dp))
-                Text(s.message, color = MaterialTheme.colorScheme.error)
+                Text(s.message.resolve(), color = MaterialTheme.colorScheme.error)
             }
             is ConnectionUiState.Checking -> {
                 Spacer(Modifier.height(24.dp))
@@ -78,7 +80,7 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
 }
 
 @Composable
-private fun ServerInput(viewModel: ConnectionViewModel, actionError: String?, initialServer: String?) {
+private fun ServerInput(viewModel: ConnectionViewModel, actionError: UiText?, initialServer: String?) {
     var server by remember(initialServer) { mutableStateOf(initialServer ?: "192.168.2.102:18081") }
     OutlinedTextField(
         value = server,
@@ -97,12 +99,12 @@ private fun ServerInput(viewModel: ConnectionViewModel, actionError: String?, in
     }
     actionError?.let {
         Spacer(Modifier.height(8.dp))
-        Text(it, color = MaterialTheme.colorScheme.error)
+        Text(it.resolve(), color = MaterialTheme.colorScheme.error)
     }
 }
 
 @Composable
-private fun AuthForms(viewModel: ConnectionViewModel, actionError: String?) {
+private fun AuthForms(viewModel: ConnectionViewModel, actionError: UiText?) {
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var token by remember { mutableStateOf("") }
@@ -160,6 +162,6 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: String?) {
 
     actionError?.let {
         Spacer(Modifier.height(8.dp))
-        Text(it, color = MaterialTheme.colorScheme.error)
+        Text(it.resolve(), color = MaterialTheme.colorScheme.error)
     }
 }

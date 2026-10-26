@@ -48,6 +48,15 @@
     <string name="conn_login">登录</string>
     <string name="conn_pair_token">配对链接 token</string>
     <string name="conn_pair">配对</string>
+    <string name="conn_err_invalid_server">无效的服务器地址</string>
+    <string name="conn_err_bad_credentials">用户名或密码错误</string>
+    <string name="conn_err_lan_disabled">服务器未开启局域网访问</string>
+    <string name="conn_err_login_failed">登录失败</string>
+    <string name="conn_err_pairing_invalid">配对链接无效或已过期</string>
+    <string name="conn_err_pair_failed">配对失败</string>
+    <string name="conn_err_network">网络错误，请重试</string>
+    <string name="conn_err_unreachable">无法连接服务器（HTTP %1$d）</string>
+    <string name="conn_err_cannot_connect">无法连接服务器</string>
     <string name="editor_project_id">项目ID</string>
     <string name="editor_file_path">文件路径</string>
     <string name="editor_open">打开</string>
