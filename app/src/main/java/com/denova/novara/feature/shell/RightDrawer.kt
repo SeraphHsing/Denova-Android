@@ -1080,7 +1080,7 @@ private fun ChapterRowItem(
         Column(Modifier.weight(1f).clickable(onClick = onOpen)) {
             Text(chapter.title.ifBlank { chapter.path }, style = MaterialTheme.typography.bodyMedium)
             Text(
-                "${ChapterRules.statusLabel(chapter.status, chapter.words)} · ${chapter.words} 字",
+                stringResource(R.string.chapter_line, ChapterRules.statusLabel(chapter.status, chapter.words), chapter.words),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -1100,7 +1100,7 @@ private fun ChapterRowItem(
 fun GameConsoleContent() {
     Column(Modifier.fillMaxWidth()) {
         Text(
-            "游戏控制台（待接会话 / 分支状态）",
+            stringResource(R.string.game_console_placeholder),
             color = MaterialTheme.colorScheme.outline,
             style = MaterialTheme.typography.bodyMedium,
         )

@@ -22,9 +22,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import com.denova.novara.R
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -58,14 +60,14 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
                 Spacer(Modifier.height(24.dp))
                 CircularProgressIndicator()
                 Spacer(Modifier.height(8.dp))
-                Text("正在连接 ${s.server.origin}…")
+                Text(stringResource(R.string.conn_connecting, s.server.origin))
             }
             is ConnectionUiState.Unauthenticated -> {
                 Spacer(Modifier.height(8.dp))
-                Text("服务器：${s.server.origin}", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.conn_server, s.server.origin), style = MaterialTheme.typography.bodyMedium)
                 if (s.local) {
                     Spacer(Modifier.height(4.dp))
-                    Text("（本机连接）", color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.conn_local), color = MaterialTheme.colorScheme.primary)
                 }
                 AuthForms(viewModel, actionError)
             }
@@ -81,8 +83,8 @@ private fun ServerInput(viewModel: ConnectionViewModel, actionError: String?, in
     OutlinedTextField(
         value = server,
         onValueChange = { server = it },
-        label = { Text("服务器地址") },
-        placeholder = { Text("host:port 或 http(s)://host:port") },
+        label = { Text(stringResource(R.string.conn_server_address)) },
+        placeholder = { Text(stringResource(R.string.conn_server_hint)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
@@ -91,7 +93,7 @@ private fun ServerInput(viewModel: ConnectionViewModel, actionError: String?, in
         onClick = { viewModel.connect(server) },
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text("连接")
+        Text(stringResource(R.string.conn_connect))
     }
     actionError?.let {
         Spacer(Modifier.height(8.dp))
@@ -108,7 +110,7 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: String?) {
     OutlinedTextField(
         value = username,
         onValueChange = { username = it },
-        label = { Text("用户名") },
+        label = { Text(stringResource(R.string.conn_username)) },
         singleLine = true,
         modifier = Modifier.fillMaxWidth(),
     )
@@ -116,7 +118,7 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: String?) {
     OutlinedTextField(
         value = password,
         onValueChange = { password = it },
-        label = { Text("密码") },
+        label = { Text(stringResource(R.string.conn_password)) },
         singleLine = true,
         visualTransformation = PasswordVisualTransformation(),
         // 密码字段必须声明为 Password 类型并关闭自动纠错/联想：
@@ -132,14 +134,14 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: String?) {
         onClick = { viewModel.login(username, password) },
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text("登录")
+        Text(stringResource(R.string.conn_login))
     }
 
     Spacer(Modifier.height(24.dp))
     OutlinedTextField(
         value = token,
         onValueChange = { token = it },
-        label = { Text("配对链接 token") },
+        label = { Text(stringResource(R.string.conn_pair_token)) },
         singleLine = true,
         // 配对 token 是凭证，同样不能进输入法词库
         keyboardOptions = KeyboardOptions(
@@ -153,7 +155,7 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: String?) {
         onClick = { viewModel.pair(token) },
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Text("配对")
+        Text(stringResource(R.string.conn_pair))
     }
 
     actionError?.let {

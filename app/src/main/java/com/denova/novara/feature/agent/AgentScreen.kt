@@ -280,7 +280,7 @@ private fun AgentAskCard(
                     Text(if (option.id in picked) "●" else "○", modifier = Modifier.padding(end = 8.dp))
                     Column {
                         Text(
-                            option.label + if (option.id == question.recommendedOptionId) "（推荐）" else "",
+                            option.label + if (option.id == question.recommendedOptionId) stringResource(R.string.agent_recommended) else "",
                             style = MaterialTheme.typography.bodySmall,
                         )
                         option.description?.takeIf { it.isNotBlank() }?.let {
@@ -576,14 +576,14 @@ fun AgentScreen(
                 singleLine = true,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
-            OutlinedButton(onClick = { viewModel.start(sessionId.trim(), projectId) }) { Text("挂接") }
+            OutlinedButton(onClick = { viewModel.start(sessionId.trim(), projectId) }) { Text(stringResource(R.string.common_attach)) }
         }
 
         val phaseText = when (state.ui.phase) {
-            AgentPhase.IDLE -> "空闲"
-            AgentPhase.RUNNING -> "运行中"
-            AgentPhase.DONE -> "完成"
-            AgentPhase.ERROR -> "错误"
+            AgentPhase.IDLE -> stringResource(R.string.agent_phase_idle)
+            AgentPhase.RUNNING -> stringResource(R.string.agent_phase_running)
+            AgentPhase.DONE -> stringResource(R.string.agent_phase_done)
+            AgentPhase.ERROR -> stringResource(R.string.common_error)
         }.let { base ->
             // 有待答提问时任务其实没结束：进程重启后 runtime 可能报 idle，这里按 ask 事实纠正文案。
             if (state.pendingAsks.isNotEmpty()) stringResource(R.string.agent_waiting_ask) else base
@@ -591,7 +591,7 @@ fun AgentScreen(
         val activityText = if (state.ui.activity.isNotBlank()) " · ${state.ui.activity}" else ""
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
             Text(
-                "状态：$phaseText$activityText${if (state.connected) " · 已连接" else ""}",
+                stringResource(R.string.agent_status, phaseText + activityText + (if (state.connected) " · " + stringResource(R.string.common_connected) else "")),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -711,7 +711,7 @@ fun AgentScreen(
         if (state.ui.thinking.isNotBlank()) {
             // 推理正文可能很长且不可滚动：不限制行数会把消息区与输入区挤出屏幕（真机上「追加」按钮因此点不到）。
             Text(
-                "思考：${state.ui.thinking}",
+                stringResource(R.string.agent_thinking, state.ui.thinking),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
                 maxLines = 4,
@@ -987,7 +987,7 @@ fun AgentScreen(
             OutlinedTextField(
                 value = draft,
                 onValueChange = { viewModel.setComposerDraft(it) },
-                label = { Text("消息") },
+                label = { Text(stringResource(R.string.agent_message)) },
                 singleLine = true,
                 // 键盘「发送」键与右侧按钮等价（终端输入同样以 IME 动作提交）。
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),

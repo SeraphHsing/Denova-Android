@@ -101,8 +101,8 @@ fun AppDrawer(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text("新手引导 ${OnboardingLogic.progressLabel(onboardingStep)}", style = MaterialTheme.typography.labelLarge)
-                    TextButton(onClick = onSkipOnboarding) { Text("跳过引导") }
+                    Text(stringResource(R.string.onboarding_progress, OnboardingLogic.progressLabel(onboardingStep)), style = MaterialTheme.typography.labelLarge)
+                    TextButton(onClick = onSkipOnboarding) { Text(stringResource(R.string.onboarding_skip)) }
                 }
                 Text(OnboardingLogic.stepTitle(onboardingStep), style = MaterialTheme.typography.bodyMedium)
                 Text(
@@ -111,9 +111,9 @@ fun AppDrawer(
                     color = MaterialTheme.colorScheme.outline,
                 )
                 when (onboardingStep) {
-                    OnboardingStep.BOOK -> TextButton(onClick = onCreateBook) { Text("去新建") }
-                    OnboardingStep.AGENT -> TextButton(onClick = onFillFirstPrompt) { Text("填入示例") }
-                    OnboardingStep.MODEL -> Text("请到设置里配置语言模型后继续。", style = MaterialTheme.typography.bodySmall)
+                    OnboardingStep.BOOK -> TextButton(onClick = onCreateBook) { Text(stringResource(R.string.onboarding_go_create)) }
+                    OnboardingStep.AGENT -> TextButton(onClick = onFillFirstPrompt) { Text(stringResource(R.string.onboarding_fill_example)) }
+                    OnboardingStep.MODEL -> Text(stringResource(R.string.onboarding_model_hint), style = MaterialTheme.typography.bodySmall)
                 }
             }
             HorizontalDivider()
@@ -149,7 +149,7 @@ fun AppDrawer(
         }
         // 建书入口常驻：引导卡只在新手期出现，跳过后仍要能新建书籍（对齐 Web 书籍管理入口）。
         TextButton(onClick = onCreateBook, modifier = Modifier.fillMaxWidth()) {
-            Text("＋ 新建书籍", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.drawer_new_book), style = MaterialTheme.typography.bodyMedium)
         }
         HorizontalDivider()
         // 一级导航：分组（创作 / 工具 / 设置）+ 图标 + 尾部状态（当前 ✓ / 其余 ›）。

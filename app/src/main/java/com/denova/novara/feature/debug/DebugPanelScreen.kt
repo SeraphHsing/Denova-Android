@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import com.denova.novara.R
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -30,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -66,10 +68,10 @@ fun DebugPanelScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Debug 日志") },
+                title = { Text(stringResource(R.string.debug_title)) },
                 actions = {
-                    TextButton(onClick = { viewModel.clear() }) { Text("清空") }
-                    TextButton(onClick = onClose) { Text("关闭") }
+                    TextButton(onClick = { viewModel.clear() }) { Text(stringResource(R.string.common_clear)) }
+                    TextButton(onClick = onClose) { Text(stringResource(R.string.common_close)) }
                 },
             )
         },
@@ -98,7 +100,7 @@ fun DebugPanelScreen(
             OutlinedTextField(
                 value = state.filter,
                 onValueChange = viewModel::setFilter,
-                label = { Text("过滤 tag / 内容") },
+                label = { Text(stringResource(R.string.debug_filter_hint)) },
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -151,26 +153,26 @@ private fun AssetProbe(
             OutlinedTextField(
                 value = assetProjectId,
                 onValueChange = onProjectIdChange,
-                label = { Text("资源-项目ID") },
+                label = { Text(stringResource(R.string.debug_asset_project)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
             OutlinedTextField(
                 value = assetPath,
                 onValueChange = onPathChange,
-                label = { Text("资源路径") },
+                label = { Text(stringResource(R.string.debug_asset_path)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
         }
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            OutlinedButton(onClick = onLoad, enabled = client != null) { Text("读取图片") }
+            OutlinedButton(onClick = onLoad, enabled = client != null) { Text(stringResource(R.string.debug_load_image)) }
             Spacer(Modifier.width(12.dp))
             Text(
                 when {
-                    client == null -> "未连接"
-                    assetUrl == null -> "填写项目与路径"
-                    else -> "已请求：${assetUrl.substringAfterLast("path=")}"
+                    client == null -> stringResource(R.string.debug_not_connected)
+                    assetUrl == null -> stringResource(R.string.debug_fill_project_path)
+                    else -> stringResource(R.string.debug_requested, assetUrl.substringAfterLast("path="))
                 },
                 style = MaterialTheme.typography.labelSmall,
             )
@@ -178,7 +180,7 @@ private fun AssetProbe(
         if (assetUrl != null && imageLoader != null) {
             AsyncImage(
                 model = assetUrl,
-                contentDescription = "受保护图片预览",
+                contentDescription = stringResource(R.string.debug_image_preview),
                 imageLoader = imageLoader,
                 modifier = Modifier.height(160.dp).width(240.dp),
             )

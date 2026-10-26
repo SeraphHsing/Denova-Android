@@ -189,28 +189,28 @@ fun EditorScreen(
             OutlinedTextField(
                 value = projectId,
                 onValueChange = { projectId = it; onProjectIdChange(it) },
-                label = { Text("项目ID") },
+                label = { Text(stringResource(R.string.editor_project_id)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
             OutlinedTextField(
                 value = filePath,
                 onValueChange = { filePath = it },
-                label = { Text("文件路径") },
+                label = { Text(stringResource(R.string.editor_file_path)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
-            OutlinedButton(onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) }) { Text("打开") }
+            OutlinedButton(onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) }) { Text(stringResource(R.string.editor_open)) }
         }
 
         // 保存状态
         val status = when (uiState.saveStatus) {
-            SaveStatus.IDLE -> if (uiState.loaded) "" else "输入项目 ID 与文件路径后打开"
-            SaveStatus.SAVING -> "保存中…"
-            SaveStatus.SAVED -> "已保存"
-            SaveStatus.MERGED -> "已自动合并保存"
-            SaveStatus.CONFLICT -> "冲突"
-            SaveStatus.ERROR -> "错误"
+            SaveStatus.IDLE -> if (uiState.loaded) "" else stringResource(R.string.editor_open_hint)
+            SaveStatus.SAVING -> stringResource(R.string.editor_saving)
+            SaveStatus.SAVED -> stringResource(R.string.editor_saved)
+            SaveStatus.MERGED -> stringResource(R.string.editor_merged)
+            SaveStatus.CONFLICT -> stringResource(R.string.editor_conflict)
+            SaveStatus.ERROR -> stringResource(R.string.editor_error)
         }
         if (status.isNotEmpty()) {
             Text(status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
@@ -260,9 +260,9 @@ fun EditorScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ModeButton("源码", mode == EditorMode.SOURCE) { mode = EditorMode.SOURCE }
-            ModeButton("富文本", mode == EditorMode.RICH) { mode = EditorMode.RICH }
-            ModeButton("预览", mode == EditorMode.PREVIEW) { mode = EditorMode.PREVIEW }
+            ModeButton(stringResource(R.string.editor_mode_source), mode == EditorMode.SOURCE) { mode = EditorMode.SOURCE }
+            ModeButton(stringResource(R.string.editor_mode_rich), mode == EditorMode.RICH) { mode = EditorMode.RICH }
+            ModeButton(stringResource(R.string.editor_mode_preview), mode == EditorMode.PREVIEW) { mode = EditorMode.PREVIEW }
             Spacer(Modifier.weight(1f))
             // 可用性来自会话历史栈；加载外部版本 / 采纳合并结果后归零。
             TextButton(onClick = { viewModel.undo() }, enabled = uiState.undoAvailable) {
@@ -419,9 +419,9 @@ fun EditorScreen(
                 FormatButton("H2") { textFieldValue = insertBlock(textFieldValue, "## 标题\n"); viewModel.updateContent(textFieldValue.text) }
                 FormatButton("•") { textFieldValue = insertBlock(textFieldValue, "- 列表项\n"); viewModel.updateContent(textFieldValue.text) }
                 FormatButton(">") { textFieldValue = insertBlock(textFieldValue, "> 引用\n"); viewModel.updateContent(textFieldValue.text) }
-                FormatButton("表") { textFieldValue = insertBlock(textFieldValue, TABLE_TEMPLATE); viewModel.updateContent(textFieldValue.text) }
-                FormatButton("链") { textFieldValue = insertBlock(textFieldValue, "[链接文字](assets/)\n"); viewModel.updateContent(textFieldValue.text) }
-                FormatButton("图") {
+                FormatButton(stringResource(R.string.editor_fmt_table)) { textFieldValue = insertBlock(textFieldValue, TABLE_TEMPLATE); viewModel.updateContent(textFieldValue.text) }
+                FormatButton(stringResource(R.string.editor_fmt_link)) { textFieldValue = insertBlock(textFieldValue, "[链接文字](assets/)\n"); viewModel.updateContent(textFieldValue.text) }
+                FormatButton(stringResource(R.string.editor_fmt_image)) {
                     // 有素材列表时先选文件（WRI-007 的「从项目素材插入」），否则退回手填模板。
                     val lister = assetLister
                     if (lister == null) {
@@ -444,11 +444,11 @@ fun EditorScreen(
                 val caretStart = textFieldValue.selection.start
                 val text = textFieldValue.text
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                    FormatButton("行+") { applyTable(MarkdownTable.insertRow(text, caretStart, below = true)) }
-                    FormatButton("行−") { applyTable(MarkdownTable.deleteRow(text, caretStart)) }
-                    FormatButton("列+") { applyTable(MarkdownTable.insertColumn(text, caretStart, right = true)) }
-                    FormatButton("列−") { applyTable(MarkdownTable.deleteColumn(text, caretStart)) }
-                    FormatButton("删表") { applyTable(MarkdownTable.deleteTable(text, caretStart)) }
+                    FormatButton(stringResource(R.string.editor_fmt_row_add)) { applyTable(MarkdownTable.insertRow(text, caretStart, below = true)) }
+                    FormatButton(stringResource(R.string.editor_fmt_row_del)) { applyTable(MarkdownTable.deleteRow(text, caretStart)) }
+                    FormatButton(stringResource(R.string.editor_fmt_col_add)) { applyTable(MarkdownTable.insertColumn(text, caretStart, right = true)) }
+                    FormatButton(stringResource(R.string.editor_fmt_col_del)) { applyTable(MarkdownTable.deleteColumn(text, caretStart)) }
+                    FormatButton(stringResource(R.string.editor_fmt_table_del)) { applyTable(MarkdownTable.deleteTable(text, caretStart)) }
                 }
             }
         }

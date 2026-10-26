@@ -85,32 +85,32 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
             OutlinedTextField(
                 value = branchId,
                 onValueChange = { branchId = it },
-                label = { Text("branch（可空）") },
+                label = { Text(stringResource(R.string.game_branch_optional)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
-            OutlinedButton(onClick = { viewModel.start(storyId.trim(), branchId.trim()) }) { Text("挂接") }
+            OutlinedButton(onClick = { viewModel.start(storyId.trim(), branchId.trim()) }) { Text(stringResource(R.string.common_attach)) }
         }
 
         // 投影状态
         val phaseText = when (uiState.stage.phase) {
-            GamePhase.IDLE -> "空闲"
-            GamePhase.RUNNING -> "运行中"
-            GamePhase.SUSPENDED -> "已暂停"
-            GamePhase.DONE -> "完成"
-            GamePhase.ABORTED -> "已中止"
-            GamePhase.ERROR -> "错误"
+            GamePhase.IDLE -> stringResource(R.string.game_phase_idle)
+            GamePhase.RUNNING -> stringResource(R.string.game_phase_running)
+            GamePhase.SUSPENDED -> stringResource(R.string.game_phase_suspended)
+            GamePhase.DONE -> stringResource(R.string.game_phase_done)
+            GamePhase.ABORTED -> stringResource(R.string.game_phase_aborted)
+            GamePhase.ERROR -> stringResource(R.string.common_error)
         }
         val activityText = when (uiState.stage.activity) {
             GameActivity.IDLE -> ""
-            GameActivity.THINKING -> "思考中…"
-            GameActivity.TOOL -> "调用工具…"
-            GameActivity.REPAIRING -> "修复中…"
-            GameActivity.RECOVERING -> "恢复中…"
+            GameActivity.THINKING -> stringResource(R.string.game_activity_thinking)
+            GameActivity.TOOL -> stringResource(R.string.game_activity_tool)
+            GameActivity.REPAIRING -> stringResource(R.string.game_activity_repairing)
+            GameActivity.RECOVERING -> stringResource(R.string.game_activity_recovering)
         }
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
             Text(
-                "状态：$phaseText${if (activityText.isNotEmpty()) " · $activityText" else ""}${if (uiState.connected) " · 已连接" else ""}",
+                stringResource(R.string.game_status, phaseText + (if (activityText.isNotEmpty()) " · " + activityText else "") + (if (uiState.connected) " · " + stringResource(R.string.common_connected) else "")),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
@@ -126,7 +126,7 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
-                label = { Text("玩家输入") },
+                label = { Text(stringResource(R.string.game_player_input)) },
                 singleLine = true,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
@@ -136,7 +136,7 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
                     input = ""
                 },
                 enabled = !uiState.sending && storyId.isNotBlank() && input.isNotBlank(),
-            ) { Text(if (uiState.sending) "发送中…" else "发送") }
+            ) { Text(if (uiState.sending) stringResource(R.string.game_sending) else stringResource(R.string.common_send)) }
         }
     }
 }
@@ -160,7 +160,7 @@ private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifie
     }
     if (blocks.isEmpty()) {
         Text(
-            text = "输入 story ID 后挂接游戏流",
+            text = stringResource(R.string.game_empty_hint),
             style = MaterialTheme.typography.bodyMedium,
             modifier = modifier.padding(12.dp),
         )

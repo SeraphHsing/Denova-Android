@@ -152,7 +152,7 @@ fun TerminalScreen(
             OutlinedTextField(
                 value = projectId,
                 onValueChange = { projectId = it },
-                label = { Text("项目 ID") },
+                label = { Text(stringResource(R.string.term_project_id)) },
                 singleLine = true,
                 enabled = !state.connected,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
@@ -160,8 +160,8 @@ fun TerminalScreen(
             OutlinedButton(
                 onClick = { viewModel.connect(projectId.trim()) },
                 enabled = projectId.isNotBlank() && !state.connected,
-            ) { Text(if (state.connected) "已连接" else "连接") }
-            TextButton(onClick = { viewModel.closeAndRelease() }) { Text("关闭会话") }
+            ) { Text(if (state.connected) stringResource(R.string.common_connected) else stringResource(R.string.term_connect)) }
+            TextButton(onClick = { viewModel.closeAndRelease() }) { Text(stringResource(R.string.term_close_session)) }
         }
 
         state.error?.let {
@@ -177,7 +177,7 @@ fun TerminalScreen(
                 )
                 // G6 决策 B：会话被其他端释放后，仍可只读回看最近 64KB 输出
                 if (state.historyAvailable) {
-                    TextButton(onClick = { viewModel.showHistory() }) { Text("查看历史") }
+                    TextButton(onClick = { viewModel.showHistory() }) { Text(stringResource(R.string.term_view_history)) }
                 }
             }
         }
@@ -186,9 +186,9 @@ fun TerminalScreen(
             AlertDialog(
                 onDismissRequest = { viewModel.hideHistory() },
                 confirmButton = {
-                    TextButton(onClick = { viewModel.hideHistory() }) { Text("关闭") }
+                    TextButton(onClick = { viewModel.hideHistory() }) { Text(stringResource(R.string.common_close)) }
                 },
-                title = { Text("终端历史（本地留存，只读）") },
+                title = { Text(stringResource(R.string.term_history_title)) },
                 text = {
                     Column(
                         modifier = Modifier
@@ -252,10 +252,10 @@ fun TerminalScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "回看 +${state.scrollOffset} 行 / ${state.scrollbackSize}",
+                        text = stringResource(R.string.term_scroll_indicator, state.scrollOffset, state.scrollbackSize),
                         style = MaterialTheme.typography.labelSmall,
                     )
-                    TextButton(onClick = { viewModel.scrollToBottom() }) { Text("回到底部") }
+                    TextButton(onClick = { viewModel.scrollToBottom() }) { Text(stringResource(R.string.term_back_to_bottom)) }
                 }
             }
         }
@@ -267,7 +267,7 @@ fun TerminalScreen(
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
-                label = { Text("输入（回车发送）") },
+                label = { Text(stringResource(R.string.term_input_hint)) },
                 singleLine = true,
                 enabled = state.connected,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -286,7 +286,7 @@ fun TerminalScreen(
                     input = ""
                 },
                 enabled = state.connected,
-            ) { Text("发送") }
+            ) { Text(stringResource(R.string.common_send)) }
         }
 
         Row(

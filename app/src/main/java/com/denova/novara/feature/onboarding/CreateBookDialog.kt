@@ -14,6 +14,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.denova.novara.R
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import com.denova.novara.core.onboarding.OnboardingLogic
@@ -38,18 +40,18 @@ fun CreateBookDialog(
 
     AlertDialog(
         onDismissRequest = { if (!creating) onDismiss() },
-        title = { Text("从想法创建书籍") },
+        title = { Text(stringResource(R.string.create_book_title)) },
         text = {
             Column {
                 Text(
-                    "先建一本书作为工作区，再和创作 Agent 一起梳理灵感。书名会决定工作目录名，同名目录已存在会被服务端拒绝。",
+                    stringResource(R.string.create_book_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text("书名") },
+                    label = { Text(stringResource(R.string.create_book_name)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
                     modifier = Modifier.fillMaxWidth(),
@@ -57,14 +59,14 @@ fun CreateBookDialog(
                 OutlinedTextField(
                     value = author,
                     onValueChange = { author = it },
-                    label = { Text("作者（可选）") },
+                    label = { Text(stringResource(R.string.create_book_author)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("简介（可选）") },
+                    label = { Text(stringResource(R.string.create_book_description)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (error != null) {
@@ -76,15 +78,15 @@ fun CreateBookDialog(
             TextButton(
                 onClick = { onCreate(title, author, description, true) },
                 enabled = canSubmit,
-            ) { Text(if (creating) "创建中…" else "从想法开始") }
+            ) { Text(if (creating) stringResource(R.string.create_book_creating) else stringResource(R.string.create_book_from_idea)) }
         },
         dismissButton = {
             Row {
                 TextButton(
                     onClick = { onCreate(title, author, description, false) },
                     enabled = canSubmit,
-                ) { Text("只建书") }
-                TextButton(onClick = onDismiss, enabled = !creating) { Text("取消") }
+                ) { Text(stringResource(R.string.create_book_only)) }
+                TextButton(onClick = onDismiss, enabled = !creating) { Text(stringResource(R.string.common_cancel)) }
             }
         },
     )
