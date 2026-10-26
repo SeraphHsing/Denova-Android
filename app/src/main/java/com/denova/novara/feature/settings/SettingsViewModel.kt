@@ -2,6 +2,7 @@ package com.denova.novara.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.persistence.Preferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,10 +23,16 @@ class SettingsViewModel(
 
     init {
         viewModelScope.launch {
-            preferences.darkTheme.collect { _darkTheme.value = it }
+            preferences.darkTheme.collect {
+                DenovaLog.i("Settings", "darkTheme cached=$it")
+                _darkTheme.value = it
+            }
         }
         viewModelScope.launch {
-            preferences.language.collect { _language.value = it }
+            preferences.language.collect {
+                DenovaLog.i("Settings", "language cached=$it")
+                _language.value = it
+            }
         }
     }
 
