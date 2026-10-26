@@ -37,7 +37,10 @@ import androidx.navigation.navArgument
 import com.denova.novara.R
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.logging.LogcatSink
+import com.denova.novara.core.onboarding.OnboardingLogic
+import com.denova.novara.core.onboarding.OnboardingStep
 import com.denova.novara.feature.agent.AgentScreen
+import com.denova.novara.feature.onboarding.CreateBookDialog
 import com.denova.novara.feature.agent.AgentViewModel
 import com.denova.novara.feature.connection.ConnectionScreen
 import com.denova.novara.feature.connection.ConnectionUiState
@@ -50,12 +53,14 @@ import com.denova.novara.feature.game.GameScreen
 import com.denova.novara.feature.game.GameViewModel
 import com.denova.novara.feature.bookshelf.BookShelfViewModel
 import com.denova.novara.feature.changes.ChangesViewModel
+import com.denova.novara.feature.chapters.ChaptersViewModel
 import com.denova.novara.feature.versions.VersionsViewModel
 import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.shell.AppDrawer
 import com.denova.novara.feature.shell.GameConsoleContent
 import com.denova.novara.feature.shell.PlaceholderScreen
+import com.denova.novara.feature.shell.ChaptersContent
 import com.denova.novara.feature.shell.ChangesContent
 import com.denova.novara.feature.shell.VersionsContent
 import com.denova.novara.feature.shell.ProjectDirectoryContent
@@ -90,17 +95,21 @@ class MainActivity : AppCompatActivity() {
                 val bookShelfViewModel: BookShelfViewModel = viewModel(factory = container.viewModelFactory)
                 val changesViewModel: ChangesViewModel = viewModel(factory = container.viewModelFactory)
                 val versionsViewModel: VersionsViewModel = viewModel(factory = container.viewModelFactory)
+    val chaptersViewModel: ChaptersViewModel = viewModel(factory = container.viewModelFactory)
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val state by connectionViewModel.state.collectAsState()
                 val projectState by projectDirectoryViewModel.state.collectAsState()
                 val bookState by bookShelfViewModel.state.collectAsState()
                 val changesState by changesViewModel.state.collectAsState()
                 val versionsState by versionsViewModel.state.collectAsState()
+    val chaptersState by chaptersViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
                 var showRightDrawer by remember { mutableStateOf(false) }
                 var rightTab by remember { mutableStateOf(0) }
                 // 当前编辑项目：书籍切换或编辑器输入框同步，供右抽屉项目目录加载。
                 var currentProjectId by remember { mutableStateOf("") }
+    // WRI-001 引导：建书对话框开关（「刚建的书」记在书架 ViewModel 里，跨重组保留）。
+    var showCreateBook by remember { mutableStateOf(false) }
                 val navController = rememberNavController()
                 val drawerState = rememberDrawerState(DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
@@ -123,6 +132,7 @@ class MainActivity : AppCompatActivity() {
                                     bookShelfViewModel.load()
                                     changesViewModel.bindClient(client)
                 versionsViewModel.bindClient(client)
+        chaptersViewModel.bindClient(client)
                                 }
                             }
                             ModalNavigationDrawer(
@@ -162,17 +172,62 @@ class MainActivity : AppCompatActivity() {
                                             } else {
                                                 null
                                             },
-                                        ) { destination ->
-                                            scope.launch { drawerState.close() }
-                                            navController.navigate(destination.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        }
+                                            // WRI-001：没有书先引导建书；刚建完进入「填第一章请求」步。
+                                            onboardingStep = when {
+                                                bookState.books.isEmpty() -> OnboardingStep.BOOK
+                                                bookState.justCreatedName.isNotEmpty() -> OnboardingStep.AGENT
+                                                else -> null
+                                            },
+                                            onSkipOnboarding = { bookShelfViewModel.clearJustCreated() },
+                                            onCreateBook = {
+                                                scope.launch { drawerState.close() }
+                                                showCreateBook = true
+                                            },
+                                            onFillFirstPrompt = {
+                                                val book = bookState.justCreatedName
+                                                bookShelfViewModel.clearJustCreated()
+                                                scope.launch { drawerState.close() }
+                                                val encoded = android.net.Uri.encode(OnboardingLogic.firstChapterPrompt(book))
+                                                navController.navigate("agent?projectId=$currentProjectId&filePath=&prompt=$encoded")
+                                            },
+                                            onNavigate = { destination ->
+                                                scope.launch { drawerState.close() }
+                                                navController.navigate(destination.route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            },
+                                        )
                                     }
                                 },
                             ) {
+                                // WRI-001 建书：「从想法开始」= 建书后进入 Agent 并预填启动提示词（不自动发送）。
+                                if (showCreateBook) {
+                                    CreateBookDialog(
+                                        creating = bookState.creating,
+                                        error = bookState.error,
+                                        onDismiss = { showCreateBook = false },
+                                        onCreate = { title, author, description, fromIdea ->
+                                            scope.launch {
+                                                val record = bookShelfViewModel.createBook(title, author, description)
+                                                if (record == null) return@launch
+                                                showCreateBook = false
+                                                // 「刚建的书」已由 createBook 写入书架状态，引导 AGENT 步据此出现。
+                                                // 建书接口已在服务端切到新 workspace：客户端同步项目作用域。
+                                                currentProjectId = record.projectId
+                                                editorViewModel.setProject(record.projectId)
+                                                if (fromIdea) {
+                                                    val encoded = android.net.Uri.encode(OnboardingLogic.INIT_PROMPT)
+                                                    navController.navigate(
+                                                        "agent?projectId=${record.projectId}&filePath=&prompt=$encoded",
+                                                    )
+                                                }
+                                            }
+                                        },
+                                    )
+                                }
+
                                 NavHost(
                                     navController = navController,
                                     startDestination = "editor",
@@ -231,10 +286,11 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
                                     composable(
-                                        route = "agent?projectId={projectId}&filePath={filePath}",
+                                        route = "agent?projectId={projectId}&filePath={filePath}&prompt={prompt}",
                                         arguments = listOf(
                                             navArgument("projectId") { type = NavType.StringType; defaultValue = "" },
                                             navArgument("filePath") { type = NavType.StringType; defaultValue = "" },
+                                            navArgument("prompt") { type = NavType.StringType; defaultValue = "" },
                                         ),
                                     ) { entry ->
                                         AgentScreen(
@@ -243,6 +299,7 @@ class MainActivity : AppCompatActivity() {
                                             onBack = { navController.popBackStack() },
                                             projectId = entry.arguments?.getString("projectId").orEmpty(),
                                             initialFile = entry.arguments?.getString("filePath").orEmpty(),
+                                            initialPrompt = entry.arguments?.getString("prompt").orEmpty(),
                                         )
                                     }
                                     composable(
@@ -279,7 +336,8 @@ class MainActivity : AppCompatActivity() {
                                 when (rightTab) {
                                     0 -> projectDirectoryViewModel.load(currentProjectId)
                                     1 -> changesViewModel.load(currentProjectId)
-                                    else -> versionsViewModel.load(currentProjectId)
+                                    2 -> versionsViewModel.load(currentProjectId)
+                                    else -> chaptersViewModel.load(currentProjectId)
                                 }
                             }
                         }
@@ -308,6 +366,9 @@ class MainActivity : AppCompatActivity() {
                                         }
                                         TextButton(onClick = { rightTab = 2 }) {
                                             Text(stringResource(R.string.versions_title))
+                                        }
+                                        TextButton(onClick = { rightTab = 3 }) {
+                                            Text(stringResource(R.string.chapters_title))
                                         }
                                     }
                                     if (rightTab == 0) {
@@ -345,7 +406,7 @@ class MainActivity : AppCompatActivity() {
                                             onEditComment = changesViewModel::startEditComment,
                                             onDeleteComment = changesViewModel::deleteComment,
                                         )
-                                    } else {
+                                    } else if (rightTab == 2) {
                                         VersionsContent(
                                             state = versionsState,
                                             onRefresh = {
@@ -362,6 +423,21 @@ class MainActivity : AppCompatActivity() {
                                             onLoadPlan = versionsViewModel::loadPlan,
                                             onConfirmRestore = versionsViewModel::confirmRestore,
                                             onDismissAction = versionsViewModel::clearActionResult,
+                                        )
+                                    } else {
+                                        ChaptersContent(
+                                            state = chaptersState,
+                                            onRefresh = {
+                                                if (currentProjectId.isNotBlank()) {
+                                                    chaptersViewModel.load(currentProjectId, force = true)
+                                                }
+                                            },
+                                            onOpenChapter = { path ->
+                                                editorViewModel.openFile(currentProjectId, path)
+                                                showRightDrawer = false
+                                                if (currentRoute != "editor") navController.navigate("editor")
+                                            },
+                                            onToggleConfirmed = chaptersViewModel::toggleConfirmed,
                                         )
                                     }
                                 }

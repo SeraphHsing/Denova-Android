@@ -530,6 +530,8 @@ fun AgentScreen(
     onBack: () -> Unit,
     projectId: String = "",
     initialFile: String = "",
+    /** 进入后填进输入框的预置正文（WRI-001 引导）；**只填不发**，用户手动发送。 */
+    initialPrompt: String = "",
 ) {
     val state by viewModel.state.collectAsState()
     val selections by viewModel.selections.collectAsState()
@@ -546,6 +548,10 @@ fun AgentScreen(
             if (chosen != null) {
                 sessionId = chosen
                 viewModel.start(chosen, projectId)
+                // 引导预置：必须放在 start 之后——start 会重置页面状态（含 composerDraft）。
+                if (initialPrompt.isNotBlank()) {
+                    viewModel.setComposerDraft(initialPrompt)
+                }
             }
         }
     }

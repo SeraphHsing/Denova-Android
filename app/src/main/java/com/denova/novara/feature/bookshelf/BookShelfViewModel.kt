@@ -18,6 +18,14 @@ data class BookShelfUiState(
     /** 当前书籍（工作区）；`null` 表示尚未选择。 */
     val currentProjectId: String? = null,
     val currentBookName: String = "",
+    /** 建书（WRI-001）进行中：按钮禁用，避免重复提交。 */
+    val creating: Boolean = false,
+    val createMessage: String? = null,
+    /**
+     * 本次会话刚创建的书名。引导的 AGENT 步据此出现——放在 ViewModel 里而不是界面 remember，
+     * 否则建书后跳到 Agent 再返回，页面重组就把这一步丢了（真机复现过）。
+     */
+    val justCreatedName: String = "",
 )
 
 /**
@@ -49,6 +57,56 @@ class BookShelfViewModel(application: Application) : AndroidViewModel(applicatio
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "加载失败")
             }
         }
+    }
+
+    /**
+     * 建书（WRI-001）：`POST /api/books/create`，只提交 `title/author/description`。
+     *
+     * 该接口在服务端会**切换当前 workspace**，所以成功后直接把当前书籍指向新 project_id，
+     * 不必再走一次 `workspace/switch`；返回 null 表示失败（错误已写进 state）。
+     */
+    suspend fun createBook(title: String, author: String = "", description: String = ""): BookRecord? {
+        val c = client ?: return null
+        val t = title.trim()
+        if (t.isEmpty()) {
+            _state.value = _state.value.copy(error = "书名不能为空")
+            return null
+        }
+        _state.value = _state.value.copy(creating = true, error = null, createMessage = null)
+        return try {
+            val resp = c.createBook(t, author, description)
+            val record = BookRecord(
+                projectId = resp.projectId,
+                name = resp.bookMeta.title.ifBlank { t },
+                path = resp.workspace,
+                author = resp.bookMeta.author,
+            )
+            _state.value = _state.value.copy(
+                creating = false,
+                error = null,
+                books = _state.value.books.filterNot { it.projectId == record.projectId } + record,
+                currentProjectId = record.projectId,
+                currentBookName = record.name,
+                createMessage = "已创建《${record.name}》",
+                justCreatedName = record.name,
+            )
+            DenovaLog.i("BookShelf", "created project=${record.projectId} workspace=${resp.workspace}")
+            record
+        } catch (e: Exception) {
+            DenovaLog.w("BookShelf", "create failed title=$t", e)
+            _state.value = _state.value.copy(creating = false, error = e.message ?: "创建书籍失败")
+            null
+        }
+    }
+
+    /** 建书提示只显示一次。 */
+    fun clearCreateMessage() {
+        _state.value = _state.value.copy(createMessage = null)
+    }
+
+    /** 引导的 AGENT 步已使用（填入示例）或已跳过：这一步不再出现。 */
+    fun clearJustCreated() {
+        _state.value = _state.value.copy(justCreatedName = "")
     }
 
     /**

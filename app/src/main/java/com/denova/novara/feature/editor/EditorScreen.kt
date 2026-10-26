@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.denova.novara.R
+import com.denova.novara.core.editor.EditorSearch
 import com.denova.novara.core.editor.MarkdownDocument
 import com.denova.novara.core.editor.MarkdownTable
 import com.denova.novara.core.network.TextSelectionRef
@@ -102,6 +103,12 @@ fun EditorScreen(
     var filePath by remember { mutableStateOf("") }
     var textFieldValue by remember { mutableStateOf(TextFieldValue("")) }
     val scope = rememberCoroutineScope()
+    // 查找 / 替换（WRI-015）状态：查询词、替换词、正则开关、当前命中序号。
+    var searchOpen by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
+    var replaceQuery by remember { mutableStateOf("") }
+    var searchRegex by remember { mutableStateOf(false) }
+    var searchIndex by remember { mutableStateOf(-1) }
     var imagePicker by remember { mutableStateOf(false) }
     var imageCandidates by remember { mutableStateOf<List<String>>(emptyList()) }
     var imageLoading by remember { mutableStateOf(false) }
@@ -263,6 +270,116 @@ fun EditorScreen(
             }
             TextButton(onClick = { viewModel.redo() }, enabled = uiState.redoAvailable) {
                 Text(stringResource(R.string.editor_redo))
+            }
+        }
+
+        // 查找 / 替换（WRI-015）：命中数「当前/总数」+ 逐个跳转 / 替换 / 全部替换。
+        // 匹配口径对齐 Web 编辑器内实现（字面量与正则均大小写不敏感），全部替换一次性完成，
+        // 因此替换后按一次「撤销」即可整体回退（走 EditorSession 的同一份历史栈）。
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = { searchOpen = !searchOpen }) {
+                Text(if (searchOpen) "收起查找" else "查找")
+            }
+        }
+        if (searchOpen) {
+            val matches = EditorSearch.findAll(textFieldValue.text, searchQuery, searchRegex)
+            val current = if (searchIndex in matches.indices) searchIndex else -1
+            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = { q ->
+                            searchQuery = q
+                            // 对齐 Web：输入即定位到第一处命中（查找条显示 1/N，正文里选中该处）。
+                            val found = EditorSearch.findAll(textFieldValue.text, q, searchRegex)
+                            searchIndex = if (found.isEmpty()) -1 else 0
+                            found.firstOrNull()?.let {
+                                textFieldValue = TextFieldValue(
+                                    textFieldValue.text,
+                                    TextRange(it.start, it.end),
+                                )
+                            }
+                        },
+                        label = { Text("查找") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        // 「结果定位数量和状态对应」：查不到时显示 0/0，而不是停在旧数字。
+                        if (matches.isEmpty()) "0/0" else "${current + 1}/${matches.size}",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 6.dp),
+                    )
+                    TextButton(
+                        onClick = {
+                            searchIndex = EditorSearch.step(matches.size, current, forward = false)
+                            matches.getOrNull(searchIndex)?.let {
+                                textFieldValue = TextFieldValue(
+                                    textFieldValue.text,
+                                    TextRange(it.start, it.end),
+                                )
+                            }
+                        },
+                        enabled = matches.isNotEmpty(),
+                    ) { Text("上一个") }
+                    TextButton(
+                        onClick = {
+                            searchIndex = EditorSearch.step(matches.size, current, forward = true)
+                            matches.getOrNull(searchIndex)?.let {
+                                textFieldValue = TextFieldValue(
+                                    textFieldValue.text,
+                                    TextRange(it.start, it.end),
+                                )
+                            }
+                        },
+                        enabled = matches.isNotEmpty(),
+                    ) { Text("下一个") }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = replaceQuery,
+                        onValueChange = { replaceQuery = it },
+                        label = { Text("替换为") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = {
+                            val match = matches.getOrNull(current) ?: return@TextButton
+                            val next = EditorSearch.replaceOne(textFieldValue.text, match, replaceQuery)
+                            textFieldValue = TextFieldValue(next, TextRange(match.start + replaceQuery.length))
+                            viewModel.updateContent(next, caret = match.start + replaceQuery.length)
+                            searchIndex = EditorSearch.step(
+                                EditorSearch.findAll(next, searchQuery, searchRegex).size,
+                                searchIndex,
+                                forward = true,
+                            )
+                        },
+                        enabled = current >= 0,
+                    ) { Text("替换") }
+                    TextButton(
+                        onClick = {
+                            val (next, count) = EditorSearch.replaceAll(
+                                textFieldValue.text,
+                                searchQuery,
+                                replaceQuery,
+                                searchRegex,
+                            )
+                            if (count > 0) {
+                                textFieldValue = TextFieldValue(next)
+                                viewModel.updateContent(next, caret = 0)
+                                searchIndex = -1
+                            }
+                        },
+                        enabled = matches.isNotEmpty(),
+                    ) { Text("全部替换") }
+                    TextButton(onClick = { searchRegex = !searchRegex; searchIndex = -1 }) {
+                        Text(if (searchRegex) "正则✓" else "正则")
+                    }
+                }
             }
         }
 

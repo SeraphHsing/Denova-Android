@@ -454,6 +454,72 @@ class DenovaClient(
     }
 
     /**
+     * 建书（WRI-001）：`POST /api/books/create`。
+     *
+     * 后端只接受 `title` / `author` / `description`，目录已存在时返回 409；
+     * **该调用会切换服务端当前 workspace**，因此返回的 `project_id` 才是后续一切的键。
+     */
+    suspend fun createBook(title: String, author: String = "", description: String = ""): CreateBookResponse {
+        val body = json.encodeToString(
+            CreateBookRequest.serializer(),
+            CreateBookRequest(title = title.trim(), author = author.trim(), description = description.trim()),
+        )
+        val request = Request.Builder()
+            .url(server.baseUrl + "/api/books/create")
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(CreateBookResponse.serializer(), text)
+            }
+        }
+    }
+
+    /**
+     * 章节目录与状态（WRI-015）：`GET /api/projects/:id/book/summary`。
+     * `status` 由后端按字数与确认位算出（`空章`/`初稿`/`成章`），客户端只读。
+     */
+    suspend fun bookSummary(projectId: String): BookSummaryResponse {
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/book/summary")
+            .build()
+        val request = Request.Builder().url(url).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(BookSummaryResponse.serializer(), text)
+            }
+        }
+    }
+
+    /**
+     * 改章节状态（WRI-015）：`PATCH /api/projects/:id/book/chapter-status` body `{path, confirmed}`。
+     *
+     * 只写确认位：`path` 必须是 `chapters/` 下已存在的 md/txt，否则后端 400；
+     * `status` 由后端重算，客户端不提交。
+     */
+    suspend fun setChapterConfirmed(projectId: String, path: String, confirmed: Boolean): ChapterStatusResponse {
+        val body = json.encodeToString(ChapterStatusRequest.serializer(), ChapterStatusRequest(path, confirmed))
+        val url = server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/book/chapter-status")
+            .build()
+        val request = Request.Builder()
+            .url(url)
+            .patch(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(ChapterStatusResponse.serializer(), text)
+            }
+        }
+    }
+
+    /**
      * 切换服务端当前工作区（书籍切换的前置）：`POST /api/workspace/switch`。
      * 对齐 Web `handleQuickWorkspaceSwitch`——客户端状态更新前必须先让服务端切到目标 workspace。
      */

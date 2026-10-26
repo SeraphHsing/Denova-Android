@@ -43,6 +43,9 @@ import com.denova.novara.feature.changes.ChangeFileDiff
 import com.denova.novara.feature.changes.ChangesUiState
 import com.denova.novara.feature.changes.DiffKind
 import com.denova.novara.feature.changes.DiffLine
+import com.denova.novara.core.book.ChapterRules
+import com.denova.novara.feature.chapters.ChapterRow
+import com.denova.novara.feature.chapters.ChaptersUiState
 import com.denova.novara.feature.project.ProjectDirectoryUiState
 import com.denova.novara.feature.versions.VersionsUiState
 
@@ -993,6 +996,106 @@ private fun ProjectFileRowItem(
 }
 
 /** 游戏控制台占位（游戏页）。会话 / 分支状态后续接 GameViewModel。 */
+/**
+ * 章节目录与状态（WRI-015）：状态字符串与字数都来自服务端摘要，按钮只切换 `confirmed`。
+ *
+ * 空章（words=0）不显示可用按钮——服务端有 `words > 0` 前置，本地放行只会换来 400。
+ */
+@Composable
+fun ChaptersContent(
+    state: ChaptersUiState,
+    onRefresh: () -> Unit,
+    onOpenChapter: (String) -> Unit,
+    onToggleConfirmed: (String) -> Unit,
+) {
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.chapters_title), style = MaterialTheme.typography.labelLarge)
+            TextButton(onClick = onRefresh, enabled = !state.loading) {
+                Text(stringResource(R.string.refresh))
+            }
+        }
+        if (state.chapters.isNotEmpty()) {
+            Text(
+                ChapterRules.summaryLabel(state.chapterCount, state.totalWords),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
+        state.message?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+        }
+        state.error?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        }
+        when {
+            state.projectId.isBlank() -> Text(
+                stringResource(R.string.chapter_status_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            state.loading && state.chapters.isEmpty() -> Text(
+                stringResource(R.string.loading),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            state.chapters.isEmpty() && state.error == null -> Text(
+                stringResource(R.string.chapter_status_empty),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(vertical = 8.dp),
+            )
+            else -> LazyColumn(Modifier.fillMaxSize()) {
+                items(state.chapters, key = { it.path }) { chapter ->
+                    ChapterRowItem(
+                        chapter = chapter,
+                        busy = state.pendingPath.isNotEmpty(),
+                        onOpen = { onOpenChapter(chapter.path) },
+                        onToggle = { onToggleConfirmed(chapter.path) },
+                    )
+                    HorizontalDivider()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChapterRowItem(
+    chapter: ChapterRow,
+    busy: Boolean,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).clickable(onClick = onOpen)) {
+            Text(chapter.title.ifBlank { chapter.path }, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "${ChapterRules.statusLabel(chapter.status, chapter.words)} · ${chapter.words} 字",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+            )
+        }
+        // 状态按钮：空章与「切换进行中」都不可点，按钮文案由确认位决定。
+        TextButton(
+            onClick = onToggle,
+            enabled = !busy && (ChapterRules.canConfirm(chapter.words, chapter.confirmed) ||
+                ChapterRules.canMarkDraft(chapter.confirmed)),
+        ) {
+            Text(ChapterRules.actionLabel(chapter.confirmed), style = MaterialTheme.typography.labelSmall)
+        }
+    }
+}
+
 @Composable
 fun GameConsoleContent() {
     Column(Modifier.fillMaxWidth()) {

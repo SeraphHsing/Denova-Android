@@ -26,6 +26,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
 import com.denova.novara.core.network.BookRecord
+import com.denova.novara.core.onboarding.OnboardingLogic
+import com.denova.novara.core.onboarding.OnboardingStep
 
 /** 一级目的地（对齐 01 §3 导航顺序；写作/游戏并排入口，设置位于末尾）。 */
 data class AppDestination(
@@ -64,6 +66,11 @@ fun AppDrawer(
     /** debug 构建的日志入口；为 null 时不显示。放在抽屉里而不是悬浮按钮，避免遮挡底部操作。 */
     onOpenDebug: (() -> Unit)? = null,
     onNavigate: (AppDestination) -> Unit,
+    /** 新手引导当前步（WRI-001）；为 null 时不显示引导卡。 */
+    onboardingStep: OnboardingStep? = null,
+    onSkipOnboarding: () -> Unit = {},
+    onCreateBook: () -> Unit = {},
+    onFillFirstPrompt: () -> Unit = {},
 ) {
     Column(
         Modifier
@@ -77,6 +84,30 @@ fun AppDrawer(
             modifier = Modifier.padding(16.dp),
         )
         HorizontalDivider()
+        // 新手引导（WRI-001）：三步核心，完成或跳过就不再出现。
+        if (onboardingStep != null) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text("新手引导 ${OnboardingLogic.progressLabel(onboardingStep)}", style = MaterialTheme.typography.labelLarge)
+                    TextButton(onClick = onSkipOnboarding) { Text("跳过引导") }
+                }
+                Text(OnboardingLogic.stepTitle(onboardingStep), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    OnboardingLogic.stepBody(onboardingStep),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                when (onboardingStep) {
+                    OnboardingStep.BOOK -> TextButton(onClick = onCreateBook) { Text("去新建") }
+                    OnboardingStep.AGENT -> TextButton(onClick = onFillFirstPrompt) { Text("填入示例") }
+                    OnboardingStep.MODEL -> Text("请到设置里配置语言模型后继续。", style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            HorizontalDivider()
+        }
         // 当前书籍切换（P3 链路起点）：选择后作为编辑器 / 项目目录的工作区。
         Text(
             stringResource(R.string.current_book),
@@ -105,6 +136,10 @@ fun AppDrawer(
                     }
                 }
             }
+        }
+        // 建书入口常驻：引导卡只在新手期出现，跳过后仍要能新建书籍（对齐 Web 书籍管理入口）。
+        TextButton(onClick = onCreateBook, modifier = Modifier.fillMaxWidth()) {
+            Text("＋ 新建书籍", style = MaterialTheme.typography.bodyMedium)
         }
         HorizontalDivider()
         appDestinations.forEach { destination ->

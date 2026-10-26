@@ -18,6 +18,7 @@ import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.AppCompatLocaleApplier
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.terminal.TerminalViewModel
+import com.denova.novara.feature.chapters.ChaptersViewModel
 import com.denova.novara.feature.versions.VersionsViewModel
 
 /**
@@ -45,6 +46,7 @@ class AppContainer(private val application: Application) {
         initializer { BookShelfViewModel(application) }
         initializer { ChangesViewModel(application) }
         initializer { VersionsViewModel(application) }
+        initializer { ChaptersViewModel(application) }
         initializer { DebugPanelViewModel(application) }
         initializer { SettingsViewModel(PreferencesStore(application), AppCompatLocaleApplier) }
     }

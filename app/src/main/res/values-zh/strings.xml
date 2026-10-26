@@ -31,6 +31,9 @@
     <string name="attach">挂接</string>
     <string name="send">发送</string>
     <string name="editor_title">Novara 编辑器</string>
+    <string name="chapters_title">章节</string>
+    <string name="chapter_status_hint">先选择书籍才能看到章节</string>
+    <string name="chapter_status_empty">还没有章节</string>
     <string name="editor_undo">撤销</string>
     <string name="editor_redo">重做</string>
     <string name="editor_pick_image">选择项目素材</string>
