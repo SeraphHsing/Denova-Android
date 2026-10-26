@@ -147,6 +147,7 @@
     <string name="common_clear">Clear</string>
     <string name="common_error">Error</string>
     <string name="agent_message">Message</string>
+    <string name="agent_output_truncated">… (%1$d characters, truncated)</string>
     <string name="ask_status_answered">Answered</string>
     <string name="ask_status_answered_items">Answered: %1$s</string>
     <string name="ask_status_cancelled_reason">Cancelled (%1$s)</string>

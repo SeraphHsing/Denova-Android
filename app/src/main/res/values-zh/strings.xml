@@ -147,6 +147,7 @@
     <string name="common_clear">清空</string>
     <string name="common_error">错误</string>
     <string name="agent_message">消息</string>
+    <string name="agent_output_truncated">…（共 %1$d 字符，已截断）</string>
     <string name="ask_status_answered">已回答</string>
     <string name="ask_status_answered_items">已回答：%1$s</string>
     <string name="ask_status_cancelled_reason">已取消（%1$s）</string>

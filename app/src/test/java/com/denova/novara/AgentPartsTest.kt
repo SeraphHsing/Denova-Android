@@ -179,7 +179,8 @@ class AgentPartsTest {
         val long = """{"k":"${"x".repeat(200)}"}"""
         val text = AgentPartLogic.prettyText(long, maxChars = 50)
         assertTrue(text.length > 50)
-        assertTrue(text.contains("已截断"))
+        // 截断标记走「语言中立」后缀（"…(字符数)"），不依赖某个语言的措辞。
+        assertTrue(text.contains("…("))
         assertEquals("", AgentPartLogic.prettyText(""))
         // 非 JSON 原样返回
         assertEquals("plain text", AgentPartLogic.prettyText("plain text", maxChars = 100))

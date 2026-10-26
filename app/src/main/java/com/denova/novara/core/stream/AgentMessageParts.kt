@@ -311,7 +311,7 @@ object AgentPartLogic {
     }
 
     /** 格式化 JSON（能解析则两空格缩进），超过 [maxChars] 截断并标注原长。 */
-    fun prettyText(raw: String, maxChars: Int = 1200): String {
+    fun prettyText(raw: String, maxChars: Int = 1200, truncatedSuffix: (Int) -> String = { "…($it)" }): String {
         if (raw.isBlank()) return ""
         val formatted = runCatching {
             val element = json.parseToJsonElement(raw)
@@ -320,7 +320,7 @@ object AgentPartLogic {
         return if (formatted.length <= maxChars) {
             formatted
         } else {
-            formatted.take(maxChars) + "\n…（共 ${formatted.length} 字符，已截断）"
+            formatted.take(maxChars) + "\n" + truncatedSuffix(formatted.length)
         }
     }
 
