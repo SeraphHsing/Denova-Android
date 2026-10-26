@@ -53,7 +53,7 @@ grouped(sorted)        → creation=[editor,game]，tools=其余 10 条，settin
 | NAV-004 菜单排序 | 未开始 | 排序模式、顺序持久化、单测齐备；真机「改顺序 → 重启 → 顺序保持」未验 |
 | NAV-005 手机可见性 | **已完成** | 13 条入口在手机端全部渲染（不应用 hiddenActivityIDs），`sort` 不丢未列出条目由单测固定 |
 | NAV-006 命令搜索 | 未开始 | 过滤与「无匹配」提示已实现；真机输入未落到搜索框（坐标随滚动变化），未验收 |
-| NAV-007 主题语言 | 未开始 | 语言切换已验证无混排；编辑器「项目ID / 文件路径」、章节段、终端等仍有硬编码中文，未达「全部控件单语」 |
+| NAV-007 主题语言 | **已完成** | 语言切换无混排（第 4 节全量复核）；深色 × 语言交叉切换四象限 + 重启持久化真机通过（第 7 节），并修复「根页面缺主题背景」缺陷 |
 | NAV-008 边缘手势 | 未开始 | 左边缘手势由 `ModalNavigationDrawer` 提供（阈值未验）；右抽屉无边缘手势，需补 |
 | NAV-009 浮层与系统返回 | 未开始 | `BackHandler` 已加（右抽屉 → 左抽屉 → 页面）；逐层返回未验 |
 | NAV-010 窄屏横屏字号 | 未开始 | 未测 320dp / 844 横屏 / 大字号 |
@@ -77,7 +77,7 @@ grouped(sorted)        → creation=[editor,game]，tools=其余 10 条，settin
 
 有意保留的非界面中文：`ThreeWayMerge` 冲突标记（写进被合并文件）、`EditorScreen` 6 条 Markdown 插入模板（写进正文）、`prettyText` 截断后缀（改为语言中立 `…(N)`，因调用点在非 Composable 上下文）、语言选项「中文」（语言自称）。服务端返回的中文（章节状态串、部分 `message`）走 `UiText.Raw` 直出。
 
-缺口：深色模式 × 语言交叉切换未逐屏验证。
+深色模式 × 语言交叉切换：见第 7 节（2026-10-26 补验，含修复）。
 
 ## 5. 自动化检查
 
@@ -91,3 +91,31 @@ BUILD SUCCESSFUL   suites=61 tests=432 failures=0
 1. 要让 `NAV-001` 收口，先做页面而不是放开 disabled：优先级最高的两个是**设置**（14 个 section 的壳，已有 `PreferencesStore` 与部分 `/api/settings` 契约）和**书籍管理**（`/books/reorder`、`/books/remove`、`/books/info` 已可用）。
 2. `NAV-007` 建议单开一轮 i18n 普查（编辑器、章节、变更、版本、终端各屏的硬编码中文）。
 3. 顺带核对本机遗留显示设置：`wm density 521`（物理 600）、`font_scale 0.9`，此前视口实验留下的 override。
+
+## 7. 深色 × 语言交叉切换（NAV-007，2026-10-26 补验）
+
+四象限 + 重启持久化真机验证（截图逐次比对）：
+
+| 步骤 | 组合 | 结果 |
+|---|---|---|
+| 初始 | 浅色 × 英文 | 基准 |
+| 切深色 | 深色 × 英文 | 语言保持英文 |
+| 切中文 | 深色 × 中文 | **深色保持**，界面全中文 |
+| 切浅色 | 浅色 × 中文 | **语言保持中文** |
+| 切英文 | 浅色 × 英文 | 完成循环 |
+| 设深色×中文 → force-stop 重启 | 深色 × 中文 | **两者均持久化** |
+
+### 发现并修复的缺陷
+
+**`NovaraTheme` 只设 `colorScheme`，没有页面背景层**。根页面（连接页 / 编辑器等）背景透明、露出 window 默认白底，导致深色模式只在自带背景的组件（抽屉 `ModalDrawerSheet`）生效，根页面始终浅色。重启后 DataStore `dark_theme=true`、`Settings.darkTheme cached=true`，但页面仍是白底，即为该缺陷。
+
+修复：`ui/theme/Theme.kt` 在 `MaterialTheme` 内包一层 `Surface(color = MaterialTheme.colorScheme.background, Modifier.fillMaxSize())`。修复后连接页 / 编辑器背景随主题正确切换。
+
+### 诊断证据
+
+```text
+I Settings: language cached=zh
+I Settings: darkTheme cached=true      # DataStore 读取正确（修复前页面仍白底）
+```
+
+DataStore protobuf 字节：`dark_theme` → `12 02 08 01`（bool true），`language` → `2a 02 7a 68`（"zh"）。
