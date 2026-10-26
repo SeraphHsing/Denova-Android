@@ -58,14 +58,35 @@ grouped(sorted)        → creation=[editor,game]，tools=其余 10 条，settin
 | NAV-009 浮层与系统返回 | 未开始 | `BackHandler` 已加（右抽屉 → 左抽屉 → 页面）；逐层返回未验 |
 | NAV-010 窄屏横屏字号 | 未开始 | 未测 320dp / 844 横屏 / 大字号 |
 
-## 4. 自动化检查
+## 4. i18n 全量复核（NAV-007，2026-10-26 追加）
+
+两遍改造：第一遍把 9 个界面的 Compose 硬编码中文换成字符串资源；第二遍引入 `core/i18n/UiText`（`Res`=资源 id+参数、`Raw`=服务端原文、`resolve()` / `resolve(context)` / `debugName()`），把 ViewModel 与纯逻辑层约 150 处文案改成 `UiText`，界面侧统一 `.resolve()`。
+
+真机切 English 后逐屏 dump（无中英混排）：
+
+| 页面 | 关键文案 |
+|---|---|
+| 连接 | Server address / Connect / host:port or http(s)://host:port |
+| 登录 | Username / Password / Sign in / Pair link token / Pair |
+| 编辑器 | Save / Terminal / Write / Sign out / Project ID / File path / Open / Source / Rich / Preview / Undo / Redo / Find |
+| 左抽屉 | Current book / + New book / Navigation / Reorder / Search actions / Creation / Tools |
+| 右抽屉 | Project files / Changes / Versions / Chapters / Project directory / Refresh |
+| 写作 Agent | session ID / Attach / Status: idle / Pause / Stop / Context / Assistant |
+| 游戏 | story ID / branch (optional) / Attach / Status: idle / Player input / Send |
+| 终端 | Terminal / Ready / Project ID / connected / Close session / Input (Enter to send) / Send |
+
+有意保留的非界面中文：`ThreeWayMerge` 冲突标记（写进被合并文件）、`EditorScreen` 6 条 Markdown 插入模板（写进正文）、`prettyText` 截断后缀（改为语言中立 `…(N)`，因调用点在非 Composable 上下文）、语言选项「中文」（语言自称）。服务端返回的中文（章节状态串、部分 `message`）走 `UiText.Raw` 直出。
+
+缺口：深色模式 × 语言交叉切换未逐屏验证。
+
+## 5. 自动化检查
 
 ```text
 ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug
 BUILD SUCCESSFUL   suites=61 tests=432 failures=0
 ```
 
-## 5. 下一步
+## 6. 下一步
 
 1. 要让 `NAV-001` 收口，先做页面而不是放开 disabled：优先级最高的两个是**设置**（14 个 section 的壳，已有 `PreferencesStore` 与部分 `/api/settings` 契约）和**书籍管理**（`/books/reorder`、`/books/remove`、`/books/info` 已可用）。
 2. `NAV-007` 建议单开一轮 i18n 普查（编辑器、章节、变更、版本、终端各屏的硬编码中文）。
