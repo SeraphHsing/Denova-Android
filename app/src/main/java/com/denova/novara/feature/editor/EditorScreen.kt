@@ -281,7 +281,7 @@ fun EditorScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = { searchOpen = !searchOpen }) {
-                Text(if (searchOpen) "收起查找" else "查找")
+                Text(stringResource(if (searchOpen) R.string.search_collapse else R.string.search_find))
             }
         }
         if (searchOpen) {
@@ -303,7 +303,7 @@ fun EditorScreen(
                                 )
                             }
                         },
-                        label = { Text("查找") },
+                        label = { Text(stringResource(R.string.search_find)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -324,7 +324,7 @@ fun EditorScreen(
                             }
                         },
                         enabled = matches.isNotEmpty(),
-                    ) { Text("上一个") }
+                    ) { Text(stringResource(R.string.search_prev)) }
                     TextButton(
                         onClick = {
                             searchIndex = EditorSearch.step(matches.size, current, forward = true)
@@ -336,13 +336,13 @@ fun EditorScreen(
                             }
                         },
                         enabled = matches.isNotEmpty(),
-                    ) { Text("下一个") }
+                    ) { Text(stringResource(R.string.search_next)) }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(
                         value = replaceQuery,
                         onValueChange = { replaceQuery = it },
-                        label = { Text("替换为") },
+                        label = { Text(stringResource(R.string.search_replace_with)) },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -359,7 +359,7 @@ fun EditorScreen(
                             )
                         },
                         enabled = current >= 0,
-                    ) { Text("替换") }
+                    ) { Text(stringResource(R.string.search_replace)) }
                     TextButton(
                         onClick = {
                             val (next, count) = EditorSearch.replaceAll(
@@ -375,9 +375,9 @@ fun EditorScreen(
                             }
                         },
                         enabled = matches.isNotEmpty(),
-                    ) { Text("全部替换") }
+                    ) { Text(stringResource(R.string.search_replace_all)) }
                     TextButton(onClick = { searchRegex = !searchRegex; searchIndex = -1 }) {
-                        Text(if (searchRegex) "正则✓" else "正则")
+                        Text(if (searchRegex) stringResource(R.string.search_regex) + "✓" else stringResource(R.string.search_regex))
                     }
                 }
             }

@@ -1,6 +1,7 @@
 package com.denova.novara
 
 import android.os.Bundle
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +39,8 @@ import com.denova.novara.R
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.logging.LogcatSink
 import com.denova.novara.core.onboarding.OnboardingLogic
+import com.denova.novara.core.persistence.PreferencesStore
+import com.denova.novara.feature.shell.ActivityNav
 import com.denova.novara.core.onboarding.OnboardingStep
 import com.denova.novara.feature.agent.AgentScreen
 import com.denova.novara.feature.onboarding.CreateBookDialog
@@ -110,9 +113,25 @@ class MainActivity : AppCompatActivity() {
                 var currentProjectId by remember { mutableStateOf("") }
     // WRI-001 引导：建书对话框开关（「刚建的书」记在书架 ViewModel 里，跨重组保留）。
     var showCreateBook by remember { mutableStateOf(false) }
+    // NAV-004：一级导航顺序（保存顺序优先；缺项按默认位插入，见 ActivityNav）。
+    val navPrefs = remember { PreferencesStore(applicationContext) }
+    var activityOrder by remember { mutableStateOf(ActivityNav.DEFAULT_ORDER) }
+    LaunchedEffect(Unit) {
+        val saved = navPrefs.activityOrder()
+        activityOrder = if (saved.isEmpty()) ActivityNav.DEFAULT_ORDER else ActivityNav.insertMissing(saved)
+    }
                 val navController = rememberNavController()
                 val drawerState = rememberDrawerState(DrawerValue.Closed)
                 val scope = rememberCoroutineScope()
+                // NAV-003：同一时刻只允许一个侧面板可见——左抽屉打开就收起右抽屉，反之亦然。
+                LaunchedEffect(drawerState.isOpen) {
+                    if (drawerState.isOpen) showRightDrawer = false
+                }
+                // NAV-009：系统返回逐层收起最上层（右抽屉 → 左抽屉 → 页面本身）。
+                BackHandler(enabled = showRightDrawer) { showRightDrawer = false }
+                BackHandler(enabled = !showRightDrawer && drawerState.isOpen) {
+                    scope.launch { drawerState.close() }
+                }
                 // 去 query 归一化，保证带参数的 route 也能在抽屉里高亮。
                 val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
                     ?.substringBefore('?')
@@ -198,6 +217,15 @@ class MainActivity : AppCompatActivity() {
                                                     restoreState = true
                                                 }
                                             },
+                                            activityItems = ActivityNav.sort(order = activityOrder),
+                                            onMoveActivity = { id, delta ->
+                                                activityOrder = ActivityNav.move(activityOrder, id, delta)
+                                                scope.launch { navPrefs.setActivityOrder(activityOrder) }
+                                            },
+                                            onResetActivityOrder = {
+                                                activityOrder = ActivityNav.DEFAULT_ORDER
+                                                scope.launch { navPrefs.setActivityOrder(ActivityNav.DEFAULT_ORDER) }
+                                            },
                                         )
                                     }
                                 },
@@ -236,7 +264,11 @@ class MainActivity : AppCompatActivity() {
                                         EditorScreen(
                                             viewModel = editorViewModel,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
-                                            onOpenRightDrawer = { showRightDrawer = true },
+                                            onOpenRightDrawer = {
+                                                // 打开右抽屉先收起左抽屉，避免两个面板同屏（NAV-003）。
+                                                scope.launch { drawerState.close() }
+                                                showRightDrawer = true
+                                            },
                                             onOpenTerminal = { projectId ->
                                                 navController.navigate("terminal/$projectId")
                                             },
@@ -281,7 +313,11 @@ class MainActivity : AppCompatActivity() {
                                         GameScreen(
                                             viewModel = gameViewModel,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
-                                            onOpenRightDrawer = { showRightDrawer = true },
+                                            onOpenRightDrawer = {
+                                                // 打开右抽屉先收起左抽屉，避免两个面板同屏（NAV-003）。
+                                                scope.launch { drawerState.close() }
+                                                showRightDrawer = true
+                                            },
                                             onBack = { navController.popBackStack() },
                                         )
                                     }

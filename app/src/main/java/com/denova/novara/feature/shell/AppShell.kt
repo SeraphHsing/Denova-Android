@@ -13,13 +13,23 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -29,28 +39,19 @@ import com.denova.novara.core.network.BookRecord
 import com.denova.novara.core.onboarding.OnboardingLogic
 import com.denova.novara.core.onboarding.OnboardingStep
 
-/** 一级目的地（对齐 01 §3 导航顺序；写作/游戏并排入口，设置位于末尾）。 */
+/** 一级目的地（顺序与实现状态都来自 [ActivityNav]，避免两处各写一份）。 */
 data class AppDestination(
     val route: String,
     val labelRes: Int,
     val implemented: Boolean,
 )
 
-val appDestinations: List<AppDestination> = listOf(
-    AppDestination("workbench", R.string.dest_workbench, implemented = false),
-    AppDestination("editor", R.string.dest_editor, implemented = true),
-    AppDestination("game", R.string.dest_game, implemented = true),
-    AppDestination("agent", R.string.dest_agent, implemented = true),
-    AppDestination("lore", R.string.dest_lore, implemented = false),
-    AppDestination("teller", R.string.dest_teller, implemented = false),
-    AppDestination("versions", R.string.dest_versions, implemented = false),
-    AppDestination("books", R.string.dest_books, implemented = false),
-    AppDestination("skills", R.string.dest_skills, implemented = false),
-    AppDestination("agents", R.string.dest_agents, implemented = false),
-    AppDestination("automations", R.string.dest_automations, implemented = false),
-    AppDestination("market", R.string.dest_market, implemented = false),
-    AppDestination("settings", R.string.dest_settings, implemented = false),
-)
+/** 按默认顺序展开的目的地表（供导航路由复用）。 */
+val appDestinations: List<AppDestination> = ActivityNav.sort().map {
+    AppDestination(it.id, it.labelRes, it.implemented)
+}
+
+private fun destinationOf(id: String): AppDestination? = appDestinations.firstOrNull { it.route == id }
 
 /** 左导航抽屉内容。 */
 @Composable
@@ -71,12 +72,20 @@ fun AppDrawer(
     onSkipOnboarding: () -> Unit = {},
     onCreateBook: () -> Unit = {},
     onFillFirstPrompt: () -> Unit = {},
+    /** 已按用户保存顺序排好的入口（NAV-001/004）；默认用基线顺序。 */
+    activityItems: List<ActivitySpec> = ActivityNav.sort(),
+    onMoveActivity: (id: String, delta: Int) -> Unit = { _, _ -> },
+    onResetActivityOrder: () -> Unit = {},
 ) {
+    // 排序模式与搜索词都是抽屉内的临时界面状态，不参与业务状态。
+    var reorderMode by remember { mutableStateOf(false) }
+    var query by remember { mutableStateOf("") }
+    // 外层不滚动：底部开关固定，只有中间的书架与导航列表滚动。
+    // 之前整列 verticalScroll 时，内容高度超出抽屉可视区，下方条目（书籍管理/设置等）会渲染出来却点不到。
     Column(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
-            .verticalScroll(rememberScrollState()),
+            .windowInsetsPadding(WindowInsets.statusBars),
     ) {
         Text(
             stringResource(R.string.drawer_title),
@@ -84,6 +93,7 @@ fun AppDrawer(
             modifier = Modifier.padding(16.dp),
         )
         HorizontalDivider()
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
         // 新手引导（WRI-001）：三步核心，完成或跳过就不再出现。
         if (onboardingStep != null) {
             Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
@@ -142,26 +152,113 @@ fun AppDrawer(
             Text("＋ 新建书籍", style = MaterialTheme.typography.bodyMedium)
         }
         HorizontalDivider()
-        appDestinations.forEach { destination ->
-            val selected = destination.route == currentRoute
-            TextButton(
-                onClick = { onNavigate(destination) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(destination.labelRes),
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                    )
-                    if (!destination.implemented) {
-                        Text(
-                            stringResource(R.string.not_implemented_suffix),
-                            color = MaterialTheme.colorScheme.outline,
-                            style = MaterialTheme.typography.labelSmall,
-                        )
+        // 一级导航：分组（创作 / 工具 / 设置）+ 图标 + 尾部状态（当前 ✓ / 其余 ›）。
+        // 排序与搜索都是抽屉内的临时状态，不写业务状态（NAV-004 / NAV-006）。
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.drawer_nav_section), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+            TextButton(onClick = { reorderMode = !reorderMode }) {
+                Text(stringResource(if (reorderMode) R.string.drawer_sort_done else R.string.drawer_sort))
+            }
+            if (reorderMode) {
+                TextButton(onClick = onResetActivityOrder) { Text(stringResource(R.string.drawer_sort_reset)) }
+            }
+        }
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            label = { Text(stringResource(R.string.drawer_search_actions)) },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        )
+        val visible = activityItems.filter { spec ->
+            query.isBlank() || stringResource(spec.labelRes).contains(query.trim(), ignoreCase = true)
+        }
+        ActivityNav.grouped(visible).forEach { (group, items) ->
+            // 设置组按基线不带分组标题。
+            if (group != ActivityGroup.SETTINGS) {
+                Text(
+                    when (group) {
+                        ActivityGroup.CREATION -> stringResource(R.string.group_creation)
+                        else -> stringResource(R.string.group_tools)
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                )
+            }
+            items.forEach { spec ->
+                val destination = destinationOf(spec.id)
+                val selected = spec.id == currentRoute
+                if (destination == null) return@forEach
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(
+                        onClick = { onNavigate(destination) },
+                        enabled = spec.implemented,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(
+                                spec.icon,
+                                contentDescription = null,
+                                tint = if (selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                            )
+                            Text(
+                                stringResource(spec.labelRes),
+                                modifier = Modifier.weight(1f),
+                                color = if (selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                            if (!spec.implemented) {
+                                Text(
+                                    stringResource(R.string.dest_placeholder),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline,
+                                )
+                            }
+                            if (selected) {
+                                Icon(
+                                    Icons.Filled.Check,
+                                    contentDescription = stringResource(R.string.dest_current),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            } else {
+                                Icon(
+                                    Icons.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.outline,
+                                )
+                            }
+                        }
+                    }
+                    if (reorderMode && group != ActivityGroup.SETTINGS) {
+                        TextButton(onClick = { onMoveActivity(spec.id, -1) }) { Text("↑") }
+                        TextButton(onClick = { onMoveActivity(spec.id, 1) }) { Text("↓") }
                     }
                 }
             }
+        }
+        if (visible.isEmpty()) {
+            Text(
+                stringResource(R.string.drawer_no_match),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
         }
         HorizontalDivider()
         TextButton(onClick = onToggleDarkTheme, modifier = Modifier.fillMaxWidth()) {

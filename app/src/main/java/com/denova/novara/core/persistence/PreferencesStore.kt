@@ -21,6 +21,9 @@ class PreferencesStore(private val context: Context) : Preferences {
 
         /** 上次挂接的 Agent 会话：进程被杀后据此回到同一会话（服务端 active 仍是事实源）。 */
         val LAST_AGENT_SESSION = stringPreferencesKey("last_agent_session")
+
+        /** 一级导航顺序（NAV-004）：逗号分隔的 id 列表；作用域对齐基线的 workspace。 */
+        val ACTIVITY_ORDER = stringPreferencesKey("activity_order")
     }
 
     override val darkTheme: Flow<Boolean> = context.novaraPreferences.data
@@ -44,5 +47,18 @@ class PreferencesStore(private val context: Context) : Preferences {
 
     suspend fun setLastAgentSession(sessionId: String) {
         context.novaraPreferences.edit { prefs -> prefs[Keys.LAST_AGENT_SESSION] = sessionId }
+    }
+
+    /** 保存过的一级导航顺序；空表示没改过（用默认顺序）。 */
+    suspend fun activityOrder(): List<String> =
+        context.novaraPreferences.data
+            .map { it[Keys.ACTIVITY_ORDER].orEmpty() }
+            .first()
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+
+    suspend fun setActivityOrder(ids: List<String>) {
+        context.novaraPreferences.edit { prefs -> prefs[Keys.ACTIVITY_ORDER] = ids.joinToString(",") }
     }
 }
