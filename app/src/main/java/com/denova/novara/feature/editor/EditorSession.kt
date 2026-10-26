@@ -4,6 +4,8 @@ import com.denova.novara.core.editor.EditHistory
 import com.denova.novara.core.editor.EditSnapshot
 import com.denova.novara.core.editor.MergeResult
 import com.denova.novara.core.editor.ThreeWayMerge
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.persistence.Draft
 import com.denova.novara.core.persistence.DraftStorage
@@ -58,7 +60,7 @@ object ReceiptPolicy {
                 baseRevision = newRevision,
                 baseContent = snapshot,
                 saveStatus = if (dirty) SaveStatus.IDLE else SaveStatus.SAVED,
-                message = if (dirty) null else "已保存",
+                message = if (dirty) null else UiText.of(R.string.editor_saved),
             ),
             reschedule = dirty,
         )
@@ -75,7 +77,7 @@ object ReceiptPolicy {
                     baseRevision = outcome.revision,
                     baseContent = outcome.mergedText,
                     saveStatus = SaveStatus.MERGED,
-                    message = "已自动合并并保存",
+                    message = UiText.of(R.string.editor_merged),
                     contentEpoch = current.contentEpoch + 1,
                 ),
                 reschedule = false,
@@ -107,7 +109,7 @@ object ReceiptPolicy {
                         externalRevision = outcome.revision,
                         mergedContent = remerged.text,
                     ),
-                    message = "发现冲突，请手动解决后保存",
+                    message = UiText.of(R.string.editor_conflict_hint),
                     contentEpoch = current.contentEpoch + 1,
                 ),
                 reschedule = false,
@@ -137,13 +139,13 @@ object ReceiptPolicy {
                 recoveryId = outcome.preserved?.id,
                 recoveryPath = outcome.preserved?.path,
             ),
-            message = "发现冲突，请手动解决后保存",
+            message = UiText.of(R.string.editor_conflict_hint),
         )
 
     fun applyError(outcome: SaveOutcome.Error, current: EditorUiState): EditorUiState =
         current.copy(
             saveStatus = SaveStatus.ERROR,
-            message = "保存失败：${outcome.exception.message}",
+            message = UiText.of(R.string.editor_save_failed, outcome.exception.message ?: ""),
         )
 }
 
@@ -230,14 +232,14 @@ class EditorSession(
                     baseContent = decision.baseContent,
                     loaded = true,
                     saveStatus = SaveStatus.IDLE,
-                    message = "已恢复未保存的编辑",
+                    message = UiText.of(R.string.editor_restored_draft),
                     contentEpoch = epoch,
                 )
             }
         }
     }
 
-    fun failOpen(message: String) {
+    fun failOpen(message: UiText) {
         _state.value = _state.value.copy(loaded = false, saveStatus = SaveStatus.ERROR, message = message)
     }
 
@@ -291,12 +293,12 @@ class EditorSession(
      * 撤销一步（WRI-014）。冲突未解决时不生效：不能靠撤销绕过「保留本地 / 加载外部」的选择。
      * 撤销后的正文照常走自动保存——服务端仍是事实源，只是内容由用户回退。
      */
-    fun undo(): Boolean = applySnapshot(history.undo(EditSnapshot(_state.value.content, _state.value.caret)), "已撤销")
+    fun undo(): Boolean = applySnapshot(history.undo(EditSnapshot(_state.value.content, _state.value.caret)), UiText.of(R.string.editor_undone))
 
     /** 重做一步（WRI-014）。 */
-    fun redo(): Boolean = applySnapshot(history.redo(EditSnapshot(_state.value.content, _state.value.caret)), "已重做")
+    fun redo(): Boolean = applySnapshot(history.redo(EditSnapshot(_state.value.content, _state.value.caret)), UiText.of(R.string.editor_redone))
 
-    private fun applySnapshot(target: EditSnapshot?, message: String): Boolean {
+    private fun applySnapshot(target: EditSnapshot?, message: UiText): Boolean {
         val s = _state.value
         if (target == null || !s.loaded || s.saveStatus == SaveStatus.CONFLICT) return false
         _state.value = withHistoryFlags(
@@ -329,7 +331,7 @@ class EditorSession(
         debounceJob?.cancel()
         debounceJob = null
         if (s.content == s.baseContent) {
-            _state.value = s.copy(saveStatus = SaveStatus.SAVED, message = "已保存")
+            _state.value = s.copy(saveStatus = SaveStatus.SAVED, message = UiText.of(R.string.editor_saved))
             return
         }
         startSave()
@@ -408,7 +410,7 @@ class EditorSession(
                 saveStatus = SaveStatus.IDLE,
                 conflictText = null,
                 conflict = null,
-                message = "已加载外部版本",
+                message = UiText.of(R.string.editor_external_loaded),
                 // 选区随基线一起归零：外部正文与本地光标位置没有对应关系。
                 caret = 0,
                 contentEpoch = s.contentEpoch + 1,

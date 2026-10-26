@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.denova.novara.NovaraApplication
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.persistence.DraftStore
@@ -45,7 +47,7 @@ data class EditorUiState(
     val baseContent: String = "",
     val loaded: Boolean = false,
     val saveStatus: SaveStatus = SaveStatus.IDLE,
-    val message: String? = null,
+    val message: UiText? = null,
     val conflictText: String? = null,
     /** 冲突选择（WRI-013）；非空即「等用户选保留本地还是加载外部」。 */
     val conflict: ExternalConflict? = null,
@@ -152,7 +154,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 persist()
             } catch (e: Exception) {
                 DenovaLog.w("Editor", "open failed project=$pid path=$p", e)
-                s.failOpen("打开文件失败：${e.message}")
+                s.failOpen(UiText.of(R.string.editor_open_failed, e.message ?: ""))
             }
         }
     }

@@ -68,6 +68,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.denova.novara.R
 import com.denova.novara.core.editor.EditorSearch
 import com.denova.novara.core.editor.MarkdownDocument
+import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.editor.MarkdownTable
 import com.denova.novara.core.network.TextSelectionRef
 import kotlinx.coroutines.launch
@@ -217,7 +218,7 @@ fun EditorScreen(
         }
         uiState.message?.let {
             Text(
-                it,
+                it.resolve(),
                 color = if (uiState.saveStatus == SaveStatus.CONFLICT || uiState.saveStatus == SaveStatus.ERROR)
                     MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodySmall,

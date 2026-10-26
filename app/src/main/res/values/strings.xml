@@ -83,6 +83,13 @@
     <string name="onboarding_fill_example">Fill example</string>
     <string name="onboarding_model_hint">Configure a language model in Settings to continue.</string>
     <string name="drawer_new_book">+ New book</string>
+    <string name="editor_conflict_hint">Conflict detected; resolve it before saving</string>
+    <string name="editor_save_failed">Save failed: %1$s</string>
+    <string name="editor_restored_draft">Restored unsaved edits</string>
+    <string name="editor_undone">Undone</string>
+    <string name="editor_redone">Redone</string>
+    <string name="editor_external_loaded">Loaded the external version</string>
+    <string name="editor_open_failed">Failed to open file: %1$s</string>
     <string name="chapter_line">%1$s · %2$d words</string>
     <string name="game_console_placeholder">Game console (sessions / branches pending)</string>
     <string name="common_attach">Attach</string>

@@ -83,6 +83,13 @@
     <string name="onboarding_fill_example">填入示例</string>
     <string name="onboarding_model_hint">请到设置里配置语言模型后继续。</string>
     <string name="drawer_new_book">＋ 新建书籍</string>
+    <string name="editor_conflict_hint">发现冲突，请手动解决后保存</string>
+    <string name="editor_save_failed">保存失败：%1$s</string>
+    <string name="editor_restored_draft">已恢复未保存的编辑</string>
+    <string name="editor_undone">已撤销</string>
+    <string name="editor_redone">已重做</string>
+    <string name="editor_external_loaded">已加载外部版本</string>
+    <string name="editor_open_failed">打开文件失败：%1$s</string>
     <string name="chapter_line">%1$s · %2$d 字</string>
     <string name="game_console_placeholder">游戏控制台（待接会话 / 分支状态）</string>
     <string name="common_attach">挂接</string>

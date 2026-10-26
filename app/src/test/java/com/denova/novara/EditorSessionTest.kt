@@ -1,5 +1,7 @@
 package com.denova.novara
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.network.DenovaApiException
 import com.denova.novara.core.network.ProjectFileDocument
 import com.denova.novara.core.network.SaveFileResponse
@@ -147,7 +149,7 @@ class EditorSessionTest {
         session.open("p", "f.md", "server", "r1")
         assertEquals("draft", session.state.value.content)
         assertEquals("r0", session.state.value.baseRevision)
-        assertEquals("已恢复未保存的编辑", session.state.value.message)
+        assertEquals(UiText.of(R.string.editor_restored_draft), session.state.value.message)
         assertNotNull(drafts.map["p\u0000f.md"]) // 草稿保留，下次仍可恢复
     }
 
