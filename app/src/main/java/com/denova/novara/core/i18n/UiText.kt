@@ -33,6 +33,12 @@ sealed interface UiText {
     }
 }
 
+/** 日志 / 非界面场景用的稳定标识（不参与展示）：资源文案给 `res:<id>`，原文原样返回。 */
+fun UiText.debugName(): String = when (this) {
+    is UiText.Res -> "res:$id"
+    is UiText.Raw -> text
+}
+
 /** 界面层解析：Compose 作用域内调用。 */
 @Composable
 fun UiText.resolve(): String = when (this) {

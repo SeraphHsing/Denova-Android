@@ -162,6 +162,30 @@
     <string name="game_activity_recovering">恢复中…</string>
     <string name="game_status">状态：%1$s</string>
     <string name="term_project_id">项目 ID</string>
+    <string name="term_status_disconnected">未连接</string>
+    <string name="term_status_connecting">连接中…</string>
+    <string name="term_status_reconnecting">重连中（第 %1$d 次）…</string>
+    <string name="term_status_reconnect_failed">连接失败，准备重连…</string>
+    <string name="term_status_lost_retrying">连接断开，重连中（第 %1$d 次）…</string>
+    <string name="term_status_connected">已连接</string>
+    <string name="term_status_ready">已就绪</string>
+    <string name="term_status_exited">已退出（code=%1$d）</string>
+    <string name="term_status_error">连接异常</string>
+    <string name="term_status_closed_code">连接已关闭（code=%1$d）</string>
+    <string name="term_status_failed">连接失败</string>
+    <string name="term_status_closed">已关闭</string>
+    <string name="term_err_connect_failed">连接失败</string>
+    <string name="term_err_released">终端会话已在其他端释放，内容未自动重建（可手动重新连接）</string>
+    <string name="term_err_idle_timeout">连接空闲超时</string>
+    <string name="term_err_released_short">会话已在其他端释放</string>
+    <string name="term_err_disconnected">连接断开</string>
+    <string name="term_err_ended">连接结束</string>
+    <string name="term_fatal_auth">认证已失效，请重新登录</string>
+    <string name="term_fatal_owner">该终端归属已被另一个项目占用：先在原项目关闭终端，再回到本项目重试</string>
+    <string name="term_fatal_token">终端凭证已失效，请重新打开终端</string>
+    <string name="term_fatal_not_found">终端会话已不存在（可能已在其他端释放）</string>
+    <string name="term_fatal_too_many">终端会话数已达上限，请先关闭其他会话</string>
+    <string name="term_fatal_disabled">服务器未启用终端功能</string>
     <string name="term_connect">连接</string>
     <string name="term_close_session">关闭会话</string>
     <string name="term_view_history">查看历史</string>

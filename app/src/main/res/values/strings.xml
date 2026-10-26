@@ -162,6 +162,30 @@
     <string name="game_activity_recovering">recovering…</string>
     <string name="game_status">Status: %1$s</string>
     <string name="term_project_id">Project ID</string>
+    <string name="term_status_disconnected">Disconnected</string>
+    <string name="term_status_connecting">Connecting…</string>
+    <string name="term_status_reconnecting">Reconnecting (attempt %1$d)…</string>
+    <string name="term_status_reconnect_failed">Connect failed, will retry…</string>
+    <string name="term_status_lost_retrying">Connection lost, reconnecting (attempt %1$d)…</string>
+    <string name="term_status_connected">Connected</string>
+    <string name="term_status_ready">Ready</string>
+    <string name="term_status_exited">Exited (code=%1$d)</string>
+    <string name="term_status_error">Connection error</string>
+    <string name="term_status_closed_code">Connection closed (code=%1$d)</string>
+    <string name="term_status_failed">Connect failed</string>
+    <string name="term_status_closed">Closed</string>
+    <string name="term_err_connect_failed">Connection failed</string>
+    <string name="term_err_released">The terminal was released on another client; content was not recreated (you can reconnect manually)</string>
+    <string name="term_err_idle_timeout">Connection idle timeout</string>
+    <string name="term_err_released_short">The session was released on another client</string>
+    <string name="term_err_disconnected">Connection dropped</string>
+    <string name="term_err_ended">Connection ended</string>
+    <string name="term_fatal_auth">Authentication expired, sign in again</string>
+    <string name="term_fatal_owner">This terminal belongs to another project: close it there first, then retry here</string>
+    <string name="term_fatal_token">Terminal credentials expired, reopen the terminal</string>
+    <string name="term_fatal_not_found">The terminal session no longer exists (it may have been released elsewhere)</string>
+    <string name="term_fatal_too_many">Terminal session limit reached; close another session first</string>
+    <string name="term_fatal_disabled">Terminal is disabled on this server</string>
     <string name="term_connect">Connect</string>
     <string name="term_close_session">Close session</string>
     <string name="term_view_history">View history</string>

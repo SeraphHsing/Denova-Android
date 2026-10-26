@@ -1,5 +1,8 @@
 package com.denova.novara
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import com.denova.novara.core.terminal.TerminalReconnectPolicy
 import com.denova.novara.core.terminal.TerminalSessionEnd
 import org.junit.Assert.assertEquals
@@ -25,7 +28,7 @@ class TerminalReconnectPolicyTest {
 
     @Test
     fun `disconnected session retries until the attempt cap`() {
-        val end = TerminalSessionEnd.Disconnected("socket closed")
+        val end = TerminalSessionEnd.Disconnected(UiText.raw("socket closed"))
 
         assertTrue(TerminalReconnectPolicy.shouldRetry(end, 0))
         assertTrue(TerminalReconnectPolicy.shouldRetry(end, TerminalReconnectPolicy.MAX_ATTEMPTS - 1))
@@ -55,12 +58,12 @@ class TerminalReconnectPolicyTest {
     fun `ownership conflicts stop retrying with a readable reason`() {
         val message = TerminalReconnectPolicy.describeFatalApiError(409, "api.terminal.ownerConflict")
 
-        assertTrue(message, message != null && message.contains("占用"))
+        assertEquals(UiText.of(R.string.term_fatal_owner), message)
     }
 
     @Test
     fun `token and session errors are terminal too`() {
-        assertTrue(TerminalReconnectPolicy.describeFatalApiError(403, "api.terminal.tokenInvalid") != null)
+        assertEquals(UiText.of(R.string.term_fatal_token), TerminalReconnectPolicy.describeFatalApiError(403, "api.terminal.tokenInvalid"))
         assertTrue(TerminalReconnectPolicy.describeFatalApiError(404, "api.terminal.notFound") != null)
         assertTrue(TerminalReconnectPolicy.describeFatalApiError(429, "api.terminal.tooMany") != null)
         assertTrue(TerminalReconnectPolicy.describeFatalApiError(503, "api.terminal.disabled") != null)

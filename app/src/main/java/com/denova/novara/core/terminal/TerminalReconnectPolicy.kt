@@ -1,5 +1,8 @@
 package com.denova.novara.core.terminal
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 /**
  * 一次 attach 会话的结束原因，决定要不要重新挂接。
  *
@@ -14,7 +17,7 @@ sealed interface TerminalSessionEnd {
     data object UserClosed : TerminalSessionEnd
 
     /** 传输中断（socket 关闭、网络失败、空闲超时）：可重新 attach 同一 PTY。 */
-    data class Disconnected(val reason: String) : TerminalSessionEnd
+    data class Disconnected(val reason: UiText) : TerminalSessionEnd
 
     /** 不可恢复（认证 / 权限失效）：重连也会失败。 */
     data class Fatal(val message: String) : TerminalSessionEnd
@@ -65,14 +68,14 @@ object TerminalReconnectPolicy {
      * 「一直转圈重连」或更糟的「静默新建一个空 PTY 顶替原来的会话」。
      * 服务端错误键形如 `api.terminal.ownerConflict`。
      */
-    fun describeFatalApiError(status: Int, code: String?): String? = when {
-        code == null -> if (isFatalStatus(status)) "认证已失效，请重新登录" else null
+    fun describeFatalApiError(status: Int, code: String?): UiText? = when {
+        code == null -> if (isFatalStatus(status)) UiText.of(R.string.term_fatal_auth) else null
         code.endsWith("ownerConflict") ->
-            "该终端归属已被另一个项目占用：先在原项目关闭终端，再回到本项目重试"
-        code.endsWith("tokenInvalid") -> "终端凭证已失效，请重新打开终端"
-        code.endsWith("notFound") -> "终端会话已不存在（可能已在其他端释放）"
-        code.endsWith("tooMany") -> "终端会话数已达上限，请先关闭其他会话"
-        code.endsWith("disabled") -> "服务器未启用终端功能"
-        else -> if (isFatalStatus(status)) "认证已失效，请重新登录" else null
+            UiText.of(R.string.term_fatal_owner)
+        code.endsWith("tokenInvalid") -> UiText.of(R.string.term_fatal_token)
+        code.endsWith("notFound") -> UiText.of(R.string.term_fatal_not_found)
+        code.endsWith("tooMany") -> UiText.of(R.string.term_fatal_too_many)
+        code.endsWith("disabled") -> UiText.of(R.string.term_fatal_disabled)
+        else -> if (isFatalStatus(status)) UiText.of(R.string.term_fatal_auth) else null
     }
 }

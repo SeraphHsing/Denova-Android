@@ -1,5 +1,9 @@
 package com.denova.novara.feature.terminal
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+import com.denova.novara.core.i18n.debugName
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -50,12 +54,12 @@ import kotlinx.coroutines.launch
 class TerminalViewModel(application: Application) : AndroidViewModel(application) {
 
     data class UiState(
-        val status: String = "未连接",
+        val status: UiText = UiText.of(R.string.term_status_disconnected),
         val connected: Boolean = false,
         val sessionId: String? = null,
         val projectId: String? = null,
         val exited: Boolean = false,
-        val error: String? = null,
+        val error: UiText? = null,
         val cols: Int = DEFAULT_COLS,
         val rows: Int = DEFAULT_ROWS,
         /** 递增即触发一次重绘。 */
@@ -175,7 +179,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
         var attempt = 0
         while (wantConnected) {
             _state.value = _state.value.copy(
-                status = if (attempt == 0) "连接中…" else "重连中（第 $attempt 次）…",
+                status = if (attempt == 0) UiText.of(R.string.term_status_connecting) else UiText.of(R.string.term_status_reconnecting, attempt),
                 connected = false,
                 exited = false,
                 projectId = projectId,
@@ -196,22 +200,22 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                     return
                 }
                 if (!isRetryable(e)) {
-                    giveUp(e.message ?: "连接失败")
+                    giveUp(e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.term_err_connect_failed))
                     return
                 }
-                val end = TerminalSessionEnd.Disconnected(e.message ?: "连接失败")
+                val end = TerminalSessionEnd.Disconnected(e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.term_err_connect_failed))
                 attempt++
                 if (!TerminalReconnectPolicy.shouldRetry(end, attempt)) {
                     giveUp(end.reason)
                     return
                 }
-                _state.value = _state.value.copy(status = "连接失败，准备重连…", error = end.reason)
+                _state.value = _state.value.copy(status = UiText.of(R.string.term_status_reconnect_failed), error = end.reason)
                 delay(TerminalReconnectPolicy.backoffDelay(attempt - 1))
                 continue
             }
 
             if (info == null) {
-                giveUp("终端会话已在其他端释放，内容未自动重建（可手动重新连接）")
+                giveUp(UiText.of(R.string.term_err_released))
                 return
             }
 
@@ -223,7 +227,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 }
                 TerminalSessionEnd.UserClosed -> return
                 is TerminalSessionEnd.Fatal -> {
-                    giveUp(end.message)
+                    giveUp(UiText.raw(end.message))
                     return
                 }
                 is TerminalSessionEnd.Disconnected -> {
@@ -232,9 +236,9 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                         giveUp(end.reason)
                         return
                     }
-                    DenovaLog.w("Terminal", "disconnected (${end.reason}); retry #$attempt")
+                    DenovaLog.w("Terminal", "disconnected (${end.reason.debugName()}); retry #$attempt")
                     _state.value = _state.value.copy(
-                        status = "连接断开，重连中（第 $attempt 次）…",
+                        status = UiText.of(R.string.term_status_lost_retrying, attempt),
                         connected = false,
                         error = end.reason,
                         reconnectAttempt = attempt,
@@ -288,7 +292,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
         connection = conn
         previousSessionId = info.id
         _state.value = _state.value.copy(
-            status = "已连接",
+            status = UiText.of(R.string.term_status_connected),
             connected = true,
             sessionId = info.id,
             exited = false,
@@ -311,7 +315,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                 val idle = System.currentTimeMillis() - lastFrameAt.get()
                 if (idle >= TerminalReconnectPolicy.IDLE_TIMEOUT_MS) {
                     DenovaLog.w("Terminal", "no frames for ${idle}ms; force re-attach")
-                    endRef.set(TerminalSessionEnd.Disconnected("连接空闲超时"))
+                    endRef.set(TerminalSessionEnd.Disconnected(UiText.of(R.string.term_err_idle_timeout)))
                     // 关掉 socket 让上面的 collect 退出，再走重连
                     conn.close()
                     return@launch
@@ -323,7 +327,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                     }.getOrNull()
                     if (alive == false) {
                         DenovaLog.w("Terminal", "session ${info.id} gone (released by another client)")
-                        endRef.set(TerminalSessionEnd.Disconnected("会话已在其他端释放"))
+                        endRef.set(TerminalSessionEnd.Disconnected(UiText.of(R.string.term_err_released_short)))
                         conn.close()
                         return@launch
                     }
@@ -346,7 +350,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                     is TerminalFrame.Ready -> {
                         applyFit()
                         onAlive()
-                        _state.value = _state.value.copy(status = "已就绪", connected = true)
+                        _state.value = _state.value.copy(status = UiText.of(R.string.term_status_ready), connected = true)
                     }
                     is TerminalFrame.Exit -> {
                         dirty = true
@@ -355,24 +359,24 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
                         captureHistory()
                         endRef.compareAndSet(null, TerminalSessionEnd.Exited)
                         _state.value = _state.value.copy(
-                            status = "已退出（code=${frame.code}）",
+                            status = UiText.of(R.string.term_status_exited, frame.code),
                             connected = false,
                             exited = true,
-                            error = frame.error,
+                            error = frame.error?.let { UiText.raw(it) },
                         )
                     }
                     is TerminalFrame.Error -> {
                         endRef.compareAndSet(
                             null,
-                            TerminalSessionEnd.Disconnected(frame.message),
+                            TerminalSessionEnd.Disconnected(frame.message?.let { UiText.raw(it) } ?: UiText.of(R.string.term_err_disconnected)),
                         )
-                        _state.value = _state.value.copy(status = "连接异常", error = frame.message)
+                        _state.value = _state.value.copy(status = UiText.of(R.string.term_status_error), error = frame.message?.let { UiText.raw(it) })
                     }
                     is TerminalFrame.Closed -> {
                         endRef.compareAndSet(
                             null,
                             TerminalSessionEnd.Disconnected(
-                                frame.reason.ifBlank { "连接已关闭（code=${frame.code}）" },
+                                frame.reason?.takeIf { it.isNotBlank() }?.let { UiText.raw(it) } ?: UiText.of(R.string.term_status_closed_code, frame.code),
                             ),
                         )
                     }
@@ -384,7 +388,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
             throw e
         } catch (e: Exception) {
             DenovaLog.w("Terminal", "stream failed", e)
-            endRef.compareAndSet(null, TerminalSessionEnd.Disconnected(e.message ?: "连接断开"))
+            endRef.compareAndSet(null, TerminalSessionEnd.Disconnected(e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.term_err_disconnected)))
         } finally {
             heartbeat.cancel()
             conn.close()
@@ -402,20 +406,20 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
             }
         }
 
-        endRef.get() ?: TerminalSessionEnd.Disconnected("连接结束")
+        endRef.get() ?: TerminalSessionEnd.Disconnected(UiText.of(R.string.term_err_ended))
     }
 
     private fun isRetryable(e: Exception): Boolean =
         !(e is DenovaApiException && TerminalReconnectPolicy.isFatalStatus(e.status))
 
     /** 终止重连并落到可见的失败态。 */
-    private fun giveUp(message: String) {
+    private fun giveUp(message: UiText) {
         wantConnected = false
         // 放弃前先把现有屏幕落盘：会话可能已被其他端释放（PTY 已 kill），
         // 至少让用户还能回看命令与输出（G6 决策 B）。
         captureHistory()
         _state.value = _state.value.copy(
-            status = "连接失败",
+            status = UiText.of(R.string.term_status_failed),
             connected = false,
             error = message,
         )
@@ -557,7 +561,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
         // 新会话从干净屏幕开始，避免上一个会话的内容残留
         screen.reset()
         _state.value = _state.value.copy(
-            status = "已关闭",
+            status = UiText.of(R.string.term_status_closed),
             connected = false,
             sessionId = null,
             projectId = null,

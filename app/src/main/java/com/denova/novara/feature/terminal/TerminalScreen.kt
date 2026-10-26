@@ -1,5 +1,7 @@
 package com.denova.novara.feature.terminal
 
+import com.denova.novara.core.i18n.resolve
+
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -137,7 +139,7 @@ fun TerminalScreen(
             IconButton(onClick = onOpenDrawer) { Text("☰") }
             Text(stringResource(R.string.terminal_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
             TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-            Text(state.status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))
+            Text(state.status.resolve(), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))
             Text(
                 text = "${state.cols}x${state.rows}",
                 style = MaterialTheme.typography.bodySmall,
@@ -170,7 +172,7 @@ fun TerminalScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = it,
+                    text = it.resolve(),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
