@@ -104,9 +104,9 @@ fun AppDrawer(
                     Text(stringResource(R.string.onboarding_progress, OnboardingLogic.progressLabel(onboardingStep)), style = MaterialTheme.typography.labelLarge)
                     TextButton(onClick = onSkipOnboarding) { Text(stringResource(R.string.onboarding_skip)) }
                 }
-                Text(OnboardingLogic.stepTitle(onboardingStep), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(OnboardingLogic.stepTitle(onboardingStep)), style = MaterialTheme.typography.bodyMedium)
                 Text(
-                    OnboardingLogic.stepBody(onboardingStep),
+                    stringResource(OnboardingLogic.stepBody(onboardingStep)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
                 )

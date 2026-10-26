@@ -1,5 +1,8 @@
 package com.denova.novara.feature.versions
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,20 +20,20 @@ import kotlinx.coroutines.launch
 data class VersionsUiState(
     val projectId: String = "",
     val loading: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
     val status: VersionStatus? = null,
     val versions: List<VersionEntry> = emptyList(),
     /** 创建版本的说明输入（VER-001）。 */
     val createText: String = "",
     val creating: Boolean = false,
     /** 一次写操作的结果提示：创建 / 恢复成功后的服务端 message。 */
-    val actionMessage: String? = null,
-    val actionError: String? = null,
+    val actionMessage: UiText? = null,
+    val actionError: UiText? = null,
     /** 正在查看 diff 的版本；空表示没有打开。 */
     val selectedVersionId: String = "",
     val diff: VersionDiff? = null,
     val diffLoading: Boolean = false,
-    val diffError: String? = null,
+    val diffError: UiText? = null,
     /** 待恢复路径（默认全选）；空集表示用户一个都没选。 */
     val selectedPaths: Set<String> = emptySet(),
     val plan: VersionRestorePlan? = null,
@@ -84,7 +87,7 @@ class VersionsViewModel(application: Application) : AndroidViewModel(application
                 )
             } catch (e: Exception) {
                 DenovaLog.w("Versions", "load failed project=$projectId", e)
-                _state.value = _state.value.copy(loading = false, error = e.message ?: "加载版本失败")
+                _state.value = _state.value.copy(loading = false, error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.versions_load_failed))
             }
         }
     }
@@ -111,7 +114,7 @@ class VersionsViewModel(application: Application) : AndroidViewModel(application
                 _state.value = _state.value.copy(
                     creating = false,
                     createText = "",
-                    actionMessage = result.message.ifBlank { "已创建版本" },
+                    actionMessage = result.message.takeIf { it.isNotBlank() }?.let { UiText.raw(it) } ?: UiText.of(R.string.versions_created),
                 )
                 DenovaLog.i(
                     "Versions",
@@ -124,7 +127,7 @@ class VersionsViewModel(application: Application) : AndroidViewModel(application
                 DenovaLog.w("Versions", "create failed project=$projectId", e)
                 _state.value = _state.value.copy(
                     creating = false,
-                    actionError = e.message ?: "创建版本失败",
+                    actionError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.versions_create_failed),
                 )
             }
         }
@@ -163,7 +166,7 @@ class VersionsViewModel(application: Application) : AndroidViewModel(application
                 DenovaLog.w("Versions", "diff failed version=$versionId", e)
                 _state.value = _state.value.copy(
                     diffLoading = false,
-                    diffError = e.message ?: "加载版本差异失败",
+                    diffError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.versions_diff_failed),
                 )
             }
         }
@@ -222,7 +225,7 @@ class VersionsViewModel(application: Application) : AndroidViewModel(application
                 DenovaLog.w("Versions", "restore plan failed version=$versionId", e)
                 _state.value = _state.value.copy(
                     planLoading = false,
-                    diffError = e.message ?: "预览恢复计划失败",
+                    diffError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.versions_restore_preview_failed),
                 )
             }
         }
@@ -248,7 +251,7 @@ class VersionsViewModel(application: Application) : AndroidViewModel(application
                 )
                 _state.value = _state.value.copy(
                     restoring = false,
-                    actionMessage = result.message.ifBlank { "已恢复到该版本" },
+                    actionMessage = result.message.takeIf { it.isNotBlank() }?.let { UiText.raw(it) } ?: UiText.of(R.string.versions_restored),
                 )
                 closeVersion()
                 load(projectId, force = true)
@@ -258,7 +261,7 @@ class VersionsViewModel(application: Application) : AndroidViewModel(application
                 DenovaLog.w("Versions", "restore failed version=$versionId", e)
                 _state.value = _state.value.copy(
                     restoring = false,
-                    diffError = e.message ?: "恢复失败",
+                    diffError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.versions_restore_failed),
                 )
             }
         }

@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.denova.novara.R
+import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GamePhase
@@ -115,7 +116,7 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
             )
         }
         uiState.error?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
+            Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
         }
 
         // 叙事单独收集 blocks 流：高频更新只重组本面板

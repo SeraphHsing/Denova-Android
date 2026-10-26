@@ -1,5 +1,8 @@
 package com.denova.novara.feature.game
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -57,7 +60,7 @@ data class GameUiState(
     val baseline: String = "",
     val connected: Boolean = false,
     val sending: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
 )
 
 /** 游戏流 ViewModel：绑定 client → 恢复协调器 → 投影 + 叙事累积。 */
@@ -212,19 +215,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (idleTerminated) {
                     DenovaLog.w("Game", "stream idle timeout; task finished")
-                    _uiState.value = _uiState.value.copy(error = "流空闲超时，任务可能已结束")
+                    _uiState.value = _uiState.value.copy(error = UiText.of(R.string.agent_flow_idle_timeout))
                 }
                 finishStream()
             } catch (e: GameStreamError) {
                 val rejected = e.status in 400..499 && e.code != null && e.code != "agent_runtime.stream_attached"
                 commands.updateStatus(commandId, if (rejected) CommandStatus.REJECTED else CommandStatus.UNCERTAIN)
                 DenovaLog.w("Game", "send failed code=${e.code} status=${e.status}")
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.message?.let { UiText.raw(it) })
                 finishStream()
             } catch (e: Exception) {
                 commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
                 DenovaLog.w("Game", "send uncertain", e)
-                _uiState.value = _uiState.value.copy(error = e.message)
+                _uiState.value = _uiState.value.copy(error = e.message?.let { UiText.raw(it) })
                 finishStream()
             }
         }

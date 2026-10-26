@@ -1,5 +1,9 @@
 package com.denova.novara.core.book
 
+import androidx.annotation.StringRes
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 /**
  * 章节状态的判定规则（WRI-015），对齐固定基线：
  *
@@ -16,18 +20,19 @@ object ChapterRules {
     fun canMarkDraft(confirmed: Boolean): Boolean = confirmed
 
     /** 按钮文案口径：已确认 → 标回初稿，否则 → 确认成章。 */
-    fun actionLabel(confirmed: Boolean): String = if (confirmed) "标回初稿" else "确认成章"
+    @StringRes
+fun actionLabel(confirmed: Boolean): Int = if (confirmed) R.string.chapter_action_unconfirm else R.string.chapter_action_confirm
 
     /** 提交给 `PATCH …/book/chapter-status` 的目标值。 */
     fun nextConfirmed(confirmed: Boolean): Boolean = !confirmed
 
     /** 状态徽标：后端字符串直出；空值按空章处理，避免界面出现空白徽标。 */
-    fun statusLabel(status: String, words: Int): String = when {
-        status.isNotBlank() -> status
-        words == 0 -> "空章"
-        else -> "初稿"
+    fun statusLabel(status: String, words: Int): UiText = when {
+        status.isNotBlank() -> UiText.raw(status)
+        words == 0 -> UiText.of(R.string.chapter_status_empty)
+        else -> UiText.of(R.string.chapter_status_draft)
     }
 
     /** 列表摘要：「3 章 · 共 1,234 字」。 */
-    fun summaryLabel(chapterCount: Int, totalWords: Int): String = "$chapterCount 章 · 共 $totalWords 字"
+    fun summaryLabel(chapterCount: Int, totalWords: Int): UiText = UiText.of(R.string.chapter_summary, chapterCount, totalWords)
 }

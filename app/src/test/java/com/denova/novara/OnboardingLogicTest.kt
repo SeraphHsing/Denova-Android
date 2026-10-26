@@ -1,8 +1,12 @@
 package com.denova.novara
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import com.denova.novara.core.onboarding.OnboardingLogic
 import com.denova.novara.core.onboarding.OnboardingStep
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -39,24 +43,21 @@ class OnboardingLogicTest {
 
     @Test
     fun `init prompt matches the web baseline wording`() {
-        assertTrue(OnboardingLogic.INIT_PROMPT.startsWith("请和我一起启动一本新书"))
-        assertTrue(OnboardingLogic.INIT_PROMPT.contains("ideas.md"))
-        // 基线明确「暂时不要创建大纲、章节或写入资料库」，客户端不得擅自改口径。
-        assertTrue(OnboardingLogic.INIT_PROMPT.contains("暂时不要创建大纲、章节或写入资料库"))
+        // 文案落在资源里（values-zh 与基线同口径），这里守「指向哪条资源」。
+        assertEquals(UiText.of(R.string.onboard_init_prompt), OnboardingLogic.INIT_PROMPT)
     }
 
     @Test
     fun `first chapter prompt embeds the book title`() {
         val prompt = OnboardingLogic.firstChapterPrompt("灵渊劫")
-        assertTrue(prompt.contains("《灵渊劫》"))
-        assertTrue(prompt.contains("chapters/"))
+        assertEquals(UiText.of(R.string.onboard_first_prompt, "灵渊劫"), prompt)
     }
 
     @Test
     fun `every step has a title and body`() {
         OnboardingStep.entries.forEach {
-            assertTrue(OnboardingLogic.stepTitle(it).isNotBlank())
-            assertTrue(OnboardingLogic.stepBody(it).isNotBlank())
+            assertNotEquals(0, OnboardingLogic.stepTitle(it))
+            assertNotEquals(0, OnboardingLogic.stepBody(it))
         }
     }
 }

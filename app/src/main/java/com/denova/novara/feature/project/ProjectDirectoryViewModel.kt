@@ -1,5 +1,8 @@
 package com.denova.novara.feature.project
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,7 +20,7 @@ import kotlinx.coroutines.launch
 data class ProjectDirectoryUiState(
     val projectId: String = "",
     val loading: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
     val nodes: List<ProjectFileNode> = emptyList(),
     val rows: List<ProjectFileRow> = emptyList(),
     val expanded: Set<String> = emptySet(),
@@ -70,7 +73,7 @@ class ProjectDirectoryViewModel(application: Application) : AndroidViewModel(app
                 val root = resp.results.firstOrNull { it.path == "" }
                 if (root == null || !root.ok) {
                     DenovaLog.w("ProjectDir", "resolve root failed code=${root?.code} error=${root?.error}")
-                    _state.value = _state.value.copy(loading = false, error = root?.error ?: "无法加载项目目录")
+                    _state.value = _state.value.copy(loading = false, error = root?.error?.let { UiText.raw(it) } ?: UiText.of(R.string.dir_load_root_failed))
                     return@launch
                 }
                 directories = root.directories.associateBy { it.path }
@@ -94,7 +97,7 @@ class ProjectDirectoryViewModel(application: Application) : AndroidViewModel(app
             } catch (e: Exception) {
                 if (currentEpoch != epoch) return@launch
                 DenovaLog.w("ProjectDir", "load failed", e)
-                _state.value = _state.value.copy(loading = false, error = e.message ?: "加载失败")
+                _state.value = _state.value.copy(loading = false, error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.dir_load_failed))
             }
         }
     }
@@ -127,7 +130,7 @@ class ProjectDirectoryViewModel(application: Application) : AndroidViewModel(app
                     DenovaLog.w("ProjectDir", "load more failed path=$path code=${result?.code}")
                     _state.value = _state.value.copy(
                         loadingMore = _state.value.loadingMore - path,
-                        error = result?.error ?: "加载更多失败",
+                        error = result?.error?.let { UiText.raw(it) } ?: UiText.of(R.string.dir_load_more_failed),
                     )
                     return@launch
                 }
@@ -143,7 +146,7 @@ class ProjectDirectoryViewModel(application: Application) : AndroidViewModel(app
                 DenovaLog.w("ProjectDir", "load more failed path=$path", e)
                 _state.value = _state.value.copy(
                     loadingMore = _state.value.loadingMore - path,
-                    error = e.message ?: "加载更多失败",
+                    error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.dir_load_more_failed),
                 )
             }
         }

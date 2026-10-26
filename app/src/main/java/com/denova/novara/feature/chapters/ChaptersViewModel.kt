@@ -1,5 +1,8 @@
 package com.denova.novara.feature.chapters
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -15,7 +18,7 @@ import kotlinx.coroutines.launch
 data class ChapterRow(
     val path: String,
     val title: String,
-    val status: String,
+    val status: UiText,
     val confirmed: Boolean,
     val words: Int,
     val index: Int,
@@ -28,8 +31,8 @@ data class ChaptersUiState(
     val chapterCount: Int = 0,
     val totalWords: Int = 0,
     val loading: Boolean = false,
-    val error: String? = null,
-    val message: String? = null,
+    val error: UiText? = null,
+    val message: UiText? = null,
     /** 正在提交状态变更的章节路径；非空期间其余按钮禁用，避免连点。 */
     val pendingPath: String = "",
 )
@@ -68,7 +71,7 @@ class ChaptersViewModel(application: Application) : AndroidViewModel(application
                 // 作用域校验：回包项目与请求不一致时丢弃，防止串项目（AGENTS §4）。
                 if (resp.projectId.isNotBlank() && resp.projectId != pid) {
                     DenovaLog.w("Chapters", "summary scope mismatch want=$pid got=${resp.projectId}")
-                    _state.value = _state.value.copy(loading = false, error = "项目作用域不一致")
+                    _state.value = _state.value.copy(loading = false, error = UiText.of(R.string.chapters_scope_mismatch))
                     return@launch
                 }
                 val summary = resp.summary
@@ -99,7 +102,7 @@ class ChaptersViewModel(application: Application) : AndroidViewModel(application
                 throw e
             } catch (e: Exception) {
                 DenovaLog.w("Chapters", "summary failed project=$pid", e)
-                _state.value = _state.value.copy(loading = false, error = e.message ?: "加载章节失败")
+                _state.value = _state.value.copy(loading = false, error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.chapters_load_failed))
             }
         }
     }
@@ -120,12 +123,12 @@ class ChaptersViewModel(application: Application) : AndroidViewModel(application
                 // 状态由服务端重算，重新拉摘要而不是本地改字符串。
                 loadedProject = ""
                 load(current.projectId, force = true)
-                _state.value = _state.value.copy(message = resp.message.ifBlank { "已更新章节状态" })
+                _state.value = _state.value.copy(message = resp.message.takeIf { it.isNotBlank() }?.let { UiText.raw(it) } ?: UiText.of(R.string.chapters_status_updated))
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 DenovaLog.w("Chapters", "status failed path=$path", e)
-                _state.value = _state.value.copy(pendingPath = "", error = e.message ?: "更新章节状态失败")
+                _state.value = _state.value.copy(pendingPath = "", error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.chapters_status_failed))
             }
         }
     }

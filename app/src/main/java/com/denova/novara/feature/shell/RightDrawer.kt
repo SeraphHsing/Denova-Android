@@ -33,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.BuildConfig
 import com.denova.novara.R
+import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.network.WorkspaceChangeComment
 import com.denova.novara.core.network.WorkspaceChangeGroupSummary
 import com.denova.novara.core.network.WorkspaceChangeSet
@@ -142,7 +143,7 @@ fun ProjectDirectoryContent(
                 modifier = Modifier.padding(vertical = 8.dp),
             )
             state.error != null -> Text(
-                state.error,
+                state.error.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(vertical = 8.dp),
@@ -234,7 +235,7 @@ fun ChangesContent(
                 modifier = Modifier.padding(vertical = 8.dp),
             )
             state.error != null -> Text(
-                state.error, color = MaterialTheme.colorScheme.error,
+                state.error.resolve(), color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
@@ -297,7 +298,7 @@ fun VersionsContent(
         }
         state.actionMessage?.let { message ->
             Text(
-                message,
+                message.resolve(),
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -307,7 +308,7 @@ fun VersionsContent(
         }
         state.actionError?.let { message ->
             Text(
-                message,
+                message.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier
@@ -328,7 +329,7 @@ fun VersionsContent(
                 modifier = Modifier.padding(vertical = 8.dp),
             )
             state.error != null -> Text(
-                state.error, color = MaterialTheme.colorScheme.error,
+                state.error.resolve(), color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(vertical = 8.dp),
             )
@@ -482,7 +483,7 @@ private fun VersionDetailContent(
             style = MaterialTheme.typography.bodySmall,
         )
         state.diffError != null -> Text(
-            state.diffError, color = MaterialTheme.colorScheme.error,
+            state.diffError.resolve(), color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodySmall,
         )
         diff == null -> Text(
@@ -619,7 +620,7 @@ private fun ChangeGroupDetail(
             }
         }
         state.detailError?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         if (composerOpen) {
             CommentComposer(
@@ -711,7 +712,7 @@ private fun CommentComposer(
         val title = when {
             state.editingCommentId != null -> stringResource(R.string.changes_comment_edit_title)
             state.commentTarget?.anchor != null ->
-                stringResource(R.string.changes_comment_target, state.commentTarget.lineLabel)
+                stringResource(R.string.changes_comment_target, state.commentTarget.lineLabel.resolve())
             else -> stringResource(R.string.changes_add_group_comment)
         }
         Text(title, style = MaterialTheme.typography.labelMedium)
@@ -726,7 +727,7 @@ private fun CommentComposer(
             modifier = Modifier.fillMaxWidth(),
         )
         state.commentError?.let {
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             TextButton(onClick = onSubmit, enabled = !state.commentSubmitting && state.commentDraft.isNotBlank()) {
@@ -1021,16 +1022,16 @@ fun ChaptersContent(
         }
         if (state.chapters.isNotEmpty()) {
             Text(
-                ChapterRules.summaryLabel(state.chapterCount, state.totalWords),
+                ChapterRules.summaryLabel(state.chapterCount, state.totalWords).resolve(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
         }
         state.message?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text(it.resolve(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
         }
         state.error?.let {
-            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+            Text(it.resolve(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
         when {
             state.projectId.isBlank() -> Text(
@@ -1080,7 +1081,7 @@ private fun ChapterRowItem(
         Column(Modifier.weight(1f).clickable(onClick = onOpen)) {
             Text(chapter.title.ifBlank { chapter.path }, style = MaterialTheme.typography.bodyMedium)
             Text(
-                stringResource(R.string.chapter_line, ChapterRules.statusLabel(chapter.status, chapter.words), chapter.words),
+                stringResource(R.string.chapter_line, chapter.status.resolve(), chapter.words),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
@@ -1091,7 +1092,7 @@ private fun ChapterRowItem(
             enabled = !busy && (ChapterRules.canConfirm(chapter.words, chapter.confirmed) ||
                 ChapterRules.canMarkDraft(chapter.confirmed)),
         ) {
-            Text(ChapterRules.actionLabel(chapter.confirmed), style = MaterialTheme.typography.labelSmall)
+            Text(stringResource(ChapterRules.actionLabel(chapter.confirmed)), style = MaterialTheme.typography.labelSmall)
         }
     }
 }

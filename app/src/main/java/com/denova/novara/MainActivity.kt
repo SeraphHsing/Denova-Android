@@ -38,6 +38,7 @@ import androidx.navigation.navArgument
 import com.denova.novara.R
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.logging.LogcatSink
+import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.onboarding.OnboardingLogic
 import com.denova.novara.core.persistence.PreferencesStore
 import com.denova.novara.feature.shell.ActivityNav
@@ -206,7 +207,7 @@ class MainActivity : AppCompatActivity() {
                                                 val book = bookState.justCreatedName
                                                 bookShelfViewModel.clearJustCreated()
                                                 scope.launch { drawerState.close() }
-                                                val encoded = android.net.Uri.encode(OnboardingLogic.firstChapterPrompt(book))
+                                                val encoded = android.net.Uri.encode(OnboardingLogic.firstChapterPrompt(book).resolve(applicationContext))
                                                 navController.navigate("agent?projectId=$currentProjectId&filePath=&prompt=$encoded")
                                             },
                                             onNavigate = { destination ->
@@ -246,7 +247,7 @@ class MainActivity : AppCompatActivity() {
                                                 currentProjectId = record.projectId
                                                 editorViewModel.setProject(record.projectId)
                                                 if (fromIdea) {
-                                                    val encoded = android.net.Uri.encode(OnboardingLogic.INIT_PROMPT)
+                                                    val encoded = android.net.Uri.encode(OnboardingLogic.INIT_PROMPT.resolve(applicationContext))
                                                     navController.navigate(
                                                         "agent?projectId=${record.projectId}&filePath=&prompt=$encoded",
                                                     )

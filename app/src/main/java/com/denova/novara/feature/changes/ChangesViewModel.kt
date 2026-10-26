@@ -1,5 +1,8 @@
 package com.denova.novara.feature.changes
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -20,28 +23,28 @@ import kotlinx.coroutines.launch
 /** 正在写评论的目标：带锚点时是 diff 行，不带锚点时是整组评论。 */
 data class CommentTarget(
     val changeSetId: String,
-    val lineLabel: String,
+    val lineLabel: UiText,
     val anchor: ChangeCommentAnchor?,
 )
 
 data class ChangesUiState(
     val projectId: String = "",
     val loading: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
     val groups: List<WorkspaceChangeGroupSummary> = emptyList(),
     /** 正在审阅 / 撤销 / 重做的分组，用于禁用重复点击。 */
     val busyGroupId: String? = null,
-    val message: String? = null,
+    val message: UiText? = null,
     /** 打开的详情（含每个文件的 before/after 正文与评论）；null 表示停在列表。 */
     val detail: WorkspaceChangeGroup? = null,
     val detailLoading: Boolean = false,
-    val detailError: String? = null,
+    val detailError: UiText? = null,
     /** 评论编辑器：目标（可带锚点）、草稿、正在编辑的评论 id。 */
     val commentTarget: CommentTarget? = null,
     val commentDraft: String = "",
     val editingCommentId: String? = null,
     val commentSubmitting: Boolean = false,
-    val commentError: String? = null,
+    val commentError: UiText? = null,
 )
 
 /**
@@ -71,7 +74,7 @@ class ChangesViewModel(application: Application) : AndroidViewModel(application)
                 DenovaLog.i("Changes", "loaded project=$projectId groups=${groups.size}")
             } catch (e: Exception) {
                 DenovaLog.w("Changes", "load failed project=$projectId", e)
-                _state.value = _state.value.copy(loading = false, error = e.message ?: "加载失败")
+                _state.value = _state.value.copy(loading = false, error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.changes_load_failed))
             }
         }
     }
@@ -95,7 +98,7 @@ class ChangesViewModel(application: Application) : AndroidViewModel(application)
                 _state.value = _state.value.copy(
                     detail = null,
                     detailLoading = false,
-                    detailError = e.message ?: "加载详情失败",
+                    detailError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.changes_detail_failed),
                 )
             }
         }
@@ -119,7 +122,7 @@ class ChangesViewModel(application: Application) : AndroidViewModel(application)
     fun selectDiffLine(set: WorkspaceChangeSet, line: DiffLine) {
         val anchor = ChangeDiff.anchor(set, line)
         val label = (if (line.kind == DiffKind.REMOVE) line.beforeLine else line.afterLine)
-            ?.let { "第 $it 行" } ?: "该行"
+            ?.let { UiText.of(R.string.changes_line, it) } ?: UiText.of(R.string.changes_whole_group)
         _state.value = _state.value.copy(
             commentTarget = CommentTarget(set.id, label, anchor),
             editingCommentId = null,
@@ -131,7 +134,7 @@ class ChangesViewModel(application: Application) : AndroidViewModel(application)
     fun startGroupComment() {
         val group = _state.value.detail ?: return
         _state.value = _state.value.copy(
-            commentTarget = CommentTarget("", "整组", null),
+            commentTarget = CommentTarget("", UiText.of(R.string.changes_whole_group), null),
             editingCommentId = null,
             commentError = null,
             commentDraft = "",
@@ -203,7 +206,7 @@ class ChangesViewModel(application: Application) : AndroidViewModel(application)
                 DenovaLog.w("Changes", "comment submit failed", e)
                 _state.value = _state.value.copy(
                     commentSubmitting = false,
-                    commentError = e.message ?: "评论提交失败",
+                    commentError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.changes_comment_failed),
                 )
             }
         }
@@ -220,7 +223,7 @@ class ChangesViewModel(application: Application) : AndroidViewModel(application)
                 reloadDetail()
             } catch (e: Exception) {
                 DenovaLog.w("Changes", "comment delete failed id=$commentId", e)
-                _state.value = _state.value.copy(commentError = e.message ?: "删除评论失败")
+                _state.value = _state.value.copy(commentError = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.changes_comment_delete_failed))
             }
         }
     }
@@ -247,7 +250,7 @@ class ChangesViewModel(application: Application) : AndroidViewModel(application)
                 val result = block(c, pid)
                 _state.value = _state.value.copy(
                     busyGroupId = null,
-                    message = result.message ?: "已更新",
+                    message = result.message?.let { UiText.raw(it) } ?: UiText.of(R.string.changes_updated),
                     error = null,
                 )
                 DenovaLog.i("Changes", "mutated group=$groupId paths=${result.affectedPaths.size}")
@@ -256,7 +259,7 @@ class ChangesViewModel(application: Application) : AndroidViewModel(application)
                 if (_state.value.detail?.id == groupId) openGroup(groupId)
             } catch (e: Exception) {
                 DenovaLog.w("Changes", "mutate failed group=$groupId", e)
-                _state.value = _state.value.copy(busyGroupId = null, error = e.message ?: "操作失败")
+                _state.value = _state.value.copy(busyGroupId = null, error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.changes_action_failed))
             }
         }
     }

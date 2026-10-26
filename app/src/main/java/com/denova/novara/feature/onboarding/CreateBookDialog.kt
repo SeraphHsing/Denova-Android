@@ -16,6 +16,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+import com.denova.novara.core.i18n.resolve
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import com.denova.novara.core.onboarding.OnboardingLogic
@@ -29,7 +31,7 @@ import com.denova.novara.core.onboarding.OnboardingLogic
 @Composable
 fun CreateBookDialog(
     creating: Boolean,
-    error: String?,
+    error: UiText?,
     onDismiss: () -> Unit,
     onCreate: (title: String, author: String, description: String, fromIdea: Boolean) -> Unit,
 ) {
@@ -70,7 +72,7 @@ fun CreateBookDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (error != null) {
-                    Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(error.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },

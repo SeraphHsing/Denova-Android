@@ -1,5 +1,8 @@
 package com.denova.novara
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import com.denova.novara.core.book.ChapterRules
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,21 +29,21 @@ class ChapterRulesTest {
 
     @Test
     fun `action label follows the current confirmed flag`() {
-        assertEquals("确认成章", ChapterRules.actionLabel(false))
-        assertEquals("标回初稿", ChapterRules.actionLabel(true))
+        assertEquals(R.string.chapter_action_confirm, ChapterRules.actionLabel(false))
+        assertEquals(R.string.chapter_action_unconfirm, ChapterRules.actionLabel(true))
         assertTrue(ChapterRules.nextConfirmed(false))
         assertFalse(ChapterRules.nextConfirmed(true))
     }
 
     @Test
     fun `status label prefers the server string and falls back by word count`() {
-        assertEquals("成章", ChapterRules.statusLabel("成章", 900))
-        assertEquals("空章", ChapterRules.statusLabel("", 0))
-        assertEquals("初稿", ChapterRules.statusLabel("", 42))
+        assertEquals(UiText.raw("成章"), ChapterRules.statusLabel("成章", 900))
+        assertEquals(UiText.of(R.string.chapter_status_empty), ChapterRules.statusLabel("", 0))
+        assertEquals(UiText.of(R.string.chapter_status_draft), ChapterRules.statusLabel("", 42))
     }
 
     @Test
     fun `summary label reports chapter count and words`() {
-        assertEquals("3 章 · 共 1234 字", ChapterRules.summaryLabel(3, 1234))
+        assertEquals(UiText.of(R.string.chapter_summary, 3, 1234), ChapterRules.summaryLabel(3, 1234))
     }
 }

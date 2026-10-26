@@ -1,5 +1,8 @@
 package com.denova.novara.feature.bookshelf
 
+import com.denova.novara.R
+import com.denova.novara.core.i18n.UiText
+
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,14 +16,14 @@ import kotlinx.coroutines.launch
 
 data class BookShelfUiState(
     val loading: Boolean = false,
-    val error: String? = null,
+    val error: UiText? = null,
     val books: List<BookRecord> = emptyList(),
     /** 当前书籍（工作区）；`null` 表示尚未选择。 */
     val currentProjectId: String? = null,
     val currentBookName: String = "",
     /** 建书（WRI-001）进行中：按钮禁用，避免重复提交。 */
     val creating: Boolean = false,
-    val createMessage: String? = null,
+    val createMessage: UiText? = null,
     /**
      * 本次会话刚创建的书名。引导的 AGENT 步据此出现——放在 ViewModel 里而不是界面 remember，
      * 否则建书后跳到 Agent 再返回，页面重组就把这一步丢了（真机复现过）。
@@ -54,7 +57,7 @@ class BookShelfViewModel(application: Application) : AndroidViewModel(applicatio
                 DenovaLog.i("BookShelf", "loaded books=${resp.books.size}")
             } catch (e: Exception) {
                 DenovaLog.w("BookShelf", "load failed", e)
-                _state.value = _state.value.copy(loading = false, error = e.message ?: "加载失败")
+                _state.value = _state.value.copy(loading = false, error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.books_load_failed))
             }
         }
     }
@@ -69,7 +72,7 @@ class BookShelfViewModel(application: Application) : AndroidViewModel(applicatio
         val c = client ?: return null
         val t = title.trim()
         if (t.isEmpty()) {
-            _state.value = _state.value.copy(error = "书名不能为空")
+            _state.value = _state.value.copy(error = UiText.of(R.string.books_title_required))
             return null
         }
         _state.value = _state.value.copy(creating = true, error = null, createMessage = null)
@@ -87,14 +90,14 @@ class BookShelfViewModel(application: Application) : AndroidViewModel(applicatio
                 books = _state.value.books.filterNot { it.projectId == record.projectId } + record,
                 currentProjectId = record.projectId,
                 currentBookName = record.name,
-                createMessage = "已创建《${record.name}》",
+                createMessage = UiText.of(R.string.books_created, record.name),
                 justCreatedName = record.name,
             )
             DenovaLog.i("BookShelf", "created project=${record.projectId} workspace=${resp.workspace}")
             record
         } catch (e: Exception) {
             DenovaLog.w("BookShelf", "create failed title=$t", e)
-            _state.value = _state.value.copy(creating = false, error = e.message ?: "创建书籍失败")
+            _state.value = _state.value.copy(creating = false, error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.books_create_failed))
             null
         }
     }
@@ -127,7 +130,7 @@ class BookShelfViewModel(application: Application) : AndroidViewModel(applicatio
             true
         } catch (e: Exception) {
             DenovaLog.w("BookShelf", "switch failed name=${book.name}", e)
-            _state.value = _state.value.copy(error = e.message ?: "切换失败")
+            _state.value = _state.value.copy(error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.books_switch_failed))
             false
         }
     }

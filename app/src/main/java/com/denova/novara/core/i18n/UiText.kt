@@ -39,6 +39,12 @@ fun UiText.debugName(): String = when (this) {
     is UiText.Raw -> text
 }
 
+/** 非 Compose 场景解析（例如把文案拼进导航参数）。 */
+fun UiText.resolve(context: android.content.Context): String = when (this) {
+    is UiText.Res -> if (args.isEmpty()) context.getString(id) else context.getString(id, *args.toTypedArray())
+    is UiText.Raw -> text
+}
+
 /** 界面层解析：Compose 作用域内调用。 */
 @Composable
 fun UiText.resolve(): String = when (this) {
