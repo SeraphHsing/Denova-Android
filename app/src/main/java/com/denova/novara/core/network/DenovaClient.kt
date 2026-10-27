@@ -244,6 +244,16 @@ class DenovaClient(
     }
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
+    /**
+     * 创建类请求专用：`encodeDefaults=true` 让表单默认值也显式上送（与 Web 行为一致，
+     * 不依赖服务端归一化），`explicitNulls=false` 让未选择的可选对象整段省略。
+     */
+    private val createJson = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        explicitNulls = false
+    }
+
     /** 在途请求计数：退出登录时据此等待进行中的读取/流收尾。 */
     val inFlight = InFlightTracker()
 
@@ -1131,6 +1141,58 @@ class DenovaClient(
         }
     }
 
+    // ---- 新建故事资源目录（P4-A / GAM-001）----
+
+    /** 叙事风格（teller）：`GET /api/interactive/tellers` → `{tellers[], default_id}`。 */
+    suspend fun interactiveTellers(): TellersResponse =
+        getJson(interactiveBaseUrl("tellers")) { json.decodeFromString(TellersResponse.serializer(), it) }
+
+    /** 策划模板：`GET /api/game-planning-templates` → `{game_planning_templates[]}`。 */
+    suspend fun gamePlanningTemplates(): PlanningTemplatesResponse =
+        getJson(apiUrl("game-planning-templates")) { json.decodeFromString(PlanningTemplatesResponse.serializer(), it) }
+
+    /** 事件包：`GET /api/event-packages` → `{event_packages[]}`。 */
+    suspend fun eventPackages(): EventPackagesResponse =
+        getJson(apiUrl("event-packages")) { json.decodeFromString(EventPackagesResponse.serializer(), it) }
+
+    /** 规则系统：`GET /api/rule-systems` → `{rule_systems[]}`。 */
+    suspend fun ruleSystems(): RuleSystemsResponse =
+        getJson(apiUrl("rule-systems")) { json.decodeFromString(RuleSystemsResponse.serializer(), it) }
+
+    /** Actor 状态系统：`GET /api/actor-states` → `{actor_states[]}`。 */
+    suspend fun actorStates(): ActorStatesResponse =
+        getJson(apiUrl("actor-states")) { json.decodeFromString(ActorStatesResponse.serializer(), it) }
+
+    /** 图像方案：`GET /api/image-presets` → `{presets[]}`（顶层键是 presets）。 */
+    suspend fun imagePresets(): ImagePresetsResponse =
+        getJson(apiUrl("image-presets")) { json.decodeFromString(ImagePresetsResponse.serializer(), it) }
+
+    /** 资料库条目（主角候选）：`GET /api/projects/:id/book/lore/items`。 */
+    suspend fun projectLoreItems(projectId: String): LoreItemsResponse =
+        getJson(projectLoreItemsUrl(projectId)) { json.decodeFromString(LoreItemsResponse.serializer(), it) }
+
+    /**
+     * 创建故事：`POST /api/interactive/stories` → `StorySummary`。
+     *
+     * 服务端在创建时已把 `index.current_story_id` 指到新故事（`Store.CreateStory`），
+     * 因此创建成功后**不需要**再调用 `:id/select`，与 Web `handleCreateStory` 一致。
+     * 请求用 `encodeDefaults=true` 显式上送默认值，避免依赖服务端归一化。
+     */
+    suspend fun createInteractiveStory(request: CreateStoryRequest): StorySummary {
+        val body = createJson.encodeToString(CreateStoryRequest.serializer(), request)
+        val http = Request.Builder()
+            .url(interactiveBaseUrl("stories"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(http).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(StorySummary.serializer(), text)
+            }
+        }
+    }
+
     /**
      * 选中故事：`POST /api/interactive/stories/:id/select`。
      * 服务端把选择写进 index 的 `current_story_id`（全 workspace 共享）。
@@ -1335,6 +1397,29 @@ class DenovaClient(
 
     private fun agentActiveUrl(sessionId: String): HttpUrl =
         agentChatUrl("active").newBuilder().addQueryParameter("session_id", sessionId).build()
+
+    /** `api/interactive/<segments>`（stories / tellers）。 */
+    private fun interactiveBaseUrl(segments: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/$segments").build()
+
+    /** `api/<segments>`（game-planning-templates / event-packages / rule-systems / actor-states / image-presets）。 */
+    private fun apiUrl(segments: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/$segments").build()
+
+    private fun projectLoreItemsUrl(projectId: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/book/lore/items")
+            .build()
+
+    /** 只读 GET + JSON 解码（资源目录类端点共用）；失败保留错误码，供界面区分原因。 */
+    private suspend fun <T> getJson(url: HttpUrl, decode: (String) -> T): T =
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                decode(text)
+            }
+        }
 
     private fun interactiveStoriesUrl(): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/stories").build()

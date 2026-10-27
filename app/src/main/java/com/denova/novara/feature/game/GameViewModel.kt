@@ -10,11 +10,16 @@ import com.denova.novara.core.command.CommandRecord
 import com.denova.novara.core.command.CommandStatus
 import com.denova.novara.NovaraApplication
 import com.denova.novara.core.command.CommandStore
+import com.denova.novara.core.game.StoryCreation
+import com.denova.novara.core.game.StoryCreationForm
+import com.denova.novara.core.game.StoryCreationIssue
+import com.denova.novara.core.game.StoryCreationResources
 import com.denova.novara.core.game.StoryLibrary
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.SendInteractiveChatRequest
 import com.denova.novara.core.network.StorySummary
+import com.denova.novara.core.network.characterLoreItems
 import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GameEventType
 import com.denova.novara.core.stream.GamePhase
@@ -30,6 +35,8 @@ import com.denova.novara.core.stream.buildCanonicalNarrative
 import com.denova.novara.core.stream.collectWithIdleGuard
 import java.util.UUID
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -80,6 +87,16 @@ data class StoryLibraryState(
     val error: UiText? = null,
 )
 
+/** 新建故事对话框状态（P4-A / GAM-001）：表单 + 资源目录 + 提交态。 */
+data class StoryCreationState(
+    val visible: Boolean = false,
+    val form: StoryCreationForm = StoryCreationForm(),
+    val resources: StoryCreationResources = StoryCreationResources(),
+    val loadingResources: Boolean = false,
+    val submitting: Boolean = false,
+    val error: UiText? = null,
+)
+
 /** 游戏流 ViewModel：绑定 client → 恢复协调器 → 投影 + 叙事累积。 */
 class GameViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -120,6 +137,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 故事世代：切换故事即推进，迟到回包据此丢弃（GAM-002 任务隔离）。 */
     private var storyEpoch = 0L
+
+    /** 新建故事：资源目录加载与提交分开两条 job，避免提交取消已完成的目录加载。 */
+    private val _creation = MutableStateFlow(StoryCreationState())
+    val creation: StateFlow<StoryCreationState> = _creation.asStateFlow()
+    private var creationResourceJob: Job? = null
+    private var creationSubmitJob: Job? = null
 
     /**
      * 叙事分块单独成流：高频（~16 次/秒）更新只驱动叙事面板重组，
@@ -269,6 +292,136 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     /** 清掉列表级错误提示（对话框关闭时调用）。 */
     fun dismissLibraryError() {
         _library.value = _library.value.copy(error = null)
+    }
+
+    // ---- 新建故事（P4-A / GAM-001）----
+
+    /** 打开新建对话框并并行加载资源目录（六个导演模块 + 当前书的资料库角色）。 */
+    fun openCreation(projectId: String) {
+        if (_creation.value.visible) return
+        _creation.value = StoryCreationState(visible = true, loadingResources = true)
+        loadCreationResources(projectId)
+    }
+
+    fun closeCreation() {
+        creationResourceJob?.cancel()
+        creationSubmitJob?.cancel()
+        _creation.value = StoryCreationState()
+    }
+
+    /** 表单更新统一走 transform，避免为几十个字段各写一个 setter。 */
+    fun updateCreationForm(transform: (StoryCreationForm) -> StoryCreationForm) {
+        val current = _creation.value
+        if (!current.visible) return
+        _creation.value = current.copy(form = transform(current.form), error = null)
+    }
+
+    private fun loadCreationResources(projectId: String) {
+        val client = client ?: return
+        creationResourceJob?.cancel()
+        creationResourceJob = viewModelScope.launch {
+            val resources = coroutineScope {
+                val tellers = async { fetchOrNull("tellers") { client.interactiveTellers() } }
+                val templates = async { fetchOrNull("planning") { client.gamePlanningTemplates() } }
+                val events = async { fetchOrNull("events") { client.eventPackages() } }
+                val rules = async { fetchOrNull("rules") { client.ruleSystems() } }
+                val actors = async { fetchOrNull("actors") { client.actorStates() } }
+                val images = async { fetchOrNull("images") { client.imagePresets() } }
+                val lore = async {
+                    if (projectId.isBlank()) null else fetchOrNull("lore") { client.projectLoreItems(projectId) }
+                }
+                val tellersRes = tellers.await()
+                StoryCreationResources(
+                    tellers = tellersRes?.tellers.orEmpty(),
+                    defaultTellerId = tellersRes?.defaultId.orEmpty(),
+                    planningTemplates = templates.await()?.templates.orEmpty(),
+                    eventPackages = events.await()?.packages.orEmpty(),
+                    ruleSystems = rules.await()?.systems.orEmpty(),
+                    actorStates = actors.await()?.states.orEmpty(),
+                    imagePresets = images.await()?.presets.orEmpty(),
+                    loreCharacters = lore.await()?.items?.characterLoreItems().orEmpty(),
+                )
+            }
+            val current = _creation.value
+            if (!current.visible) return@launch
+            _creation.value = current.copy(
+                resources = resources,
+                form = StoryCreation.applyDefaults(current.form, resources),
+                loadingResources = false,
+            )
+            DenovaLog.i(
+                "Game",
+                "create resources tellers=${resources.tellers.size} templates=${resources.planningTemplates.size} " +
+                    "events=${resources.eventPackages.size} rules=${resources.ruleSystems.size} " +
+                    "actors=${resources.actorStates.size} presets=${resources.imagePresets.size} " +
+                    "lore=${resources.loreCharacters.size}",
+            )
+        }
+    }
+
+    /** 单个目录失败不阻断其它项；取消照常传播。 */
+    private suspend fun <T> fetchOrNull(label: String, block: suspend () -> T): T? =
+        try {
+            block()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            DenovaLog.w("Game", "create resource $label failed", e)
+            null
+        }
+
+    /**
+     * 提交创建：本地校验 → `POST /api/interactive/stories` → 插入列表 → 直接挂接。
+     * 服务端创建时已把 `index.current_story_id` 指向新故事，因此不再调用 `select`。
+     */
+    fun createStory() {
+        val client = client ?: return
+        val state = _creation.value
+        if (!state.visible || state.submitting) return
+        val issue = StoryCreation.validate(state.form)
+        if (issue != null) {
+            _creation.value = state.copy(error = UiText.of(issue.messageRes()))
+            return
+        }
+        val request = StoryCreation.build(state.form)
+        _creation.value = state.copy(submitting = true, error = null)
+        creationSubmitJob?.cancel()
+        creationSubmitJob = viewModelScope.launch {
+            val created = try {
+                client.createInteractiveStory(request)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "create story failed", e)
+                _creation.value = _creation.value.copy(submitting = false, error = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            DenovaLog.i(
+                "Game",
+                "story created id=${created.id} title_source=${created.titleSource} " +
+                    "protagonist=${created.protagonist.mode} opening=${created.opening.mode} " +
+                    "choices=${created.choiceCount} turns=${created.turnCount}",
+            )
+            _creation.value = StoryCreationState()
+            _library.value = _library.value.copy(
+                stories = StoryLibrary.merged(_library.value.stories, created),
+                currentStoryId = created.id,
+                error = null,
+            )
+            start(created.id, DEFAULT_BRANCH)
+        }
+    }
+
+    private fun StoryCreationIssue.messageRes(): Int = when (this) {
+        StoryCreationIssue.CUSTOM_PROTAGONIST_NAME -> R.string.game_create_err_custom_name
+        StoryCreationIssue.MISSING_LORE_ITEM -> R.string.game_create_err_lore
+        StoryCreationIssue.EMPTY_PRESET_OPENING -> R.string.game_create_err_preset_opening
+        StoryCreationIssue.EMPTY_CUSTOM_OPENING -> R.string.game_create_err_custom_opening
+        StoryCreationIssue.CHOICE_COUNT_RANGE -> R.string.game_create_err_choice
+        StoryCreationIssue.REPLY_CHARS_RANGE -> R.string.game_create_err_reply
+        StoryCreationIssue.IMAGE_INTERVAL_RANGE -> R.string.game_create_err_interval
+        StoryCreationIssue.DIFFICULTY_RANGE -> R.string.game_create_err_difficulty
+        StoryCreationIssue.ROLL_MODIFIER_RANGE -> R.string.game_create_err_roll
     }
 
     /** 挂接指定 story/branch 的活动游戏流。 */
@@ -594,6 +747,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         sendJob?.cancel()
         flushJob?.cancel()
         libraryJob?.cancel()
+        creationResourceJob?.cancel()
+        creationSubmitJob?.cancel()
         super.onCleared()
     }
 }

@@ -1,10 +1,14 @@
 package com.denova.novara.feature.game
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -18,16 +22,25 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,9 +60,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.denova.novara.R
+import com.denova.novara.core.game.StoryCreationForm
 import com.denova.novara.core.game.StoryLibrary
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.logging.DenovaLog
@@ -62,9 +78,16 @@ import com.denova.novara.core.stream.GamePhase
  * 叙事按 chunk 累积；断线由 [GameViewModel] 内部恢复协调器自动重挂。
  */
 @Composable
-fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDrawer: () -> Unit, onBack: () -> Unit) {
+fun GameScreen(
+    viewModel: GameViewModel,
+    projectId: String,
+    onOpenDrawer: () -> Unit,
+    onOpenRightDrawer: () -> Unit,
+    onBack: () -> Unit,
+) {
     val uiState by viewModel.uiState.collectAsState()
     val library by viewModel.library.collectAsState()
+    val creation by viewModel.creation.collectAsState()
 
     // 后台被系统掐断连接后，回前台自动重挂（身份/结果仍对应）。
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -133,6 +156,9 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
             }
             IconButton(onClick = { viewModel.loadStories() }, enabled = !library.loading) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.common_refresh))
+            }
+            IconButton(onClick = { viewModel.openCreation(projectId) }, enabled = !creation.submitting) {
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.game_create))
             }
         }
         library.error?.let {
@@ -235,6 +261,424 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
                 TextButton(onClick = { deleteTarget = null }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
+    }
+
+    if (creation.visible) {
+        StoryCreationDialog(
+            state = creation,
+            onUpdate = viewModel::updateCreationForm,
+            onSubmit = viewModel::createStory,
+            onDismiss = viewModel::closeCreation,
+        )
+    }
+}
+
+/** 新建故事表单（P4-A / GAM-001）：基础（主角 / 开场）+ 可折叠高级（导演模块 / 生成参数 / 检定 / 呈现）。 */
+@Composable
+private fun StoryCreationDialog(
+    state: StoryCreationState,
+    onUpdate: ((StoryCreationForm) -> StoryCreationForm) -> Unit,
+    onSubmit: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var advanced by remember { mutableStateOf(false) }
+    val form = state.form
+    val resources = state.resources
+
+    Dialog(
+        onDismissRequest = { if (!state.submitting) onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(
+            // 键盘弹出时靠 imePadding 抬升、靠固定页脚保证按钮可达：
+            // AlertDialog 的按钮区会被 IME 顶出屏幕（真机复现过点不到「创建」）。
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+                .imePadding()
+                .padding(horizontal = 12.dp),
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 6.dp,
+        ) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Text(
+                    stringResource(R.string.game_create_title),
+                    style = MaterialTheme.typography.titleLarge,
+                )
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(top = 12.dp),
+                ) {
+                if (state.loadingResources) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text(
+                            stringResource(R.string.game_create_loading),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(start = 8.dp),
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = form.title,
+                    onValueChange = { text -> onUpdate { it.copy(title = text) } },
+                    label = { Text(stringResource(R.string.game_create_story_title)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                )
+                OutlinedTextField(
+                    value = form.origin,
+                    onValueChange = { text -> onUpdate { it.copy(origin = text) } },
+                    label = { Text(stringResource(R.string.game_create_origin)) },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                )
+
+                CreationSection(stringResource(R.string.game_create_protagonist))
+                ChoiceRow(
+                    options = listOf(
+                        "default" to stringResource(R.string.game_create_protagonist_default),
+                        "custom" to stringResource(R.string.game_create_protagonist_custom),
+                        "lore" to stringResource(R.string.game_create_protagonist_lore),
+                    ),
+                    selected = form.protagonistMode,
+                    onSelect = { mode -> onUpdate { it.copy(protagonistMode = mode) } },
+                )
+                when (form.protagonistMode) {
+                    "custom" -> {
+                        OutlinedTextField(
+                            value = form.protagonistName,
+                            onValueChange = { text -> onUpdate { it.copy(protagonistName = text) } },
+                            label = { Text(stringResource(R.string.game_create_protagonist_name)) },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                        )
+                        OutlinedTextField(
+                            value = form.protagonistProfile,
+                            onValueChange = { text -> onUpdate { it.copy(protagonistProfile = text) } },
+                            label = { Text(stringResource(R.string.game_create_protagonist_profile)) },
+                            minLines = 2,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                        )
+                    }
+
+                    "lore" -> ResourceDropdown(
+                        label = stringResource(R.string.game_create_lore_pick),
+                        options = resources.loreCharacters.map { it.id to it.name },
+                        selectedId = form.protagonistLoreId,
+                        onSelect = { id -> onUpdate { it.copy(protagonistLoreId = id) } },
+                    )
+                }
+
+                CreationSection(stringResource(R.string.game_create_opening))
+                ChoiceRow(
+                    options = listOf(
+                        "ai" to stringResource(R.string.game_create_opening_ai),
+                        "preset" to stringResource(R.string.game_create_opening_preset),
+                        "custom" to stringResource(R.string.game_create_opening_custom),
+                    ),
+                    selected = form.openingMode,
+                    onSelect = { mode -> onUpdate { it.copy(openingMode = mode) } },
+                )
+                when (form.openingMode) {
+                    "preset" -> OutlinedTextField(
+                        value = form.openingPresetText,
+                        onValueChange = { text -> onUpdate { it.copy(openingPresetText = text) } },
+                        label = { Text(stringResource(R.string.game_create_opening_preset_text)) },
+                        minLines = 2,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    )
+
+                    "custom" -> OutlinedTextField(
+                        value = form.openingCustomText,
+                        onValueChange = { text -> onUpdate { it.copy(openingCustomText = text) } },
+                        label = { Text(stringResource(R.string.game_create_opening_custom_text)) },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    )
+                }
+
+                TextButton(onClick = { advanced = !advanced }) {
+                    Text((if (advanced) "▾ " else "▸ ") + stringResource(R.string.game_create_section_advanced))
+                }
+
+                if (advanced) {
+                    CreationSection(stringResource(R.string.game_create_section_modules))
+                    ResourceDropdown(
+                        label = stringResource(R.string.game_create_planning_template),
+                        options = resources.planningTemplates.map { it.id to it.name },
+                        selectedId = form.planningTemplateId,
+                        onSelect = { id -> onUpdate { it.copy(planningTemplateId = id) } },
+                    )
+                    ResourceDropdown(
+                        label = stringResource(R.string.game_create_narrative_style),
+                        options = resources.tellers.map { it.id to it.name },
+                        selectedId = form.narrativeStyleId,
+                        onSelect = { id -> onUpdate { it.copy(narrativeStyleId = id) } },
+                    )
+                    SwitchRow(
+                        label = stringResource(R.string.game_create_planning_enabled),
+                        checked = form.planningMode == "enabled",
+                        onCheckedChange = { on ->
+                            onUpdate { it.copy(planningMode = if (on) "enabled" else "disabled") }
+                        },
+                    )
+                    SwitchRow(
+                        label = stringResource(R.string.game_create_rule_enabled),
+                        checked = form.ruleSystemEnabled,
+                        onCheckedChange = { on -> onUpdate { it.copy(ruleSystemEnabled = on) } },
+                    )
+                    ResourceDropdown(
+                        label = stringResource(R.string.game_create_rule_system),
+                        options = resources.ruleSystems.map { it.id to it.name },
+                        selectedId = form.ruleSystemId,
+                        onSelect = { id -> onUpdate { it.copy(ruleSystemId = id) } },
+                    )
+                    SwitchRow(
+                        label = stringResource(R.string.game_create_actor_enabled),
+                        checked = form.actorStateEnabled,
+                        onCheckedChange = { on -> onUpdate { it.copy(actorStateEnabled = on) } },
+                    )
+                    ResourceDropdown(
+                        label = stringResource(R.string.game_create_actor_state),
+                        options = resources.actorStates.map { it.id to it.name },
+                        selectedId = form.actorStateId,
+                        onSelect = { id -> onUpdate { it.copy(actorStateId = id) } },
+                    )
+
+                    CreationSection(stringResource(R.string.game_create_event_packages))
+                    if (resources.eventPackages.isEmpty()) {
+                        Text(stringResource(R.string.game_create_none), style = MaterialTheme.typography.bodySmall)
+                    } else {
+                        resources.eventPackages.forEach { pkg ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(
+                                    checked = pkg.id in form.eventPackageIds,
+                                    onCheckedChange = { checked ->
+                                        onUpdate { current ->
+                                            val next = if (checked) {
+                                                current.eventPackageIds + pkg.id
+                                            } else {
+                                                current.eventPackageIds - pkg.id
+                                            }
+                                            current.copy(eventPackageIds = next)
+                                        }
+                                    },
+                                )
+                                Text(
+                                    pkg.name.ifBlank { pkg.id },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
+                            }
+                        }
+                    }
+
+                    CreationSection(stringResource(R.string.game_create_generation))
+                    ResourceDropdown(
+                        label = stringResource(R.string.game_create_image_preset),
+                        options = resources.imagePresets.map { it.id to it.name },
+                        selectedId = form.imagePresetId,
+                        onSelect = { id -> onUpdate { it.copy(imagePresetId = id) } },
+                    )
+                    SwitchRow(
+                        label = stringResource(R.string.game_create_image_auto),
+                        checked = form.imageMode == "interval",
+                        onCheckedChange = { on ->
+                            onUpdate { it.copy(imageMode = if (on) "interval" else "manual") }
+                        },
+                    )
+                    if (form.imageMode == "interval") {
+                        StepperRow(
+                            label = stringResource(R.string.game_create_image_interval),
+                            value = form.imageIntervalTurns,
+                            range = 1..50,
+                            onChange = { value -> onUpdate { it.copy(imageIntervalTurns = value) } },
+                        )
+                    }
+                    StepperRow(
+                        label = stringResource(R.string.game_create_reply_chars),
+                        value = form.replyTargetChars,
+                        range = 100..20000,
+                        step = 100,
+                        onChange = { value -> onUpdate { it.copy(replyTargetChars = value) } },
+                    )
+                    StepperRow(
+                        label = stringResource(R.string.game_create_choice_count),
+                        value = form.choiceCount,
+                        range = 2..10,
+                        onChange = { value -> onUpdate { it.copy(choiceCount = value) } },
+                    )
+
+                    CreationSection(stringResource(R.string.game_create_checks))
+                    StepperRow(
+                        label = stringResource(R.string.game_create_difficulty),
+                        value = form.difficultyShift,
+                        range = -2..2,
+                        onChange = { value -> onUpdate { it.copy(difficultyShift = value) } },
+                    )
+                    StepperRow(
+                        label = stringResource(R.string.game_create_roll_modifier),
+                        value = form.rollModifier,
+                        range = -20..20,
+                        onChange = { value -> onUpdate { it.copy(rollModifier = value) } },
+                    )
+
+                    CreationSection(stringResource(R.string.game_create_state_schema))
+                    ChoiceRow(
+                        options = listOf(
+                            "adapt_template" to stringResource(R.string.game_create_state_adapt),
+                            "fixed_template" to stringResource(R.string.game_create_state_fixed),
+                            "generate" to stringResource(R.string.game_create_state_generate),
+                        ),
+                        selected = form.stateSchemaMode,
+                        onSelect = { mode -> onUpdate { it.copy(stateSchemaMode = mode) } },
+                    )
+
+                    CreationSection(stringResource(R.string.game_create_presentation))
+                    SwitchRow(
+                        label = stringResource(R.string.game_create_presentation_bg),
+                        checked = form.presentationBackground,
+                        onCheckedChange = { on -> onUpdate { it.copy(presentationBackground = on) } },
+                    )
+                    SwitchRow(
+                        label = stringResource(R.string.game_create_presentation_chars),
+                        checked = form.presentationCharacters,
+                        onCheckedChange = { on -> onUpdate { it.copy(presentationCharacters = on) } },
+                    )
+                }
+
+                state.error?.let {
+                    Text(
+                        it.resolve(),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = onDismiss, enabled = !state.submitting) {
+                        Text(stringResource(R.string.common_cancel))
+                    }
+                    TextButton(
+                        onClick = onSubmit,
+                        enabled = !state.submitting && !state.loadingResources,
+                    ) { Text(stringResource(R.string.game_create_submit)) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreationSection(title: String) {
+    Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
+    )
+}
+
+/** 单选行（主角模式 / 开场模式 / 状态结构）：窄屏可横向滚动，不换行折断。 */
+@Composable
+private fun ChoiceRow(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        options.forEach { (value, label) ->
+            FilterChip(
+                selected = selected == value,
+                onClick = { onSelect(value) },
+                label = { Text(label, maxLines = 1) },
+            )
+        }
+    }
+}
+
+/** 资源下拉：空列表时禁用（例如当前书没有资料库角色）。 */
+@Composable
+private fun ResourceDropdown(
+    label: String,
+    options: List<Pair<String, String>>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedName = options.firstOrNull { it.first == selectedId }?.second
+        ?: selectedId.ifBlank { stringResource(R.string.game_create_none) }
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+        OutlinedButton(
+            onClick = { expanded = true },
+            enabled = options.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(
+                text = "$label: $selectedName",
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { (id, name) ->
+                DropdownMenuItem(
+                    text = { Text(name.ifBlank { id }) },
+                    onClick = {
+                        onSelect(id)
+                        expanded = false
+                    },
+                )
+            }
+        }
+    }
+}
+
+/** 数值步进（避免负号键盘与 IME 干扰；范围在按钮上直接夹紧）。 */
+@Composable
+private fun StepperRow(
+    label: String,
+    value: Int,
+    range: IntRange,
+    step: Int = 1,
+    onChange: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        TextButton(
+            onClick = { onChange((value - step).coerceIn(range.first, range.last)) },
+            enabled = value > range.first,
+        ) { Text("−") }
+        Text(value.toString(), style = MaterialTheme.typography.bodyMedium)
+        TextButton(
+            onClick = { onChange((value + step).coerceIn(range.first, range.last)) },
+            enabled = value < range.last,
+        ) { Text("+") }
+    }
+}
+
+@Composable
+private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

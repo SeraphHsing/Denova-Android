@@ -313,6 +313,7 @@ class MainActivity : AppCompatActivity() {
                                     composable("game") {
                                         GameScreen(
                                             viewModel = gameViewModel,
+                                            projectId = currentProjectId,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
                                             onOpenRightDrawer = {
                                                 // 打开右抽屉先收起左抽屉，避免两个面板同屏（NAV-003）。
