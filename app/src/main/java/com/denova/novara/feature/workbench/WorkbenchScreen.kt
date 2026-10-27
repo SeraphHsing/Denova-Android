@@ -3,7 +3,9 @@ package com.denova.novara.feature.workbench
 import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -23,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -49,6 +51,8 @@ import com.denova.novara.core.workbench.WorkbenchTabKind
 import com.denova.novara.core.workbench.WorkbenchTabs
 import com.denova.novara.feature.agent.AgentScreen
 import com.denova.novara.feature.agent.AgentViewModel
+import com.denova.novara.feature.terminal.TerminalScreen
+import com.denova.novara.feature.terminal.TerminalViewModel
 
 /**
  * 工作台页面（P4-B）：页签条 + 主副会话 + 会话内容。
@@ -73,6 +77,14 @@ fun WorkbenchScreen(
     val titles = remember(state.projects) { viewModel.sessionTitles() }
     val primaryCount = WorkbenchTabs.ofGroup(state.tabs, WorkbenchGroup.PRIMARY).size
     val secondaryCount = WorkbenchTabs.ofGroup(state.tabs, WorkbenchGroup.SECONDARY).size
+    // 关页签要释放该页签独占的 PTY。终端 ViewModel 挂在 Activity 的 ViewModelStore 上（旋转后仍在），
+    // holder 同样是 Activity 级 ViewModel，因此「页签 → 终端会话」的对应关系不会因旋转丢失。
+    val terminalHolder: TerminalTabHolder = viewModel(key = TERMINAL_HOLDER_KEY)
+    val closeTab: (String) -> Unit = { tabId ->
+        terminalHolder.release(tabId)
+        viewModel.closeTab(tabId)
+    }
+    val terminalLabel = stringResource(R.string.terminal_title)
 
     Column(
         Modifier
@@ -110,13 +122,19 @@ fun WorkbenchScreen(
             activeTabId = activeTab?.id,
             titles = titles,
             onActivate = viewModel::activateTab,
-            onClose = viewModel::closeTab,
+            onClose = closeTab,
             onMoveLeft = { viewModel.moveTabWithinGroup(it, -1) },
             onMoveRight = { viewModel.moveTabWithinGroup(it, 1) },
             onSendToOtherGroup = viewModel::moveTabToOtherGroup,
             onNewSession = {
                 val projectId = state.selectedProjectId
                 if (projectId.isNotBlank()) viewModel.createSession(projectId)
+            },
+            onNewTerminal = {
+                val projectId = state.selectedProjectId
+                if (projectId.isNotBlank()) {
+                    viewModel.openTerminal(projectId = projectId, label = terminalLabel)
+                }
             },
             canCreateSession = state.selectedProjectId.isNotBlank() && !state.busy,
         )
@@ -146,7 +164,12 @@ fun WorkbenchScreen(
                 )
             }
         } else {
-            WorkbenchTabHost(tab = activeTab, client = client, onOpenDrawer = onOpenDrawer)
+            WorkbenchTabHost(
+                tab = activeTab,
+                client = client,
+                onOpenDrawer = onOpenDrawer,
+                terminalHolder = terminalHolder,
+            )
         }
     }
 }
@@ -178,25 +201,39 @@ private fun TabStrip(
     onMoveRight: (String) -> Unit,
     onSendToOtherGroup: (String) -> Unit,
     onNewSession: () -> Unit,
+    onNewTerminal: () -> Unit,
     canCreateSession: Boolean,
 ) {
     Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        tabs.forEach { tab ->
-            TabItem(
-                tab = tab,
-                title = WorkbenchTabs.titleOf(tab, titles).ifBlank {
-                    stringResource(R.string.workbench_session_untitled)
-                },
-                active = tab.id == activeTabId,
-                onActivate = { onActivate(tab.id) },
-                onClose = { onClose(tab.id) },
-                onMoveLeft = { onMoveLeft(tab.id) },
-                onMoveRight = { onMoveRight(tab.id) },
-                onSendToOtherGroup = { onSendToOtherGroup(tab.id) },
-            )
+        // 页签可横向滚动，但「＋」固定在右端：标题一长，加号被滚出屏幕后就再也找不到入口。
+        // 激活页签自动滚进可视区：否则切到后面的页签时，条上还停在最左边，看不到自己刚打开的是哪个。
+        val listState = rememberLazyListState()
+        LaunchedEffect(activeTabId, tabs.size) {
+            val index = tabs.indexOfFirst { it.id == activeTabId }
+            if (index >= 0) listState.animateScrollToItem(index)
+        }
+        LazyRow(
+            modifier = Modifier.weight(1f),
+            state = listState,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items(tabs, key = { it.id }) { tab ->
+                TabItem(
+                    tab = tab,
+                    title = WorkbenchTabs.titleOf(tab, titles).ifBlank {
+                        stringResource(R.string.workbench_session_untitled)
+                    },
+                    active = tab.id == activeTabId,
+                    onActivate = { onActivate(tab.id) },
+                    onClose = { onClose(tab.id) },
+                    onMoveLeft = { onMoveLeft(tab.id) },
+                    onMoveRight = { onMoveRight(tab.id) },
+                    onSendToOtherGroup = { onSendToOtherGroup(tab.id) },
+                )
+            }
         }
         var addMenu by remember { mutableStateOf(false) }
         Box {
@@ -208,6 +245,14 @@ private fun TabStrip(
                     onClick = {
                         addMenu = false
                         onNewSession()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.workbench_terminal_new)) },
+                    enabled = canCreateSession,
+                    onClick = {
+                        addMenu = false
+                        onNewTerminal()
                     },
                 )
             }
@@ -268,7 +313,12 @@ private fun TabItem(
  * 「不串会话流或队列」）。通道绑定在渲染前完成，再交给 [AgentScreen] 内嵌渲染。
  */
 @Composable
-private fun WorkbenchTabHost(tab: WorkbenchTab, client: DenovaClient?, onOpenDrawer: () -> Unit) {
+private fun WorkbenchTabHost(
+    tab: WorkbenchTab,
+    client: DenovaClient?,
+    onOpenDrawer: () -> Unit,
+    terminalHolder: TerminalTabHolder,
+) {
     when (val kind = tab.kind) {
         is WorkbenchTabKind.Agent -> {
             val application = LocalContext.current.applicationContext as Application
@@ -298,6 +348,38 @@ private fun WorkbenchTabHost(tab: WorkbenchTab, client: DenovaClient?, onOpenDra
             )
         }
 
+        is WorkbenchTabKind.Terminal -> {
+            val application = LocalContext.current.applicationContext as Application
+            val factory: ViewModelProvider.Factory = remember(application) {
+                viewModelFactory { initializer { TerminalViewModel(application) } }
+            }
+            val terminalViewModel: TerminalViewModel =
+                viewModel(key = terminalViewModelKey(tab.id), factory = factory)
+            DisposableEffect(tab.id, terminalViewModel) {
+                terminalHolder.register(tab.id, terminalViewModel)
+                onDispose { }
+            }
+            LaunchedEffect(tab.id, tab.projectId, client) {
+                val c = client ?: return@LaunchedEffect
+                terminalViewModel.bindClient(c)
+                // 每个页签一个独立 owner：服务端用 owner_tab_id 做幂等键且禁止跨项目复用，
+                // 共用固定 owner 会让第二个项目的终端直接 409。
+                terminalViewModel.bindOwner(tab.id)
+                // 已有会话（旋转重建 / 切区回来）就不要再 connect()：那会重新解析会话，
+                // 白白多一轮 POST 且可能打断正在跑的 PTY。只有全新页签才发起首次连接。
+                if (terminalViewModel.state.value.projectId == null) {
+                    terminalViewModel.connect(tab.projectId)
+                }
+            }
+            TerminalScreen(
+                viewModel = terminalViewModel,
+                onOpenDrawer = onOpenDrawer,
+                onBack = {},
+                initialProjectId = tab.projectId,
+                inline = true,
+            )
+        }
+
         else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 stringResource(R.string.workbench_empty_tab),
@@ -307,3 +389,25 @@ private fun WorkbenchTabHost(tab: WorkbenchTab, client: DenovaClient?, onOpenDra
         }
     }
 }
+
+internal fun terminalViewModelKey(tabId: String): String = "workbench-terminal-$tabId"
+
+/**
+ * 终端页签 → 终端 ViewModel 的登记表（P4-B / WB-008）。
+ *
+ * 挂在 Activity 的 ViewModelStore 上：旋转重建 Composable 后对应关系仍在，
+ * 关页签时才能准确释放该页签独占的 PTY（而不是释放不了或误伤别的页签）。
+ */
+class TerminalTabHolder : androidx.lifecycle.ViewModel() {
+    private val terminals = mutableMapOf<String, TerminalViewModel>()
+
+    fun register(tabId: String, viewModel: TerminalViewModel) {
+        terminals[tabId] = viewModel
+    }
+
+    fun release(tabId: String) {
+        terminals.remove(tabId)?.closeAndRelease()
+    }
+}
+
+const val TERMINAL_HOLDER_KEY: String = "workbench-terminal-holder"

@@ -123,4 +123,40 @@ class WorkbenchTabsTest {
         assertEquals("自定义", WorkbenchTabs.titleOf(tab.copy(customTitle = "自定义"), mapOf("s1" to "服务端标题")))
         assertEquals("", WorkbenchTabs.titleOf(tab, emptyMap()))
     }
+
+    // ---- 终端页签（P4-B / WB-007 / WB-008）----
+
+    private fun terminal(projectId: String, tabId: String, group: WorkbenchGroup = WorkbenchGroup.PRIMARY) =
+        WorkbenchTab(
+            id = tabId,
+            projectId = projectId,
+            group = group,
+            kind = WorkbenchTabKind.Terminal(profileId = "shell", label = "终端"),
+        )
+
+    @Test
+    fun `two terminals in the same project stay separate tabs`() {
+        val tabs = WorkbenchTabs.open(
+            WorkbenchTabs.open(emptyList(), terminal("p1", "term:a")),
+            terminal("p1", "term:b"),
+        )
+
+        // 每个终端页签是独立 owner（独立 PTY），不能像会话那样按项目去重。
+        assertEquals(listOf("term:a", "term:b"), tabs.map { it.id })
+    }
+
+    @Test
+    fun `terminal tab title falls back to its label`() {
+        val tab = terminal("p1", "term:a")
+
+        assertEquals("终端", WorkbenchTabs.titleOf(tab, emptyMap()))
+        assertEquals("自定义", WorkbenchTabs.titleOf(tab.copy(customTitle = "自定义"), emptyMap()))
+    }
+
+    @Test
+    fun `closing a terminal tab activates its neighbour`() {
+        val tabs = listOf(agent("p1", "s1"), terminal("p1", "term:a"), agent("p1", "s2"))
+
+        assertEquals("agent:p1:s2", WorkbenchTabs.activeAfterClose(tabs, "term:a"))
+    }
 }

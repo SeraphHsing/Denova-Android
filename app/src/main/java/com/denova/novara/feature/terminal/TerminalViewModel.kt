@@ -109,8 +109,23 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
     private val historyStore = TerminalHistoryStore(File(getApplication<Application>().filesDir, "terminal-history"))
     private var lastHistory: String? = null
 
+    /** PTY 归属标识，默认「本机单终端」；工作台页签会改成按页签唯一（见 [bindOwner]）。 */
+    private var ownerTabId: String = OWNER_TAB_ID
+
     fun bindClient(client: DenovaClient) {
         this.client = client
+    }
+
+    /**
+     * 指定 PTY 归属标识（`owner_tab_id`）。
+     *
+     * 服务端以 `owner_tab_id` 做幂等键，且**同一个 owner 不能跨项目复用**（`ErrOwnerConflict`）。
+     * 独立终端页是「本机一个终端」，用 [OWNER_TAB_ID]；工作台每个终端页签是独立 owner，
+     * 必须按页签 id 传入，否则第二个项目的终端会撞 409。
+     */
+    fun bindOwner(ownerTabId: String) {
+        if (ownerTabId.isBlank()) return
+        this.ownerTabId = ownerTabId
     }
 
     /** 连接：优先复用同一项目下 owner 的存活会话（切页 / 重启不丢 PTY），否则新建。 */
@@ -263,7 +278,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
     ): TerminalSessionInfo? {
         val sessions = client.terminalSessions().sessions
         val alive = sessions.firstOrNull {
-            it.ownerTabId == OWNER_TAB_ID && it.projectId == projectId && !it.exited
+            it.ownerTabId == ownerTabId && it.projectId == projectId && !it.exited
         }
         if (alive != null) return alive
         val previous = previousSessionId
@@ -271,7 +286,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
             DenovaLog.w("Terminal", "previous session $previous is gone; refuse to recreate silently")
             return null
         }
-        return client.createTerminalSession(projectId, OWNER_TAB_ID, cols, rows)
+        return client.createTerminalSession(projectId, ownerTabId, cols, rows)
     }
 
     /**
@@ -577,6 +592,7 @@ class TerminalViewModel(application: Application) : AndroidViewModel(application
         if (id != null) {
             viewModelScope.launch {
                 runCatching { client.deleteTerminalSession(id) }
+                    .onSuccess { DenovaLog.i("Terminal", "released session=$id") }
                     .onFailure { DenovaLog.w("Terminal", "delete session failed", it) }
             }
         }

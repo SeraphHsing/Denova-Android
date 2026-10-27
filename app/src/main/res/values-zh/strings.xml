@@ -634,6 +634,7 @@
     <string name="workbench_project_reorder_failed">保存项目顺序失败</string>
     <string name="workbench_host_directory_remote">目录选择只能在运行 Denova 的本机使用。请在宿主上操作，或改用「新建项目目录」。</string>
     <string name="workbench_session_new">新建会话</string>
+    <string name="workbench_terminal_new">新终端</string>
     <string name="workbench_session_untitled">未命名会话</string>
     <string name="workbench_session_rename">重命名会话</string>
     <string name="workbench_session_delete">删除会话</string>

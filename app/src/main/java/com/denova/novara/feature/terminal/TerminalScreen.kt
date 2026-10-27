@@ -91,6 +91,11 @@ fun TerminalScreen(
     onOpenDrawer: () -> Unit,
     onBack: () -> Unit,
     initialProjectId: String = "",
+    /**
+     * 内嵌模式（P4-B 工作台终端页签）：页签条已经给出页面标题与关闭入口，
+     * 项目身份由页签决定，因此不画「☰ / 标题 / 返回」与「项目 ID + 连接」两行。
+     */
+    inline: Boolean = false,
 ) {
     val state by viewModel.state.collectAsState()
     var projectId by remember(initialProjectId) { mutableStateOf(initialProjectId) }
@@ -132,38 +137,59 @@ fun TerminalScreen(
             .padding(bottom = bottomInset)
             .imePadding(),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text(stringResource(R.string.terminal_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-            Text(state.status.resolve(), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))
-            Text(
-                text = "${state.cols}x${state.rows}",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(8.dp),
-            )
-        }
+        if (inline) {
+            // 内嵌：只留一行状态（连接状态 / 网格尺寸 / 关闭会话），其余交给工作台页签条。
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(state.status.resolve(), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    text = "${state.cols}×${state.rows}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                )
+                Box(Modifier.weight(1f))
+                if (state.connected) {
+                    TextButton(onClick = { viewModel.closeAndRelease() }) {
+                        Text(stringResource(R.string.term_close_session))
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                IconButton(onClick = onOpenDrawer) { Text("☰") }
+                Text(stringResource(R.string.terminal_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+                TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+                Text(state.status.resolve(), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))
+                Text(
+                    text = "${state.cols}x${state.rows}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(8.dp),
+                )
+            }
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = projectId,
-                onValueChange = { projectId = it },
-                label = { Text(stringResource(R.string.term_project_id)) },
-                singleLine = true,
-                enabled = !state.connected,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-            )
-            OutlinedButton(
-                onClick = { viewModel.connect(projectId.trim()) },
-                enabled = projectId.isNotBlank() && !state.connected,
-            ) { Text(if (state.connected) stringResource(R.string.common_connected) else stringResource(R.string.term_connect)) }
-            TextButton(onClick = { viewModel.closeAndRelease() }) { Text(stringResource(R.string.term_close_session)) }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = projectId,
+                    onValueChange = { projectId = it },
+                    label = { Text(stringResource(R.string.term_project_id)) },
+                    singleLine = true,
+                    enabled = !state.connected,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
+                OutlinedButton(
+                    onClick = { viewModel.connect(projectId.trim()) },
+                    enabled = projectId.isNotBlank() && !state.connected,
+                ) { Text(if (state.connected) stringResource(R.string.common_connected) else stringResource(R.string.term_connect)) }
+                TextButton(onClick = { viewModel.closeAndRelease() }) { Text(stringResource(R.string.term_close_session)) }
+            }
         }
 
         state.error?.let {

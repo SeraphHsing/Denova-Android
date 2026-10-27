@@ -137,6 +137,25 @@ class WorkbenchViewModel(application: Application) : AndroidViewModel(applicatio
         DenovaLog.i("Workbench", "open session=${sessionId.take(12)} group=$group")
     }
 
+    /** 打开终端页签（WB-007 / WB-008）：每个页签一份独立 PTY owner，关页签才释放。 */
+    fun openTerminal(projectId: String, profileId: String = "shell", label: String = "") {
+        if (projectId.isBlank()) return
+        val group = _state.value.activeGroup
+        val tab = WorkbenchTab(
+            id = terminalTabId(),
+            projectId = projectId,
+            group = group,
+            kind = WorkbenchTabKind.Terminal(profileId = profileId, label = label),
+        )
+        _state.value = _state.value.copy(
+            tabs = WorkbenchTabs.open(_state.value.tabs, tab),
+            selectedProjectId = projectId,
+            activeTabPrimary = if (group == WorkbenchGroup.PRIMARY) tab.id else _state.value.activeTabPrimary,
+            activeTabSecondary = if (group == WorkbenchGroup.SECONDARY) tab.id else _state.value.activeTabSecondary,
+        )
+        DenovaLog.i("Workbench", "open terminal tab=${tab.id.take(12)} project=${projectId.take(12)} profile=$profileId")
+    }
+
     fun activateTab(tabId: String) {
         val tab = WorkbenchTabs.find(_state.value.tabs, tabId) ?: return
         _state.value = _state.value.copy(
@@ -396,5 +415,11 @@ class WorkbenchViewModel(application: Application) : AndroidViewModel(applicatio
 
     companion object {
         fun agentTabId(projectId: String, sessionId: String): String = "agent:$projectId:$sessionId"
+
+        /**
+         * 终端页签 id 每次新建都唯一：同一项目可以并存多个终端（每个都是独立 owner），
+         * 不能像会话那样按「项目 + 会话」去重。
+         */
+        fun terminalTabId(): String = "term:" + java.util.UUID.randomUUID().toString().replace("-", "").take(16)
     }
 }
