@@ -72,6 +72,7 @@ import com.denova.novara.feature.shell.VersionsContent
 import com.denova.novara.feature.shell.ProjectDirectoryContent
 import com.denova.novara.feature.shell.RightDrawer
 import com.denova.novara.feature.books.BooksScreen
+import com.denova.novara.feature.lore.LoreScreen
 import com.denova.novara.feature.shell.appDestinations
 import com.denova.novara.feature.terminal.TerminalScreen
 import com.denova.novara.feature.terminal.TerminalViewModel
@@ -399,6 +400,13 @@ class MainActivity : AppCompatActivity() {
                                                     bookShelfViewModel.refresh()
                                                 }
                                             },
+                                        )
+                                    }
+                                    composable("lore") {
+                                        LoreScreen(
+                                            client = connectionViewModel.client,
+                                            projectId = currentProjectId,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
                                         )
                                     }
                                     appDestinations.filter { !it.implemented }.forEach { destination ->

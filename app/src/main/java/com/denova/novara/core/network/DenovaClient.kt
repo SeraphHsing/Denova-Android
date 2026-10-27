@@ -40,6 +40,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import com.denova.novara.core.logging.DenovaLog
 import okhttp3.Call
@@ -1411,6 +1412,117 @@ class DenovaClient(
     suspend fun projectLoreItems(projectId: String): LoreItemsResponse =
         getJson(projectLoreItemsUrl(projectId)) { json.decodeFromString(LoreItemsResponse.serializer(), it) }
 
+    // ---- 资料库（P4-C / LOR-001…004）----
+
+    suspend fun loreCategories(projectId: String): List<LoreCategory> =
+        getJson(loreUrl(projectId, "categories")) {
+            json.decodeFromString(ListSerializer(LoreCategory.serializer()), it)
+        }
+
+    /** 分类增删改移：`POST .../lore/categories`，返回改完的完整分类表。 */
+    suspend fun mutateLoreCategory(projectId: String, mutation: LoreCategoryMutation): List<LoreCategory> =
+        writeJson(
+            url = loreUrl(projectId, "categories"),
+            payload = json.encodeToString(LoreCategoryMutation.serializer(), mutation),
+        ) { json.decodeFromString(ListSerializer(LoreCategory.serializer()), it) }
+
+    suspend fun createLoreItem(projectId: String, input: LoreItemInput): LoreItemSummary =
+        writeJson(
+            url = loreUrl(projectId, "items"),
+            payload = json.encodeToString(LoreItemInput.serializer(), input),
+        ) { json.decodeFromString(LoreItemResponse.serializer(), it).item }
+
+    suspend fun updateLoreItem(projectId: String, id: String, input: LoreItemInput): LoreItemSummary =
+        writeJson(
+            url = loreUrl(projectId, "items/$id"),
+            payload = json.encodeToString(LoreItemInput.serializer(), input),
+            method = "PUT",
+        ) { json.decodeFromString(LoreItemResponse.serializer(), it).item }
+
+    suspend fun deleteLoreItem(projectId: String, id: String) {
+        writeJson<Unit>(url = loreUrl(projectId, "items/$id"), method = "DELETE") { }
+    }
+
+    /** 材料上传（multipart `file`）：`POST .../items/:id/materials/upload`。 */
+    suspend fun uploadLoreMaterial(
+        projectId: String,
+        itemId: String,
+        file: UploadFile,
+    ): LoreItemSummary {
+        val body = multipartBody(emptyMap(), fileField = "file", file = file)
+        val request = Request.Builder().url(loreUrl(projectId, "items/$itemId/materials/upload")).post(body).build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(LoreItemResponse.serializer(), text).item
+            }
+        }
+    }
+
+    /** 材料关联 / 重命名 / 移除 / 设为封面：`POST .../items/:id/materials`。 */
+    suspend fun mutateLoreMaterial(
+        projectId: String,
+        itemId: String,
+        mutation: LoreMaterialMutation,
+    ): LoreItemSummary =
+        writeJson(
+            url = loreUrl(projectId, "items/$itemId/materials"),
+            payload = json.encodeToString(LoreMaterialMutation.serializer(), mutation),
+        ) { json.decodeFromString(LoreItemResponse.serializer(), it).item }
+
+    suspend fun loreAssets(projectId: String): List<LoreMaterial> =
+        getJson(loreUrl(projectId, "assets")) {
+            json.decodeFromString(ListSerializer(LoreMaterial.serializer()), it)
+        }
+
+    /** 生成条目配图：`POST .../items/:id/image/generate`（失败时服务端给 `api.lore.image*` 原因）。 */
+    suspend fun generateLoreImage(projectId: String, itemId: String): LoreItemSummary =
+        writeJson(url = loreUrl(projectId, "items/$itemId/image/generate"), payload = "{}") {
+            json.decodeFromString(LoreItemResponse.serializer(), it).item
+        }
+
+    /** 生成条目语音：`POST .../items/:id/speech/generate`，返回更新后的条目（含新 MP3 材料）。 */
+    suspend fun generateLoreSpeech(projectId: String, itemId: String, request: LoreSpeechRequest): LoreItemSummary =
+        writeJson(
+            url = loreUrl(projectId, "items/$itemId/speech/generate"),
+            payload = json.encodeToString(LoreSpeechRequest.serializer(), request),
+        ) { json.decodeFromString(LoreItemResponse.serializer(), it).item }
+
+    suspend fun loreIndex(projectId: String): LoreIndexSnapshot =
+        getJson(loreUrl(projectId, "index")) { json.decodeFromString(LoreIndexSnapshot.serializer(), it) }
+
+    suspend fun updateLoreIndex(projectId: String, update: LoreIndexUpdate): LoreIndexSnapshot =
+        writeJson(
+            url = loreUrl(projectId, "index"),
+            payload = json.encodeToString(LoreIndexUpdate.serializer(), update),
+            method = "PUT",
+        ) { json.decodeFromString(LoreIndexSnapshot.serializer(), it) }
+
+    suspend fun previewLoreIndex(projectId: String, guide: LoreIndexGuide): LoreIndexPreview =
+        writeJson(
+            url = loreUrl(projectId, "index/preview"),
+            payload = json.encodeToString(LoreIndexGuide.serializer(), guide),
+        ) { json.decodeFromString(LoreIndexPreview.serializer(), it) }
+
+    suspend fun previewLoreClassification(
+        projectId: String,
+        request: LoreClassificationRequest,
+    ): LoreClassificationPreview =
+        writeJson(
+            url = loreUrl(projectId, "classification/preview"),
+            payload = json.encodeToString(LoreClassificationRequest.serializer(), request),
+        ) { json.decodeFromString(LoreClassificationPreview.serializer(), it) }
+
+    suspend fun applyLoreClassification(
+        projectId: String,
+        request: LoreClassificationApplyRequest,
+    ): LoreClassificationApplyResult =
+        writeJson(
+            url = loreUrl(projectId, "classification/apply"),
+            payload = json.encodeToString(LoreClassificationApplyRequest.serializer(), request),
+        ) { json.decodeFromString(LoreClassificationApplyResult.serializer(), it) }
+
     /**
      * 创建故事：`POST /api/interactive/stories` → `StorySummary`。
      *
@@ -2307,6 +2419,34 @@ class DenovaClient(
         server.baseUrl.toHttpUrl().newBuilder()
             .addPathSegments("api/projects/$projectId/book/lore/items")
             .build()
+
+    /** `api/projects/:id/book/lore/<suffix>`。 */
+    private fun loreUrl(projectId: String, suffix: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/book/lore/$suffix")
+            .build()
+
+    /** 写请求 + JSON 解码（资料库 / 技能 / 设置等共用）；失败保留错误码，供界面区分原因。 */
+    private suspend fun <T> writeJson(
+        url: HttpUrl,
+        payload: String? = null,
+        method: String = "POST",
+        decode: (String) -> T,
+    ): T = withContext(Dispatchers.IO) {
+        val body = payload?.toRequestBody(jsonMediaType)
+        val builder = Request.Builder().url(url)
+        when (method) {
+            "PUT" -> builder.put(body ?: "".toRequestBody(jsonMediaType))
+            "PATCH" -> builder.patch(body ?: "".toRequestBody(jsonMediaType))
+            "DELETE" -> builder.delete()
+            else -> builder.post(body ?: "".toRequestBody(jsonMediaType))
+        }
+        okHttpClient.newCall(builder.build()).execute().use { resp ->
+            val text = resp.body?.string().orEmpty()
+            if (!resp.isSuccessful) throw toException(resp.code, text)
+            decode(text)
+        }
+    }
 
     /** 只读 GET + JSON 解码（资源目录类端点共用）；失败保留错误码，供界面区分原因。 */
     private suspend fun <T> getJson(url: HttpUrl, decode: (String) -> T): T =

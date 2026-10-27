@@ -69,6 +69,18 @@ data class LoreItemSummary(
     val tags: List<String> = emptyList(),
     @SerialName("brief_description") val briefDescription: String = "",
     @SerialName("updated_at") val updatedAt: String = "",
+    // ---- 资料库页面（P4-C / LOR-001…004）用的完整字段；游戏侧选择器只读上面的子集 ----
+    @SerialName("type_source") val typeSource: String = "",
+    val importance: String = "",
+    val keywords: List<String> = emptyList(),
+    @SerialName("load_mode") val loadMode: String = "",
+    @SerialName("index_memberships") val indexMemberships: List<LoreIndexMembership> = emptyList(),
+    val content: String = "",
+    @SerialName("created_at") val createdAt: String = "",
+    val image: LoreImage? = null,
+    val materials: LoreMaterials? = null,
+    @SerialName("resolved_materials") val resolvedMaterials: List<LoreMaterial> = emptyList(),
+    @SerialName("detail_fields") val detailFields: Int = 0,
 )
 
 @Serializable

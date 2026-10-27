@@ -51,7 +51,7 @@ object ActivityNav {
         ActivitySpec("game", R.string.dest_game, ActivityGroup.CREATION, Icons.Filled.PlayArrow, implemented = true),
         ActivitySpec("agent", R.string.dest_agent, ActivityGroup.TOOLS, Icons.Filled.Send, implemented = true),
         ActivitySpec("workbench", R.string.dest_workbench, ActivityGroup.TOOLS, Icons.Filled.Home, implemented = true),
-        ActivitySpec("lore", R.string.dest_lore, ActivityGroup.TOOLS, Icons.Filled.Star, implemented = false),
+        ActivitySpec("lore", R.string.dest_lore, ActivityGroup.TOOLS, Icons.Filled.Star, implemented = true),
         ActivitySpec("teller", R.string.dest_teller, ActivityGroup.TOOLS, Icons.Filled.Notifications, implemented = false),
         ActivitySpec("versions", R.string.dest_versions, ActivityGroup.TOOLS, Icons.Filled.Refresh, implemented = false),
         ActivitySpec("books", R.string.dest_books, ActivityGroup.TOOLS, Icons.Filled.List, implemented = true),
