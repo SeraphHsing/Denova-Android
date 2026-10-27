@@ -14,7 +14,7 @@ object StoryTurnText {
     }
 }
 
-/** 轮次锚点：用于「跳转指定轮次」。 */
+/** 轮次锚点：用于「跳转指定轮次」与「版本切换 / 重生成」。 */
 data class TurnAnchor(
     val turnId: String,
     /** 轮次序号（1 基，含已翻页的更早轮次）。 */
@@ -23,6 +23,12 @@ data class TurnAnchor(
     val label: String,
     /** 该轮在叙事块列表里的首块索引。 */
     val blockIndex: Int,
+    /** 版本总数（<=1 时 UI 不展示切换控件）。 */
+    val versionCount: Int = 1,
+    /** 当前版本序号（1 基）。 */
+    val versionNumber: Int = 1,
+    /** 该轮是否能重生成（玩家输入为空的开场轮由服务端 `start_opening` 处理，这里只挡空输入）。 */
+    val canRegenerate: Boolean = true,
 )
 
 object StoryPaging {
@@ -48,13 +54,46 @@ object StoryPaging {
         blockIndexOf: (String) -> Int?,
     ): List<TurnAnchor> = turns.mapIndexedNotNull { index, turn ->
         val blockIndex = blockIndexOf(turn.id) ?: return@mapIndexedNotNull null
+        val versionCount = turn.versions.size.coerceAtLeast(1)
         TurnAnchor(
             turnId = turn.id,
             number = firstNumber + index,
             label = label(turn),
             blockIndex = blockIndex,
+            versionCount = versionCount,
+            versionNumber = currentVersionNumber(turn, versionCount),
+            canRegenerate = canRegenerate(turn),
         )
     }
+
+    /** 当前版本序号（1 基）：优先看 `versions[].current`，回退 `version_idx`。 */
+    fun currentVersionNumber(turn: TurnEvent, versionCount: Int = turn.versions.size): Int {
+        val fromFlag = turn.versions.indexOfFirst { it.current }
+        if (fromFlag >= 0) return fromFlag + 1
+        if (turn.versionIdx in 0 until versionCount) return turn.versionIdx + 1
+        return 1
+    }
+
+    /**
+     * 切版本的目标 id：`direction=-1` 取上一版、`+1` 取下一版；越界返回 null。
+     * 与 Web 一致——`turn_id` 保持当前轮，只换 `version_turn_id`。
+     */
+    fun versionTarget(turn: TurnEvent, direction: Int): String? {
+        if (turn.versions.size < 2) return null
+        val current = currentVersionNumber(turn) - 1
+        val target = current + direction
+        if (target !in turn.versions.indices) return null
+        return turn.versions[target].turnId.takeIf { it.isNotBlank() }
+    }
+
+    /** 重生成需要能重放该轮的玩家输入；只有内部提示的空输入不允许。 */
+    fun replayInput(turn: TurnEvent): String? {
+        val user = turn.user?.trim().orEmpty()
+        if (user.isBlank() || user.startsWith("[Source:")) return null
+        return user
+    }
+
+    private fun canRegenerate(turn: TurnEvent): Boolean = replayInput(turn) != null
 
     fun label(turn: TurnEvent): String {
         val user = turn.user?.takeIf { it.isNotBlank() && !it.trimStart().startsWith("[Source:") }

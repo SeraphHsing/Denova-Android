@@ -240,6 +240,9 @@
     <string name="game_console_no_turns">No turns loaded</string>
     <string name="game_console_turn_number">Turn %1$d</string>
     <string name="game_console_turn_jump">Jump</string>
+    <string name="game_console_turn_regenerate">Regenerate</string>
+    <string name="game_console_version">v%1$d/%2$d</string>
+    <string name="game_regenerate_no_input">This turn has no replayable input</string>
     <string name="game_console_branch_fork">Fork</string>
     <string name="game_console_branch_switch">Switch</string>
     <string name="game_console_branch_delete">Delete</string>

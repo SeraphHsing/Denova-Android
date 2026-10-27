@@ -35,6 +35,20 @@ data class TurnEvent(
     @SerialName("state_delta") val stateDelta: TurnStateDelta? = null,
     @SerialName("state_status") val stateStatus: String = "",
     @SerialName("state_error") val stateError: String = "",
+    /** 同一轮的多个候选版本（GAM-010）；`current=true` 的那个与 [id] 相同。 */
+    val versions: List<TurnVersion> = emptyList(),
+    @SerialName("version_idx") val versionIdx: Int = 0,
+)
+
+/**
+ * 一轮的某个版本：切换版本时把 `version_turn_id` 传给
+ * `POST /api/interactive/stories/:id/switch-turn-version`，`turn_id` 仍是当前展示的轮次。
+ */
+@Serializable
+data class TurnVersion(
+    @SerialName("turn_id") val turnId: String = "",
+    val ts: String = "",
+    val current: Boolean = false,
 )
 
 /** 推荐行动：`turn_result.choices` 优先，缺失时回退 `hot_state.choices`（与 Web 一致）。 */

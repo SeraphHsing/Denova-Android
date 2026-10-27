@@ -116,6 +116,17 @@ data class SwitchBranchRequest(
     @SerialName("branch_id") val branchId: String,
 )
 
+/**
+ * `POST .../switch-turn-version`（GAM-010）：`turn_id` 是当前展示的轮次，
+ * `version_turn_id` 是要切到的那个版本的 turn id（取自 `versions[].turn_id`）。
+ */
+@Serializable
+data class SwitchTurnVersionRequest(
+    @SerialName("branch_id") val branchId: String,
+    @SerialName("turn_id") val turnId: String,
+    @SerialName("version_turn_id") val versionTurnId: String,
+)
+
 /** `PUT .../branches/:branchId/plan`：方案是带 revision 的文档，冲突返回 409。 */
 @Serializable
 data class UpdateBranchPlanRequest(

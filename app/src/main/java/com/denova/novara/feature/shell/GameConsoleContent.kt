@@ -62,6 +62,8 @@ fun GameConsoleContent(
     onLoadEarlier: () -> Unit,
     onSelectTurn: (String) -> Unit,
     onForkTurn: (String) -> Unit,
+    onSwitchVersion: (String, Int) -> Unit,
+    onRegenerate: (String) -> Unit,
     onSwitchBranch: (String) -> Unit,
     onDeleteBranch: (String) -> Unit,
     onSavePlan: (String) -> Unit,
@@ -150,27 +152,51 @@ fun GameConsoleContent(
                     }
                     // 新轮次在前，便于直接跳到最近几轮。
                     items(turnAnchors.asReversed(), key = { "turn-${it.turnId}" }) { anchor ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(end = 4.dp),
-                            ) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     stringResource(R.string.game_console_turn_number, anchor.number),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.outline,
                                 )
-                                Text(anchor.label, style = MaterialTheme.typography.bodySmall)
+                                // 版本切换（GAM-010）：只换展示版本，按钮越界时 ViewModel 直接忽略。
+                                if (anchor.versionCount > 1) {
+                                    TextButton(
+                                        onClick = { onSwitchVersion(anchor.turnId, -1) },
+                                        enabled = !branchBusy,
+                                    ) { Text("‹") }
+                                    Text(
+                                        stringResource(
+                                            R.string.game_console_version,
+                                            anchor.versionNumber,
+                                            anchor.versionCount,
+                                        ),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                    TextButton(
+                                        onClick = { onSwitchVersion(anchor.turnId, 1) },
+                                        enabled = !branchBusy,
+                                    ) { Text("›") }
+                                }
                             }
-                            TextButton(onClick = { onSelectTurn(anchor.turnId) }) {
-                                Text(stringResource(R.string.game_console_turn_jump))
-                            }
-                            TextButton(onClick = { onForkTurn(anchor.turnId) }, enabled = !branchBusy) {
-                                Text(stringResource(R.string.game_console_branch_fork))
+                            Text(anchor.label, style = MaterialTheme.typography.bodySmall)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                TextButton(onClick = { onSelectTurn(anchor.turnId) }) {
+                                    Text(stringResource(R.string.game_console_turn_jump))
+                                }
+                                TextButton(onClick = { onForkTurn(anchor.turnId) }, enabled = !branchBusy) {
+                                    Text(stringResource(R.string.game_console_branch_fork))
+                                }
+                                TextButton(
+                                    onClick = { onRegenerate(anchor.turnId) },
+                                    enabled = !branchBusy && anchor.canRegenerate,
+                                ) {
+                                    Text(stringResource(R.string.game_console_turn_regenerate))
+                                }
                             }
                         }
                     }

@@ -107,6 +107,8 @@ data class SendInteractiveChatRequest(
     @SerialName("story_id") val storyId: String,
     val branch: String? = null,
     val message: String,
+    /** 从该轮重生成（GAM-010）：服务端回退到它再重新跑这一轮。 */
+    @SerialName("regenerate_from_turn_id") val regenerateFromTurnId: String? = null,
 )
 
 /**
@@ -1195,6 +1197,31 @@ class DenovaClient(
         val body = json.encodeToString(SwitchBranchRequest.serializer(), SwitchBranchRequest(branchId))
         val request = Request.Builder()
             .url(interactiveStoryUrl(storyId, "switch-branch"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
+    /**
+     * 切换轮次版本（GAM-010）：`POST .../switch-turn-version` body `{branch_id, turn_id, version_turn_id}`。
+     * 只换展示的版本，不新生成；成功后需重取快照与历史（状态会随之回退到该版本）。
+     */
+    suspend fun switchInteractiveTurnVersion(
+        storyId: String,
+        branchId: String,
+        turnId: String,
+        versionTurnId: String,
+    ) {
+        val body = json.encodeToString(
+            SwitchTurnVersionRequest.serializer(),
+            SwitchTurnVersionRequest(branchId, turnId, versionTurnId),
+        )
+        val request = Request.Builder()
+            .url(interactiveStoryUrl(storyId, "switch-turn-version"))
             .post(body.toRequestBody(jsonMediaType))
             .build()
         withContext(Dispatchers.IO) {

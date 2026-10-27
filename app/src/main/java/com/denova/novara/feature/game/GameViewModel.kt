@@ -188,6 +188,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private var historyHasMore = false
     private var branchJob: Job? = null
 
+    /** 本次发送是否为「从某轮重生成」：收尾后需要整段重取历史。 */
+    private var pendingRegeneration = false
+
     /** 故事世代：切换故事即推进，迟到回包据此丢弃（GAM-002 任务隔离）。 */
     private var storyEpoch = 0L
 
@@ -217,6 +220,72 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
         // 登录后预取故事列表；进入游戏页时页面再按需刷新（不重复挂接）。
         if (_library.value.stories.isEmpty()) loadStories()
+    }
+
+    // ---- 轮次版本与重生成（P4-A / GAM-010）----
+
+    /**
+     * 切换轮次版本：只换展示版本，不触发新生成。
+     * 版本切换会改变规范状态与该轮之后的叙事，因此完成后重取历史与快照（丢弃未落库的流式尾部）。
+     */
+    fun switchTurnVersion(turnId: String, direction: Int) {
+        val client = client ?: return
+        val state = _uiState.value
+        if (state.storyId.isBlank() || state.branchBusy) return
+        val turn = loadedTurns.firstOrNull { it.id == turnId }
+        if (turn == null) {
+            DenovaLog.w("Game", "switch version turn not loaded turn=$turnId")
+            return
+        }
+        val target = StoryPaging.versionTarget(turn, direction)
+        if (target == null) {
+            DenovaLog.w("Game", "no ${if (direction < 0) "older" else "newer"} version turn=$turnId")
+            return
+        }
+        _uiState.value = state.copy(branchBusy = true, branchError = null)
+        branchJob?.cancel()
+        branchJob = viewModelScope.launch {
+            try {
+                client.switchInteractiveTurnVersion(state.storyId, state.branchId, turnId, target)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "switch turn version failed turn=$turnId", e)
+                _uiState.value = _uiState.value.copy(
+                    branchBusy = false,
+                    branchError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            _uiState.value = _uiState.value.copy(branchBusy = false)
+            DenovaLog.i("Game", "turn version switched turn=$turnId to=$target")
+            dropPendingChunks()
+            streamTail.setLength(0)
+            loadBaseline(state.storyId, state.branchId, FULL_BASELINE_TURNS, "version")
+            refreshSnapshot()
+        }
+    }
+
+    /**
+     * 从指定轮重生成：重放该轮的玩家输入并带 `regenerate_from_turn_id`。
+     * 服务端会回退到该轮再重跑，收尾后必须重取历史（本地 turns 已失效）。
+     */
+    fun regenerateTurn(turnId: String) {
+        val state = _uiState.value
+        if (state.storyId.isBlank() || state.sending) return
+        val turn = loadedTurns.firstOrNull { it.id == turnId }
+        if (turn == null) {
+            DenovaLog.w("Game", "regenerate turn not loaded turn=$turnId")
+            return
+        }
+        val input = StoryPaging.replayInput(turn)
+        if (input == null) {
+            _uiState.value = state.copy(branchError = UiText.of(R.string.game_regenerate_no_input))
+            return
+        }
+        pendingRegeneration = true
+        DenovaLog.i("Game", "regenerate turn=$turnId")
+        send(state.storyId, state.branchId, input, regenerateFromTurnId = turnId)
     }
 
     // ---- 分支与分支方案（P4-A / GAM-008、GAM-009）----
@@ -663,6 +732,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         loadedTurns = emptyList()
         historyCursor = null
         historyHasMore = false
+        pendingRegeneration = false
         refreshSnapshot()
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
@@ -698,7 +768,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** 发送玩家输入：先落本地事务（SUBMITTING）再 POST，流正常结束即 ACCEPTED。 */
-    fun send(storyId: String, branchId: String, message: String) {
+    fun send(
+        storyId: String,
+        branchId: String,
+        message: String,
+        regenerateFromTurnId: String? = null,
+    ) {
         val client = client ?: return
         val text = message.trim()
         if (text.isEmpty() || storyId.isBlank()) return
@@ -708,6 +783,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             storyId = storyId,
             branch = branchId.ifBlank { null },
             message = text,
+            regenerateFromTurnId = regenerateFromTurnId,
         )
         val record = CommandRecord(
             commandId = commandId,
@@ -924,6 +1000,21 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             current.stage
         }
         _uiState.value = current.copy(stage = stage, connected = false, sending = false)
+        val storyId = _uiState.value.storyId
+        val branchId = _uiState.value.branchId
+        // 重生成会回退并重跑该轮：本地 turns 已失效，必须整段重取（含叙事重建）。
+        if (pendingRegeneration) {
+            pendingRegeneration = false
+            DenovaLog.i("Game", "regenerated; resync canonical history")
+            viewModelScope.launch {
+                dropPendingChunks()
+                streamTail.setLength(0)
+                loadBaseline(storyId, branchId, FULL_BASELINE_TURNS, "regen")
+                refreshSnapshot()
+                loadStories()
+            }
+            return
+        }
         // 收尾刷新：有轮次落库时快照已由 `interactive_turn_persisted` 刷新，这里只重取列表
         // （更新 turn_count / updated_at）；无落库但确实跑过流时才补一次快照。
         if (current.stage.receivedPersistedTurn) {

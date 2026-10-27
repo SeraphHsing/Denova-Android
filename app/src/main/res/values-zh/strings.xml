@@ -240,6 +240,9 @@
     <string name="game_console_no_turns">还没有加载轮次</string>
     <string name="game_console_turn_number">第 %1$d 轮</string>
     <string name="game_console_turn_jump">跳转</string>
+    <string name="game_console_turn_regenerate">重生成</string>
+    <string name="game_console_version">v%1$d/%2$d</string>
+    <string name="game_regenerate_no_input">这一轮没有可重放的输入</string>
     <string name="game_console_branch_fork">分叉</string>
     <string name="game_console_branch_switch">切换</string>
     <string name="game_console_branch_delete">删除</string>

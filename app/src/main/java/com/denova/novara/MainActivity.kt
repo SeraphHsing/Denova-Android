@@ -410,6 +410,10 @@ class MainActivity : AppCompatActivity() {
                                     onLoadEarlier = { gameViewModel.loadEarlierHistory() },
                                     onSelectTurn = { gameViewModel.scrollToTurn(it) },
                                     onForkTurn = { gameViewModel.createBranchFromTurn(it, "") },
+                                    onSwitchVersion = { turnId, direction ->
+                                        gameViewModel.switchTurnVersion(turnId, direction)
+                                    },
+                                    onRegenerate = { gameViewModel.regenerateTurn(it) },
                                     onSwitchBranch = { gameViewModel.switchBranch(it) },
                                     onDeleteBranch = { gameViewModel.deleteBranch(it) },
                                     onSavePlan = { gameViewModel.saveBranchPlan(it) },

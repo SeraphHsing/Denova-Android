@@ -1,11 +1,13 @@
 package com.denova.novara
 
 import com.denova.novara.core.network.BranchesResponse
+import com.denova.novara.core.network.SendInteractiveChatRequest
 import com.denova.novara.core.network.UpdateBranchPlanResult
 import com.denova.novara.core.stream.NarrativeBuilder
 import com.denova.novara.core.stream.StoryPaging
 import com.denova.novara.core.stream.StoryTurnText
 import com.denova.novara.core.stream.TurnEvent
+import com.denova.novara.core.stream.TurnVersion
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -79,6 +81,64 @@ class StoryPagingTest {
 
         val normal = TurnEvent(id = "t2", user = "推门", narrative = "门开了")
         assertEquals("> 推门\n\n门开了", StoryTurnText.of(normal))
+    }
+
+    @Test
+    fun `version target walks the version list and stops at edges`() {
+        val turn = TurnEvent(
+            id = "t2",
+            user = "前进",
+            narrative = "n",
+            versions = listOf(
+                TurnVersion(turnId = "t2v1"),
+                TurnVersion(turnId = "t2v2", current = true),
+                TurnVersion(turnId = "t2v3"),
+            ),
+        )
+
+        assertEquals(2, StoryPaging.currentVersionNumber(turn))
+        assertEquals("t2v1", StoryPaging.versionTarget(turn, -1))
+        assertEquals("t2v3", StoryPaging.versionTarget(turn, 1))
+
+        val newest = turn.copy(versions = listOf(
+            TurnVersion(turnId = "a"),
+            TurnVersion(turnId = "b", current = true),
+        ))
+        assertNull(StoryPaging.versionTarget(newest, 1))
+        // 只有一个版本时不提供切换。
+        assertNull(StoryPaging.versionTarget(TurnEvent(id = "t9"), 1))
+    }
+
+    @Test
+    fun `anchors expose version count and regenerate eligibility`() {
+        val withVersions = TurnEvent(
+            id = "t1",
+            user = "推门",
+            narrative = "n",
+            versions = listOf(TurnVersion(turnId = "t1"), TurnVersion(turnId = "t1b", current = true)),
+        )
+        val opening = TurnEvent(id = "t0", user = "[Source: opening]", narrative = "n")
+
+        val anchors = StoryPaging.anchors(listOf(withVersions, opening), firstNumber = 1) { 0 }
+
+        assertEquals(2, anchors.size)
+        assertEquals(2, anchors[0].versionCount)
+        assertEquals(2, anchors[0].versionNumber)
+        assertTrue(anchors[0].canRegenerate)
+        // 内部提示（开场注入）不作为可重放输入。
+        assertNull(StoryPaging.replayInput(opening))
+        assertTrue(!anchors[1].canRegenerate)
+    }
+
+    @Test
+    fun `chat request carries regenerate target only when set`() {
+        val plain = SendInteractiveChatRequest(commandId = "c1", storyId = "s1", message = "hi")
+        val jsonText = json.encodeToString(SendInteractiveChatRequest.serializer(), plain)
+        assertTrue(!jsonText.contains("regenerate_from_turn_id"))
+
+        val regen = plain.copy(regenerateFromTurnId = "t7")
+        val regenText = json.encodeToString(SendInteractiveChatRequest.serializer(), regen)
+        assertTrue(regenText.contains("\"regenerate_from_turn_id\":\"t7\""))
     }
 
     @Test
