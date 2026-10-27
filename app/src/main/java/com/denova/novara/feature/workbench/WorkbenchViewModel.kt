@@ -189,6 +189,41 @@ class WorkbenchViewModel(application: Application) : AndroidViewModel(applicatio
         _state.value = _state.value.copy(tabs = WorkbenchTabs.withSelectedPath(_state.value.tabs, tabId, path))
     }
 
+    /**
+     * 打开变更审阅页签（WB-005）：每项目一个，重复打开只激活它。
+     * [groupId] 非空时直接打开该分组（从历史 / 外部入口跳转用）。
+     */
+    fun openReview(projectId: String, groupId: String = "") {
+        if (projectId.isBlank()) return
+        val group = _state.value.activeGroup
+        val existing = _state.value.tabs.firstOrNull {
+            it.projectId == projectId && it.kind is WorkbenchTabKind.Review
+        }
+        val tab = existing ?: WorkbenchTab(
+            id = reviewTabId(projectId),
+            projectId = projectId,
+            group = group,
+            kind = WorkbenchTabKind.Review(groupId),
+        )
+        val opened = WorkbenchTabs.open(_state.value.tabs, tab)
+        val tabs = if (groupId.isNotBlank()) WorkbenchTabs.withReviewGroup(opened, tab.id, groupId) else opened
+        _state.value = _state.value.copy(
+            tabs = tabs,
+            selectedProjectId = projectId,
+            activeGroup = tab.group,
+            activeTabPrimary = if (tab.group == WorkbenchGroup.PRIMARY) tab.id else _state.value.activeTabPrimary,
+            activeTabSecondary = if (tab.group == WorkbenchGroup.SECONDARY) tab.id else _state.value.activeTabSecondary,
+        )
+        DenovaLog.i("Workbench", "open review tab=${tab.id} group=${groupId.ifBlank { "-" }}")
+    }
+
+    /** 审阅页签记住当前分组，撤销 / 重做 / 评论都以它为目标。 */
+    fun selectReviewGroup(tabId: String, groupId: String) {
+        _state.value = _state.value.copy(
+            tabs = WorkbenchTabs.withReviewGroup(_state.value.tabs, tabId, groupId),
+        )
+    }
+
     fun activateTab(tabId: String) {
         val tab = WorkbenchTabs.find(_state.value.tabs, tabId) ?: return
         _state.value = _state.value.copy(
@@ -457,5 +492,8 @@ class WorkbenchViewModel(application: Application) : AndroidViewModel(applicatio
 
         /** 文件页签按项目唯一（对齐 Web `AgentChatFilesTab`：一个项目一个文件工作区）。 */
         fun filesTabId(projectId: String): String = "files:$projectId"
+
+        /** 变更审阅页签按项目唯一：同一项目同时只盯一组变更，避免撤销打到别的分组。 */
+        fun reviewTabId(projectId: String): String = "review:$projectId"
     }
 }

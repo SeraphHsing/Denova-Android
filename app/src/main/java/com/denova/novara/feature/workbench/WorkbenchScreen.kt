@@ -53,7 +53,9 @@ import com.denova.novara.core.workbench.WorkbenchTabKind
 import com.denova.novara.core.workbench.WorkbenchTabs
 import com.denova.novara.feature.agent.AgentScreen
 import com.denova.novara.feature.agent.AgentViewModel
+import com.denova.novara.feature.changes.ChangesViewModel
 import com.denova.novara.feature.editor.EditorScreen
+import com.denova.novara.feature.shell.ChangesContent
 import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.terminal.TerminalScreen
@@ -91,6 +93,25 @@ fun WorkbenchScreen(
     }
     val terminalLabel = stringResource(R.string.terminal_title)
 
+    // 历史面板（WB-006）：Activity 级 ViewModel，关掉再开保留上次项目与查询。
+    var historyOpen by remember { mutableStateOf(false) }
+    val application = LocalContext.current.applicationContext as Application
+    val historyFactory: ViewModelProvider.Factory = remember(application) {
+        viewModelFactory { initializer { WorkbenchHistoryViewModel(application) } }
+    }
+    val historyViewModel: WorkbenchHistoryViewModel = viewModel(key = HISTORY_KEY, factory = historyFactory)
+    if (historyOpen) {
+        LaunchedEffect(state.projects, client) {
+            val c = client ?: return@LaunchedEffect
+            historyViewModel.bindClient(c, state.projects, state.selectedProjectId)
+        }
+        WorkbenchHistorySheet(
+            viewModel = historyViewModel,
+            onDismiss = { historyOpen = false },
+            onOpenSession = { projectId, sessionId -> viewModel.openSession(projectId, sessionId) },
+        )
+    }
+
     Column(
         Modifier
             .fillMaxSize()
@@ -119,6 +140,8 @@ fun WorkbenchScreen(
                 onClick = { viewModel.switchGroup(WorkbenchGroup.SECONDARY) },
             )
             Box(Modifier.weight(1f))
+            // 会话历史（WB-006）：跨项目检索、分页、行内重命名 / 导出 / 删除。
+            TextButton(onClick = { historyOpen = true }) { Text(stringResource(R.string.workbench_history)) }
             TextButton(onClick = onOpenRightDrawer) { Text("»") }
         }
 
@@ -144,6 +167,10 @@ fun WorkbenchScreen(
             onNewFiles = {
                 val projectId = state.selectedProjectId
                 if (projectId.isNotBlank()) viewModel.openFiles(projectId)
+            },
+            onNewReview = {
+                val projectId = state.selectedProjectId
+                if (projectId.isNotBlank()) viewModel.openReview(projectId)
             },
             canCreateSession = state.selectedProjectId.isNotBlank() && !state.busy,
         )
@@ -179,6 +206,7 @@ fun WorkbenchScreen(
                 onOpenDrawer = onOpenDrawer,
                 terminalHolder = terminalHolder,
                 onSelectFile = viewModel::selectFile,
+                onSelectReviewGroup = viewModel::selectReviewGroup,
             )
         }
     }
@@ -213,6 +241,7 @@ private fun TabStrip(
     onNewSession: () -> Unit,
     onNewTerminal: () -> Unit,
     onNewFiles: () -> Unit,
+    onNewReview: () -> Unit,
     canCreateSession: Boolean,
 ) {
     Row(
@@ -272,6 +301,14 @@ private fun TabStrip(
                     onClick = {
                         addMenu = false
                         onNewFiles()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.workbench_review_new)) },
+                    enabled = canCreateSession,
+                    onClick = {
+                        addMenu = false
+                        onNewReview()
                     },
                 )
             }
@@ -338,6 +375,7 @@ private fun WorkbenchTabHost(
     onOpenDrawer: () -> Unit,
     terminalHolder: TerminalTabHolder,
     onSelectFile: (tabId: String, path: String) -> Unit,
+    onSelectReviewGroup: (tabId: String, groupId: String) -> Unit,
 ) {
     when (val kind = tab.kind) {
         is WorkbenchTabKind.Agent -> {
@@ -406,7 +444,74 @@ private fun WorkbenchTabHost(
             client = client,
             onSelectFile = { path -> onSelectFile(tab.id, path) },
         )
+        is WorkbenchTabKind.Review -> WorkbenchReviewHost(
+            tab = tab,
+            reviewedGroupId = kind.groupId,
+            client = client,
+            onSelectGroup = { groupId -> onSelectReviewGroup(tab.id, groupId) },
+        )
     }
+}
+
+/**
+ * 变更审阅页签宿主（P4-B / WB-005）。
+ *
+ * 直接复用右抽屉里的 [ChangesContent] 与 [ChangesViewModel]：列表 / diff / 评论 / 审阅 / 撤销 / 重做
+ * 与写作页共用同一套实现与同一批端点（`/api/projects/:id/changes/…`），没有第二份逻辑。
+ * 注意：KDoc 里不能出现「斜杠 + 星号」，Kotlin 的块注释是可嵌套的，会吞掉后面的代码。
+ * 页签记住当前分组，切走再回来仍在同一组上，撤销 / 重做不会打到别的 change group。
+ */
+@Composable
+private fun WorkbenchReviewHost(
+    tab: WorkbenchTab,
+    reviewedGroupId: String,
+    client: DenovaClient?,
+    onSelectGroup: (String) -> Unit,
+) {
+    val application = LocalContext.current.applicationContext as Application
+    val factory: ViewModelProvider.Factory = remember(application) {
+        viewModelFactory { initializer { ChangesViewModel(application) } }
+    }
+    // 每项目一个审阅页签，因此 key 用页签 id 即可；旋转后仍是同一个 ViewModel。
+    val changesViewModel: ChangesViewModel = viewModel(key = "workbench-review-${tab.id}", factory = factory)
+    val changesState by changesViewModel.state.collectAsState()
+
+    LaunchedEffect(tab.id, tab.projectId, client) {
+        val c = client ?: return@LaunchedEffect
+        changesViewModel.bindClient(c)
+        changesViewModel.load(tab.projectId)
+    }
+    // 页签记得的分组在别处被关掉 / 撤销到不存在时，回到列表，避免详情卡在空数据上。
+    LaunchedEffect(tab.id, reviewedGroupId, changesState.detail?.id) {
+        if (reviewedGroupId.isNotBlank() && changesState.detail?.id != reviewedGroupId) {
+            changesViewModel.openGroup(reviewedGroupId)
+        }
+    }
+
+    ChangesContent(
+        state = changesState,
+        onReview = { groupId, decision, changeSetId ->
+            changesViewModel.review(groupId, decision, changeSetId)
+        },
+        onUndo = { groupId -> changesViewModel.undo(groupId) },
+        onRedo = { groupId -> changesViewModel.redo(groupId) },
+        onRefresh = { changesViewModel.load(tab.projectId, force = true) },
+        onOpen = { groupId ->
+            onSelectGroup(groupId)
+            changesViewModel.openGroup(groupId)
+        },
+        onCloseDetail = {
+            onSelectGroup("")
+            changesViewModel.closeDetail()
+        },
+        onSelectLine = changesViewModel::selectDiffLine,
+        onGroupComment = changesViewModel::startGroupComment,
+        onDraftChange = changesViewModel::onCommentDraftChange,
+        onSubmitComment = changesViewModel::submitComment,
+        onCancelComment = changesViewModel::cancelComment,
+        onEditComment = changesViewModel::startEditComment,
+        onDeleteComment = changesViewModel::deleteComment,
+    )
 }
 
 /**
@@ -554,3 +659,6 @@ class TerminalTabHolder : androidx.lifecycle.ViewModel() {
 }
 
 const val TERMINAL_HOLDER_KEY: String = "workbench-terminal-holder"
+
+/** 会话历史面板的 ViewModel key（Activity 级，关掉再开保留查询与项目）。 */
+const val HISTORY_KEY: String = "workbench-history"

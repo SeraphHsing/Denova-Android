@@ -661,4 +661,27 @@
     <string name="workbench_cancel">Cancel</string>
     <string name="workbench_show_more_sessions">Show more</string>
     <string name="workbench_session_count">%1$d conversations</string>
+    <string name="workbench_history">History</string>
+    <string name="workbench_history_title">Conversation history</string>
+    <string name="workbench_history_search">Search conversations</string>
+    <string name="workbench_history_empty">No matching conversations</string>
+    <string name="workbench_history_load_more">Load more</string>
+    <string name="workbench_history_count">Showing %1$d of %2$d</string>
+    <string name="workbench_history_message_count">%1$d msgs</string>
+    <string name="workbench_history_open">Open</string>
+    <string name="workbench_history_rename_hint">Conversation title</string>
+    <string name="workbench_history_export">Export Markdown</string>
+    <string name="workbench_history_exporting">Exporting…</string>
+    <string name="workbench_history_export_saved">Saved to %1$s</string>
+    <string name="workbench_history_export_failed">Export failed: %1$s</string>
+    <string name="workbench_history_export_failed_short">Export failed</string>
+    <string name="workbench_history_delete_title">Delete conversation</string>
+    <string name="workbench_history_delete_body">Delete “%1$s”? The saved transcript is removed.</string>
+    <string name="workbench_history_delete">Delete</string>
+    <string name="workbench_history_renamed">Renamed</string>
+    <string name="workbench_history_rename_failed">Failed to rename conversation</string>
+    <string name="workbench_history_deleted">Deleted</string>
+    <string name="workbench_history_delete_failed">Failed to delete conversation</string>
+    <string name="workbench_history_load_failed">Failed to load history</string>
+    <string name="workbench_review_new">Change review</string>
 </resources>

@@ -1,4 +1,4 @@
-package com.denova.novara.feature.shell
+ package com.denova.novara.feature.shell
 
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement

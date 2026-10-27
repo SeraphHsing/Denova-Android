@@ -29,6 +29,14 @@ sealed interface WorkbenchTabKind {
      * [selectedPath] 随页签保留：切走再切回、或换到另一区，编辑中的文件不会丢。
      */
     data class Files(val selectedPath: String = "") : WorkbenchTabKind
+
+    /**
+     * 变更审阅页签（每项目唯一，P4-B / WB-005）。
+     *
+     * 页签带着「当前打开的分组」：切走再切回、或换到另一区，用户盯着的 change group 不会被重置，
+     * 撤销 / 重做 / 评论始终作用在同一个分组上。
+     */
+    data class Review(val groupId: String = "") : WorkbenchTabKind
 }
 
 data class WorkbenchTab(
@@ -72,6 +80,7 @@ object WorkbenchTabs {
             left.kind is WorkbenchTabKind.Agent && right.kind is WorkbenchTabKind.Agent ->
                 (left.kind as WorkbenchTabKind.Agent).sessionId == (right.kind as WorkbenchTabKind.Agent).sessionId
             left.kind is WorkbenchTabKind.Files && right.kind is WorkbenchTabKind.Files -> true
+            left.kind is WorkbenchTabKind.Review && right.kind is WorkbenchTabKind.Review -> true
             left.kind is WorkbenchTabKind.Terminal && right.kind is WorkbenchTabKind.Terminal -> left.id == right.id
             else -> false
         }
@@ -119,8 +128,16 @@ object WorkbenchTabs {
             is WorkbenchTabKind.Agent -> sessionTitles[kind.sessionId].orEmpty()
             is WorkbenchTabKind.Terminal -> kind.label
             is WorkbenchTabKind.Files -> kind.selectedPath.substringAfterLast('/')
+            is WorkbenchTabKind.Review -> ""
         }
     }
+
+    /** 审阅页签记录当前分组（撤销 / 重做 / 评论的作用目标）。 */
+    fun withReviewGroup(tabs: List<WorkbenchTab>, id: String, groupId: String): List<WorkbenchTab> =
+        tabs.map { tab ->
+            val kind = tab.kind
+            if (tab.id == id && kind is WorkbenchTabKind.Review) tab.copy(kind = kind.copy(groupId = groupId)) else tab
+        }
 
     /** 文件页签换选中文件（其余页签不变）。 */
     fun withSelectedPath(tabs: List<WorkbenchTab>, id: String, path: String): List<WorkbenchTab> =

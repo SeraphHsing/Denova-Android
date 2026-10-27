@@ -592,7 +592,7 @@ private fun ChangeGroupDetail(
         Text(
             stringResource(R.string.changes_files, group.changeSets.map { it.path }.distinct().size) +
                 " · " + stringResource(R.string.changes_pending_edit_count, group.pendingEditCount) +
-                " · " + stringResource(R.string.changes_comments, group.comments.size),
+                " · " + stringResource(R.string.changes_comments, group.comments.count { !it.deleted }),
             style = MaterialTheme.typography.labelSmall,
             color = muted,
         )
@@ -669,7 +669,7 @@ private fun ChangeGroupDetail(
             item(key = "comments") {
                 Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        stringResource(R.string.changes_comments, group.comments.size),
+                        stringResource(R.string.changes_comments, group.comments.count { !it.deleted }),
                         style = MaterialTheme.typography.labelLarge,
                     )
                     if (group.comments.none { !it.deleted }) {
@@ -899,6 +899,8 @@ private fun ChangeGroupItem(
             TextButton(onClick = { onOpen(group.id) }, enabled = !busy) {
                 Text(stringResource(R.string.changes_open))
             }
+            // summary 只有服务端给的 comment_count（含软删除行），列表行的计数以它为准；
+            // 详情页头部另行按未删除条数统计，避免「删了一条仍显示 2」。
             if (group.commentCount > 0) {
                 Text(
                     stringResource(R.string.changes_comments, group.commentCount),

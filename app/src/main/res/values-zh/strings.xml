@@ -661,4 +661,26 @@
     <string name="workbench_cancel">取消</string>
     <string name="workbench_show_more_sessions">显示更多</string>
     <string name="workbench_session_count">%1$d 个会话</string>
-</resources>
+    <string name="workbench_history">历史</string>
+    <string name="workbench_history_title">会话历史</string>
+    <string name="workbench_history_search">搜索会话</string>
+    <string name="workbench_history_empty">没有匹配的会话</string>
+    <string name="workbench_history_load_more">加载更多</string>
+    <string name="workbench_history_count">已显示 %1$d / %2$d 条</string>
+    <string name="workbench_history_message_count">%1$d 条消息</string>
+    <string name="workbench_history_open">打开</string>
+    <string name="workbench_history_rename_hint">会话标题</string>
+    <string name="workbench_history_export">导出 Markdown</string>
+    <string name="workbench_history_exporting">正在导出…</string>
+    <string name="workbench_history_export_saved">已导出到 %1$s</string>
+    <string name="workbench_history_export_failed">导出失败：%1$s</string>
+    <string name="workbench_history_export_failed_short">导出失败</string>
+    <string name="workbench_history_delete_title">删除会话</string>
+    <string name="workbench_history_delete_body">删除「%1$s」？已保存的记录会被移除。</string>
+    <string name="workbench_history_delete">删除</string>
+    <string name="workbench_history_renamed">已重命名</string>
+    <string name="workbench_history_rename_failed">重命名失败</string>
+    <string name="workbench_history_deleted">已删除</string>
+    <string name="workbench_history_delete_failed">删除失败</string>
+    <string name="workbench_history_load_failed">加载历史失败</string>
+    <string name="workbench_review_new">变更审阅</string></resources>

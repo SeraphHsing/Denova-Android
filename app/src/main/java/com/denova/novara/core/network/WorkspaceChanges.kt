@@ -2,6 +2,7 @@ package com.denova.novara.core.network
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.nullable
 
 /**
  * 变更审阅契约（对齐固定 Web 基线 `features/changes/types.ts` 与 `features/changes/api.ts`）。
@@ -67,9 +68,33 @@ data class WorkspaceChangeComment(
     val author: String? = null,
     @SerialName("created_at") val createdAt: String = "",
     val deleted: Boolean = false,
-    /** 行锚点（服务端原样回传）；整组评论为 null。 */
+    /**
+     * 行锚点（服务端原样回传）；整组评论为 null。
+     *
+     * 服务端 `Anchor` 是结构体 + `omitempty`，而 Go 的 `omitempty` 对结构体不生效，
+     * 所以整组评论会回 `"anchor": {}`（不是 `null`）。这里用宽松反序列化把空对象读成 null。
+     */
+    @Serializable(with = LenientCommentAnchorSerializer::class)
     val anchor: ChangeCommentAnchor? = null,
 )
+
+/** 把服务端「零值锚点」（`{}` 或缺字段）读成 null，其余按正常锚点解析。 */
+object LenientCommentAnchorSerializer : kotlinx.serialization.KSerializer<ChangeCommentAnchor?> {
+    private val delegate = ChangeCommentAnchor.serializer().nullable
+
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor = delegate.descriptor
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChangeCommentAnchor?) {
+        delegate.serialize(encoder, value)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChangeCommentAnchor? = try {
+        delegate.deserialize(decoder)
+    } catch (_: kotlinx.serialization.MissingFieldException) {
+        // 整组评论：服务端回了零值锚点对象，语义上等于「没有锚点」。
+        null
+    }
+}
 
 /** 变更分组详情（对齐 Go `workspacechange.ChangeGroup`）。 */
 @Serializable
