@@ -86,7 +86,8 @@ private const val RESUME_MESSAGE = "Continue."
  * 全量随后台任务补全（history 耗时随 limit 近似线性：3 轮 ≈0.22s，50 轮 ≈2.1s）。
  */
 private const val FAST_BASELINE_TURNS = 3
-private const val FULL_BASELINE_TURNS = 50
+/** 首屏基线轮次数：与快照窗口对齐的一页，更早的轮次按需向前翻（GAM-007）。 */
+private const val FULL_BASELINE_TURNS = 20
 
 /** 游戏 UI 状态：投影阶段 + 累积叙事 + 连接态 + 快照派生的行动选项。 */
 data class GameUiState(
@@ -270,6 +271,31 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                     "actions=${active.recoveryActions.map { it.kind }}",
             )
         }
+    }
+
+    // ---- 开场生成（P4-A / GAM-003）----
+
+    /** 0 轮故事生成开场：`start_opening=true`，正文由服务端按开场配置生成。 */
+    fun startOpening() {
+        val state = _uiState.value
+        if (state.storyId.isBlank() || state.sending) return
+        DenovaLog.i("Game", "start opening story=${state.storyId} branch=${state.branchId}")
+        send(
+            storyId = state.storyId,
+            branchId = state.branchId.ifBlank { DEFAULT_BRANCH },
+            message = "",
+            startOpening = true,
+        )
+    }
+
+    /**
+     * 叙事滚到最旧端时调用（GAM-007）：还有更早的轮次就继续翻页。
+     * UI 只在到达末端时触发一次，重复触发由 [loadEarlierHistory] 的在途标记挡掉。
+     */
+    fun onNarrativeTopReached() {
+        if (!historyHasMore) return
+        if (_uiState.value.loadingEarlier) return
+        loadEarlierHistory()
     }
 
     // ---- 剧情编辑（P4-A / GAM-015）----
@@ -1101,16 +1127,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         message: String,
         regenerateFromTurnId: String? = null,
         resumeInterruptionId: String? = null,
+        startOpening: Boolean = false,
     ) {
         val client = client ?: return
         val text = message.trim()
-        if (text.isEmpty() || storyId.isBlank()) return
+        if ((!startOpening && text.isEmpty()) || storyId.isBlank()) return
         val commandId = UUID.randomUUID().toString()
         val request = SendInteractiveChatRequest(
             commandId = commandId,
             storyId = storyId,
             branch = branchId.ifBlank { null },
             message = text,
+            startOpening = if (startOpening) true else null,
             regenerateFromTurnId = regenerateFromTurnId,
             resumeInterruptionId = resumeInterruptionId,
         )

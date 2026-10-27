@@ -107,7 +107,9 @@ data class SendInteractiveChatRequest(
     val mode: String = "story",
     @SerialName("story_id") val storyId: String,
     val branch: String? = null,
-    val message: String,
+    val message: String = "",
+    /** 生成开场（GAM-003）：turns=0 时用它代替 message，服务端会跑首轮开场。 */
+    @SerialName("start_opening") val startOpening: Boolean? = null,
     /** 从该轮重生成（GAM-010）：服务端回退到它再重新跑这一轮。 */
     @SerialName("regenerate_from_turn_id") val regenerateFromTurnId: String? = null,
     /** 续接挂起的输入（GAM-012）：来自 active 投影的 `pending_interruption_id`。 */

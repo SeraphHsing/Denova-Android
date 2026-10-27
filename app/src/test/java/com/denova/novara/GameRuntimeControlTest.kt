@@ -119,6 +119,24 @@ class GameRuntimeControlTest {
     }
 
     @Test
+    fun `opening request sends start_opening without message`() {
+        val request = SendInteractiveChatRequest(
+            commandId = "c3",
+            storyId = "s1",
+            branch = "main",
+            message = "",
+            startOpening = true,
+        )
+        val text = json.encodeToString(SendInteractiveChatRequest.serializer(), request)
+
+        assertTrue(text.contains("\"start_opening\":true"))
+        // message 有默认空值、client 的 Json 不开 encodeDefaults，因此开场请求不带 message 字段。
+        assertFalse(text.contains("\"message\""))
+        assertFalse(text.contains("regenerate_from_turn_id"))
+        assertFalse(text.contains("resume_interruption_id"))
+    }
+
+    @Test
     fun `active view exposes operation and interruption ids`() {
         val active = json.decodeFromString(
             GameActiveView.serializer(),

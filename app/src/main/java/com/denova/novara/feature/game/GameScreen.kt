@@ -56,6 +56,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -199,6 +201,25 @@ fun GameScreen(
         }
         uiState.error?.let {
             Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
+        }
+
+        // 0 轮故事还没有任何轮次：给出「生成开场」入口（GAM-003），否则舞台是空的一片。
+        if (uiState.snapshotLoaded && uiState.turnCount == 0 &&
+            !uiState.sending && uiState.stage.phase != GamePhase.RUNNING
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                TextButton(onClick = { viewModel.startOpening() }) {
+                    Text(stringResource(R.string.game_start_opening))
+                }
+                Text(
+                    stringResource(R.string.game_start_opening_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
         }
 
         // 运行时控制（GAM-012 / GAM-013）：运行中可暂停；挂起或存在待续接输入时可续接 / 放弃。
@@ -998,6 +1019,18 @@ private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifie
         }
         if (blocks.size > lastBlockCount + 20) listState.scrollToItem(0)
         lastBlockCount = blocks.size
+    }
+
+    // 滚到最旧端（reverseLayout 的末端）就继续向前翻页（GAM-007）：
+    // 只在「到达」瞬间触发，是否真的发请求由 ViewModel 的 hasMore/loadingEarlier 决定。
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: -1
+            last >= 0 && last >= info.totalItemsCount - 2
+        }
+            .distinctUntilChanged()
+            .collect { atOldest -> if (atOldest) viewModel.onNarrativeTopReached() }
     }
 
     LazyColumn(
