@@ -96,6 +96,12 @@ fun EditorScreen(
     loaderFactory: ((projectId: String, documentPath: String) -> PreviewAssetLoader?)? = null,
     /** 项目内可用图片素材（WRI-007 插入）；为空时「图」按钮只插手填模板。 */
     assetLister: (suspend (projectId: String) -> List<String>)? = null,
+    /**
+     * 内嵌模式（P4-B / WB-004）：工作台文件页签里复用同一个编辑器本体。
+     * 隐藏工作台页签条已有的顶栏、文件页签条与「项目 ID / 文件路径」输入行，
+     * 只保留当前文件路径 + 保存 + 模式行 + 正文；项目与文件由宿主页签决定。
+     */
+    inline: Boolean = false,
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val tabsState by viewModel.tabs.collectAsState()
@@ -153,10 +159,33 @@ fun EditorScreen(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars),
+        modifier = if (inline) {
+            Modifier.fillMaxSize()
+        } else {
+            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars)
+        },
     ) {
+        if (inline) {
+            // 内嵌：文件由页签决定，这里只显示当前路径并提供保存（状态行沿用下面的统一提示）。
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = uiState.filePath.ifBlank { stringResource(R.string.workbench_files_unselected) },
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(
+                    onClick = { viewModel.save() },
+                    enabled = uiState.loaded &&
+                        uiState.saveStatus != SaveStatus.SAVING &&
+                        uiState.saveStatus != SaveStatus.CONFLICT,
+                ) { Text(stringResource(R.string.save)) }
+            }
+        } else {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             IconButton(onClick = onOpenDrawer) { Text("☰") }
             Text(stringResource(R.string.editor_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
@@ -203,10 +232,16 @@ fun EditorScreen(
             )
             OutlinedButton(onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) }) { Text(stringResource(R.string.editor_open)) }
         }
+        }
 
         // 保存状态
         val status = when (uiState.saveStatus) {
-            SaveStatus.IDLE -> if (uiState.loaded) "" else stringResource(R.string.editor_open_hint)
+            // 内嵌时项目与文件都由宿主页签决定，不能提示用户去「输入项目 ID 与文件路径」。
+            SaveStatus.IDLE -> if (uiState.loaded) {
+                ""
+            } else {
+                stringResource(if (inline) R.string.workbench_files_hint else R.string.editor_open_hint)
+            }
             SaveStatus.SAVING -> stringResource(R.string.editor_saving)
             SaveStatus.SAVED -> stringResource(R.string.editor_saved)
             SaveStatus.MERGED -> stringResource(R.string.editor_merged)

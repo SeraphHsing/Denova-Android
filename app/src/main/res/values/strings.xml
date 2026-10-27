@@ -635,6 +635,11 @@
     <string name="workbench_host_directory_remote">The folder picker only works on the machine running Denova. Open Denova there, or add a project folder instead.</string>
     <string name="workbench_session_new">New conversation</string>
     <string name="workbench_terminal_new">New terminal</string>
+    <string name="workbench_files_new">Project files</string>
+    <string name="workbench_files_pick">Choose file</string>
+    <string name="workbench_files_unselected">No file selected</string>
+    <string name="workbench_files_empty">This project has no files yet</string>
+    <string name="workbench_files_hint">Use “Choose file” above to open a project file</string>
     <string name="workbench_session_untitled">Untitled conversation</string>
     <string name="workbench_session_rename">Rename conversation</string>
     <string name="workbench_session_delete">Delete conversation</string>

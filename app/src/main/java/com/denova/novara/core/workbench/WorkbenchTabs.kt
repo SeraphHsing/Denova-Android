@@ -23,8 +23,12 @@ sealed interface WorkbenchTabKind {
         val label: String = "",
     ) : WorkbenchTabKind
 
-    /** 项目文件工作区页签（每项目唯一）。 */
-    data object Files : WorkbenchTabKind
+    /**
+     * 项目文件工作区页签（每项目唯一，对齐 Web `AgentChatFilesTab`）。
+     *
+     * [selectedPath] 随页签保留：切走再切回、或换到另一区，编辑中的文件不会丢。
+     */
+    data class Files(val selectedPath: String = "") : WorkbenchTabKind
 }
 
 data class WorkbenchTab(
@@ -108,15 +112,22 @@ object WorkbenchTabs {
     fun lastInGroup(tabs: List<WorkbenchTab>, group: WorkbenchGroup): String? =
         ofGroup(tabs, group).lastOrNull()?.id
 
-    /** 展示标题：自定义 → 会话标题 → 类型文案键（由界面解析）。 */
+    /** 展示标题：自定义 → 会话标题 → 终端名 / 文件名（都为空时由界面用类型文案兜底）。 */
     fun titleOf(tab: WorkbenchTab, sessionTitles: Map<String, String>): String {
         if (tab.customTitle.isNotBlank()) return tab.customTitle
         return when (val kind = tab.kind) {
             is WorkbenchTabKind.Agent -> sessionTitles[kind.sessionId].orEmpty()
             is WorkbenchTabKind.Terminal -> kind.label
-            WorkbenchTabKind.Files -> ""
+            is WorkbenchTabKind.Files -> kind.selectedPath.substringAfterLast('/')
         }
     }
+
+    /** 文件页签换选中文件（其余页签不变）。 */
+    fun withSelectedPath(tabs: List<WorkbenchTab>, id: String, path: String): List<WorkbenchTab> =
+        tabs.map { tab ->
+            val kind = tab.kind
+            if (tab.id == id && kind is WorkbenchTabKind.Files) tab.copy(kind = kind.copy(selectedPath = path)) else tab
+        }
 
     /** 关闭某项目全部页签（项目被移除 / 归档时），返回剩余页签。 */
     fun closeProject(tabs: List<WorkbenchTab>, projectId: String): List<WorkbenchTab> =

@@ -89,8 +89,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     private val persistMutex = Mutex()
 
-    /** 登录后绑定当前连接的 client，建立保存编排、状态机，并恢复上次的标签栏。 */
-    fun bindClient(client: DenovaClient) {
+    /**
+     * 登录后绑定当前连接的 client，建立保存编排与状态机。
+     *
+     * [restoreTabs] 为 false 时不恢复「上次项目」的标签桶：工作台文件页签有自己的项目作用域，
+     * 恢复会把别的项目（或该 ViewModel 上一次使用过的项目）的正文带进来——屏幕上留着别人的文件，
+     * 保存还会写回那个项目。文件页签一律按自己页签的项目显式打开文件。
+     */
+    fun bindClient(client: DenovaClient, restoreTabs: Boolean = true) {
         DenovaLog.i("Editor", "client bound")
         val origin = client.serverOrigin
         if (serverScope.isNotEmpty() && serverScope != origin) {
@@ -113,7 +119,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         collectJob = viewModelScope.launch {
             s.state.collect { _uiState.value = it }
         }
-        restoreTabs()
+        if (restoreTabs) restoreTabs()
     }
 
     /**

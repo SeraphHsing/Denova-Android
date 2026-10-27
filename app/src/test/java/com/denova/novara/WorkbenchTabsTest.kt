@@ -20,8 +20,13 @@ class WorkbenchTabsTest {
             kind = WorkbenchTabKind.Agent(sessionId),
         )
 
-    private fun files(projectId: String, group: WorkbenchGroup = WorkbenchGroup.PRIMARY) =
-        WorkbenchTab(id = "files:$projectId", projectId = projectId, group = group, kind = WorkbenchTabKind.Files)
+    private fun files(projectId: String, group: WorkbenchGroup = WorkbenchGroup.PRIMARY, path: String = "") =
+        WorkbenchTab(
+            id = "files:$projectId",
+            projectId = projectId,
+            group = group,
+            kind = WorkbenchTabKind.Files(path),
+        )
 
     @Test
     fun `opening the same conversation twice keeps one tab`() {
@@ -158,5 +163,26 @@ class WorkbenchTabsTest {
         val tabs = listOf(agent("p1", "s1"), terminal("p1", "term:a"), agent("p1", "s2"))
 
         assertEquals("agent:p1:s2", WorkbenchTabs.activeAfterClose(tabs, "term:a"))
+    }
+
+    // ---- 文件页签（P4-B / WB-004 工作台宿主形态）----
+
+    @Test
+    fun `files tab is unique per project and keeps the selected file`() {
+        val first = WorkbenchTabs.open(emptyList(), files("p1", path = "a.md"))
+        val reopened = WorkbenchTabs.open(first, files("p1", path = "a.md"))
+
+        assertEquals(1, reopened.size)
+        // 同一项目再次打开只切换选中文件，不新建页签。
+        val switched = WorkbenchTabs.withSelectedPath(reopened, "files:p1", "ch/01.md")
+        assertEquals("ch/01.md", (switched.single().kind as WorkbenchTabKind.Files).selectedPath)
+        assertEquals("01.md", WorkbenchTabs.titleOf(switched.single(), emptyMap()))
+    }
+
+    @Test
+    fun `files tab in another project is a separate tab`() {
+        val tabs = WorkbenchTabs.open(WorkbenchTabs.open(emptyList(), files("p1")), files("p2"))
+
+        assertEquals(listOf("files:p1", "files:p2"), tabs.map { it.id })
     }
 }

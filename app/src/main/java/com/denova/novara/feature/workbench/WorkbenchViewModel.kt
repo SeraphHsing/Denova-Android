@@ -156,6 +156,39 @@ class WorkbenchViewModel(application: Application) : AndroidViewModel(applicatio
         DenovaLog.i("Workbench", "open terminal tab=${tab.id.take(12)} project=${projectId.take(12)} profile=$profileId")
     }
 
+    /**
+     * 打开项目文件工作区页签（WB-004 工作台宿主形态）：
+     * 每项目只有一个文件页签，重复打开只切换选中文件并激活。
+     */
+    fun openFiles(projectId: String, path: String = "") {
+        if (projectId.isBlank()) return
+        val group = _state.value.activeGroup
+        val existing = _state.value.tabs.firstOrNull {
+            it.projectId == projectId && it.kind is WorkbenchTabKind.Files
+        }
+        val tab = existing ?: WorkbenchTab(
+            id = filesTabId(projectId),
+            projectId = projectId,
+            group = group,
+            kind = WorkbenchTabKind.Files(path),
+        )
+        val opened = WorkbenchTabs.open(_state.value.tabs, tab)
+        val tabs = if (path.isNotBlank()) WorkbenchTabs.withSelectedPath(opened, tab.id, path) else opened
+        _state.value = _state.value.copy(
+            tabs = tabs,
+            selectedProjectId = projectId,
+            activeGroup = tab.group,
+            activeTabPrimary = if (tab.group == WorkbenchGroup.PRIMARY) tab.id else _state.value.activeTabPrimary,
+            activeTabSecondary = if (tab.group == WorkbenchGroup.SECONDARY) tab.id else _state.value.activeTabSecondary,
+        )
+        DenovaLog.i("Workbench", "open files tab=${tab.id} path=${path.ifBlank { "-" }}")
+    }
+
+    /** 文件页签里切换选中文件（供页签标题与恢复使用）。 */
+    fun selectFile(tabId: String, path: String) {
+        _state.value = _state.value.copy(tabs = WorkbenchTabs.withSelectedPath(_state.value.tabs, tabId, path))
+    }
+
     fun activateTab(tabId: String) {
         val tab = WorkbenchTabs.find(_state.value.tabs, tabId) ?: return
         _state.value = _state.value.copy(
@@ -421,5 +454,8 @@ class WorkbenchViewModel(application: Application) : AndroidViewModel(applicatio
          * 不能像会话那样按「项目 + 会话」去重。
          */
         fun terminalTabId(): String = "term:" + java.util.UUID.randomUUID().toString().replace("-", "").take(16)
+
+        /** 文件页签按项目唯一（对齐 Web `AgentChatFilesTab`：一个项目一个文件工作区）。 */
+        fun filesTabId(projectId: String): String = "files:$projectId"
     }
 }

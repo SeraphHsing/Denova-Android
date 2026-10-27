@@ -13,9 +13,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -51,6 +53,9 @@ import com.denova.novara.core.workbench.WorkbenchTabKind
 import com.denova.novara.core.workbench.WorkbenchTabs
 import com.denova.novara.feature.agent.AgentScreen
 import com.denova.novara.feature.agent.AgentViewModel
+import com.denova.novara.feature.editor.EditorScreen
+import com.denova.novara.feature.editor.EditorViewModel
+import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.terminal.TerminalScreen
 import com.denova.novara.feature.terminal.TerminalViewModel
 
@@ -136,6 +141,10 @@ fun WorkbenchScreen(
                     viewModel.openTerminal(projectId = projectId, label = terminalLabel)
                 }
             },
+            onNewFiles = {
+                val projectId = state.selectedProjectId
+                if (projectId.isNotBlank()) viewModel.openFiles(projectId)
+            },
             canCreateSession = state.selectedProjectId.isNotBlank() && !state.busy,
         )
         HorizontalDivider()
@@ -169,6 +178,7 @@ fun WorkbenchScreen(
                 client = client,
                 onOpenDrawer = onOpenDrawer,
                 terminalHolder = terminalHolder,
+                onSelectFile = viewModel::selectFile,
             )
         }
     }
@@ -202,6 +212,7 @@ private fun TabStrip(
     onSendToOtherGroup: (String) -> Unit,
     onNewSession: () -> Unit,
     onNewTerminal: () -> Unit,
+    onNewFiles: () -> Unit,
     canCreateSession: Boolean,
 ) {
     Row(
@@ -253,6 +264,14 @@ private fun TabStrip(
                     onClick = {
                         addMenu = false
                         onNewTerminal()
+                    },
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.workbench_files_new)) },
+                    enabled = canCreateSession,
+                    onClick = {
+                        addMenu = false
+                        onNewFiles()
                     },
                 )
             }
@@ -318,6 +337,7 @@ private fun WorkbenchTabHost(
     client: DenovaClient?,
     onOpenDrawer: () -> Unit,
     terminalHolder: TerminalTabHolder,
+    onSelectFile: (tabId: String, path: String) -> Unit,
 ) {
     when (val kind = tab.kind) {
         is WorkbenchTabKind.Agent -> {
@@ -380,13 +400,136 @@ private fun WorkbenchTabHost(
             )
         }
 
-        else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text(
-                stringResource(R.string.workbench_empty_tab),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-            )
+        is WorkbenchTabKind.Files -> WorkbenchFilesHost(
+            tab = tab,
+            selectedPath = kind.selectedPath,
+            client = client,
+            onSelectFile = { path -> onSelectFile(tab.id, path) },
+        )
+    }
+}
+
+/**
+ * 文件页签宿主（P4-B / WB-004 工作台宿主形态）。
+ *
+ * 对齐 Web `AgentChatFilesTab`：一个项目一个文件工作区，页签记住上次打开的文件。
+ * 手机上一屏放不下「树 + 编辑器」两栏，所以树做成可折叠的文件选择器，选中后让出空间给编辑器；
+ * 编辑器本体复用 [EditorScreen] 的 inline 模式，保存 / 冲突 / 撤销重做与写作页完全同一套逻辑。
+ */
+@Composable
+private fun WorkbenchFilesHost(
+    tab: WorkbenchTab,
+    selectedPath: String,
+    client: DenovaClient?,
+    onSelectFile: (String) -> Unit,
+) {
+    val application = LocalContext.current.applicationContext as Application
+    val editorFactory: ViewModelProvider.Factory = remember(application) {
+        viewModelFactory { initializer { EditorViewModel(application) } }
+    }
+    val directoryFactory: ViewModelProvider.Factory = remember(application) {
+        viewModelFactory { initializer { ProjectDirectoryViewModel(application) } }
+    }
+    val editorViewModel: EditorViewModel = viewModel(key = "workbench-files-editor-${tab.id}", factory = editorFactory)
+    val directoryViewModel: ProjectDirectoryViewModel =
+        viewModel(key = "workbench-files-tree-${tab.id}", factory = directoryFactory)
+    val directoryState by directoryViewModel.state.collectAsState()
+    var pickerOpen by remember(tab.id) { mutableStateOf(selectedPath.isBlank()) }
+
+    LaunchedEffect(tab.id, tab.projectId, client) {
+        val c = client ?: return@LaunchedEffect
+        // 不恢复「上次项目」的标签桶：页签有自己的项目作用域，恢复会把别的项目的正文带进屏幕
+        // （保存还会写回那个项目）。
+        editorViewModel.bindClient(c, restoreTabs = false)
+        directoryViewModel.bindClient(c)
+        directoryViewModel.load(tab.projectId)
+    }
+
+    LaunchedEffect(tab.id, tab.projectId, client, selectedPath) {
+        if (client == null || selectedPath.isBlank()) return@LaunchedEffect
+        // 已经打开同一个文件就不再重读，避免覆盖未保存的正文。
+        if (editorViewModel.uiState.value.filePath != selectedPath) {
+            editorViewModel.openFile(tab.projectId, selectedPath)
         }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = selectedPath.ifBlank { stringResource(R.string.workbench_files_unselected) },
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            TextButton(onClick = { pickerOpen = !pickerOpen }) {
+                Text(
+                    stringResource(
+                        if (pickerOpen) R.string.common_close else R.string.workbench_files_pick,
+                    ),
+                )
+            }
+        }
+        if (pickerOpen) {
+            HorizontalDivider()
+            val rows = directoryState.rows
+            when {
+                directoryState.loading && rows.isEmpty() -> Text(
+                    stringResource(R.string.loading),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+                rows.isEmpty() -> Text(
+                    stringResource(R.string.workbench_files_empty),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                )
+                else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+                    items(rows, key = { it.node.path.ifBlank { "$" } + ":" + it.depth }) { row ->
+                        val indent = (row.depth * 12).dp
+                        TextButton(
+                            onClick = {
+                                if (row.node.isDir) {
+                                    directoryViewModel.toggle(row.node.path)
+                                } else {
+                                    onSelectFile(row.node.path)
+                                    pickerOpen = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().padding(start = indent),
+                        ) {
+                            Text(
+                                text = (if (row.node.isDir) (if (row.expanded) "▾ " else "▸ ") else "") + row.node.name,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                color = if (row.node.path == selectedPath) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            }
+            HorizontalDivider()
+        }
+        EditorScreen(
+            viewModel = editorViewModel,
+            onOpenDrawer = {},
+            onOpenRightDrawer = {},
+            onOpenTerminal = {},
+            onLogout = {},
+            currentProjectId = tab.projectId,
+            inline = true,
+        )
     }
 }
 
