@@ -233,7 +233,7 @@ class DenovaApiException(
 class DenovaClient(
     private val server: ServerKey,
     private val cookieJar: CookieJar = InMemoryCookieJar(),
-) : FileRemote, GameStreamTransport, AgentStreamTransport, ConflictArchive {
+) : FileRemote, GameStreamTransport, AgentStreamTransport, ConflictArchive, AgentGateway {
 
     companion object {
         /** 退出登录时等待在途请求收尾的上限；超时后照常退出，避免无限卡住。 */
@@ -896,7 +896,7 @@ class DenovaClient(
      * 不依赖 Last-Event-ID，重连游标通过 `after=` 显式传递。
      */
     /** 写作会话列表：`GET /api/sessions`（`active=true` 为当前会话）。 */
-    suspend fun sessionList(): List<SessionSummary> {
+    override suspend fun sessionList(): List<SessionSummary> {
         val request = Request.Builder().url(server.baseUrl + "/api/sessions").get().build()
         return withContext(Dispatchers.IO) {
             okHttpClient.newCall(request).execute().use { resp ->
@@ -908,7 +908,7 @@ class DenovaClient(
     }
 
     /** 创建写作会话：`POST /api/sessions`。 */
-    suspend fun createSession(title: String = ""): SessionSummary {
+    override suspend fun createSession(title: String): SessionSummary {
         val body = json.encodeToString(CreateSessionRequest.serializer(), CreateSessionRequest(title))
         val request = Request.Builder()
             .url(server.baseUrl + "/api/sessions")
@@ -924,7 +924,7 @@ class DenovaClient(
     }
 
     /** 发送写作输入：`POST /api/chat`，响应为 AI SDK UI message 流。 */
-    fun postChat(request: SendChatRequest): Flow<AgentUiFrame> = flow {
+    override fun postChat(request: SendChatRequest): Flow<AgentUiFrame> = flow {
         val body = json.encodeToString(SendChatRequest.serializer(), request)
         val req = Request.Builder()
             .url(chatSendUrl())
@@ -955,7 +955,7 @@ class DenovaClient(
      * 回答提问（AGT-004）：`POST /api/session/asks/:ask_id/answer`。
      * 答案体的 `question_id` / `selected_option_ids` 必须来自服务端下发的问句，不能自造。
      */
-    suspend fun answerSessionAsk(
+    override suspend fun answerSessionAsk(
         sessionId: String,
         askId: String,
         answers: List<AgentAskAnswer>,
@@ -968,10 +968,10 @@ class DenovaClient(
     )
 
     /** 取消提问（AGT-004）：`POST /api/session/asks/:ask_id/cancel`，原因默认 `user_cancelled`。 */
-    suspend fun cancelSessionAsk(
+    override suspend fun cancelSessionAsk(
         sessionId: String,
         askId: String,
-        reason: String = AgentAskLogic.CANCEL_REASON_USER,
+        reason: String,
     ): AgentAskResolution = postAskResolution(
         path = "asks/$askId/cancel",
         body = json.encodeToString(
@@ -999,7 +999,7 @@ class DenovaClient(
      * 提交运行时命令（暂停 / 停止，AGT-005）：`POST /api/chat/commands`。
      * 失败按 `agent_runtime.*` 错误码抛 [DenovaApiException]，由上层区分「无活动运行」与「目标已变化」。
      */
-    suspend fun submitAgentCommand(request: AgentCommandRequest): AgentCommandReceipt {
+    override suspend fun submitAgentCommand(request: AgentCommandRequest): AgentCommandReceipt {
         val body = json.encodeToString(AgentCommandRequest.serializer(), request)
         val call = Request.Builder()
             .url(agentChatUrl("commands"))
@@ -1020,7 +1020,7 @@ class DenovaClient(
      * 服务端要求 `message` 非空（分析的是「下一轮会带上什么」），因此用与 Web 相同的探针文本，
      * 不会写进会话历史、也不触发运行。
      */
-    suspend fun contextAnalysis(sessionId: String, message: String = CONTEXT_ANALYSIS_PROBE): AgentContextAnalysis {
+    override suspend fun contextAnalysis(sessionId: String, message: String): AgentContextAnalysis {
         val body = json.encodeToString(
             AgentContextAnalysisRequest.serializer(),
             AgentContextAnalysisRequest(sessionId = sessionId, message = message),
@@ -1075,7 +1075,7 @@ class DenovaClient(
      * 读取写作 session 的 canonical 消息历史（rehydrate/挂接后重建基线）。
      * [before] 是分页游标：带上一页的 `page.next_before` 即向历史更早处翻页（AGT-010）。
      */
-    suspend fun sessionMessages(sessionId: String, limit: Int, before: String? = null): AgentMessagesPage {
+    override suspend fun sessionMessages(sessionId: String, limit: Int, before: String?): AgentMessagesPage {
         val request = Request.Builder().url(sessionMessagesUrl(sessionId, limit, before)).get().build()
         return withContext(Dispatchers.IO) {
             okHttpClient.newCall(request).execute().use { resp ->
@@ -1090,7 +1090,7 @@ class DenovaClient(
      * 项目资源原始字节：`GET /api/projects/:id/files/asset?path=`（消息里的图片部件走这里）。
      * 走同一个已鉴权的 OkHttpClient，因此不依赖图片库的 cookie 配置。
      */
-    suspend fun projectAssetBytes(projectId: String, path: String): ByteArray {
+    override suspend fun projectAssetBytes(projectId: String, path: String): ByteArray {
         val url = server.baseUrl.toHttpUrl().newBuilder()
             .addPathSegments("api/projects/$projectId/files/asset")
             .addQueryParameter("path", path)
@@ -1107,7 +1107,7 @@ class DenovaClient(
     }
 
     /** 绝对 http(s) 资源字节（消息里的远程图片部件）：沿用同一鉴权客户端，避免图片库各自配 cookie。 */
-    suspend fun fetchBytes(url: String): ByteArray {
+    override suspend fun fetchBytes(url: String): ByteArray {
         return withContext(Dispatchers.IO) {
             okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
                 val bytes = resp.body?.bytes() ?: ByteArray(0)
@@ -1620,6 +1620,417 @@ class DenovaClient(
 
     private fun interactiveSendUrl(): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/chat").build()
+
+    // ---- 工作台：项目与会话（P4-B / WB-001 / WB-002 / WB-006 / WB-010）----
+
+    /**
+     * 工作台项目树：`GET /api/agent-chat/projects[?project_id=]`。
+     * 只读，不会切换全局写作工作区；`project_id` 为空时返回全部已登记项目。
+     */
+    suspend fun agentChatProjects(projectId: String = ""): List<AgentChatProject> {
+        val url = apiUrl("agent-chat/projects").newBuilder()
+            .apply { projectId.takeIf { it.isNotBlank() }?.let { addQueryParameter("project_id", it) } }
+            .build()
+        return getJson(url) { text ->
+            json.decodeFromString(AgentChatProjectsResponse.serializer(), text).projects.map {
+                it.copy(sessions = it.sessions)
+            }
+        }
+    }
+
+    /** 运行中的会话心跳：`GET /api/agent-chat/activity`（只扫执行身份，不读会话正文）。 */
+    suspend fun agentChatActivity(): List<AgentChatActivityBinding> =
+        getJson(apiUrl("agent-chat/activity")) { text ->
+            json.decodeFromString(AgentChatActivityResponse.serializer(), text).bindings
+        }
+
+    /** 跨项目历史搜索：`GET /api/agent-chat/history?query=&project_id=&offset=&limit=`。 */
+    suspend fun agentChatHistory(
+        query: String = "",
+        projectId: String = "",
+        offset: Int = 0,
+        limit: Int = 0,
+    ): AgentChatHistoryPage {
+        val url = apiUrl("agent-chat/history").newBuilder()
+            .apply {
+                query.takeIf { it.isNotBlank() }?.let { addQueryParameter("query", it) }
+                projectId.takeIf { it.isNotBlank() }?.let { addQueryParameter("project_id", it) }
+                if (offset > 0) addQueryParameter("offset", offset.toString())
+                if (limit > 0) addQueryParameter("limit", limit.toString())
+            }
+            .build()
+        return getJson(url) { text -> json.decodeFromString(AgentChatHistoryPage.serializer(), text) }
+    }
+
+    /** 导出会话 Markdown：`GET /api/projects/:id/agent-chat/session/export?session_id=`。 */
+    suspend fun agentChatExport(projectId: String, sessionId: String): String {
+        val url = projectAgentChatUrl(projectId, "session/export").newBuilder()
+            .addQueryParameter("session_id", sessionId)
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                text
+            }
+        }
+    }
+
+    /**
+     * 登记已存在的宿主目录：`POST /api/agent-chat/projects`（body `{path}`，必须是绝对路径）。
+     * 路径必须来自宿主目录选择，客户端不得把手机目录当作宿主目录（WB-010）。
+     */
+    suspend fun agentChatAddProject(path: String): AgentChatProject {
+        val body = json.encodeToString(AddAgentChatProjectRequest.serializer(), AddAgentChatProjectRequest(path))
+        val request = Request.Builder()
+            .url(apiUrl("agent-chat/projects"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentChatProject.serializer(), text)
+            }
+        }
+    }
+
+    /** 在宿主上新建 General 项目目录：`POST /api/agent-chat/projects/directory`（body `{name,parent_directory?}`）。 */
+    suspend fun createAgentChatDirectory(name: String, parentDirectory: String? = null): AgentChatProject {
+        val body = json.encodeToString(
+            CreateAgentChatDirectoryRequest.serializer(),
+            CreateAgentChatDirectoryRequest(name = name, parentDirectory = parentDirectory?.takeIf { it.isNotBlank() }),
+        )
+        val request = Request.Builder()
+            .url(apiUrl("agent-chat/projects/directory"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentChatProject.serializer(), text)
+            }
+        }
+    }
+
+    /** 重命名项目：`PATCH /api/agent-chat/projects/:id` body `{name}`（与 path 互斥）。 */
+    suspend fun agentChatRenameProject(projectId: String, name: String): AgentChatProject =
+        patchAgentChatProject(projectId, UpdateAgentChatProjectRequest(name = name))
+
+    /** 重新关联目录：`PATCH /api/agent-chat/projects/:id` body `{path}`（绝对路径）。 */
+    suspend fun agentChatRelinkProject(projectId: String, path: String): AgentChatProject =
+        patchAgentChatProject(projectId, UpdateAgentChatProjectRequest(path = path))
+
+    private suspend fun patchAgentChatProject(
+        projectId: String,
+        payload: UpdateAgentChatProjectRequest,
+    ): AgentChatProject {
+        val body = json.encodeToString(UpdateAgentChatProjectRequest.serializer(), payload)
+        val request = Request.Builder()
+            .url(apiUrl("agent-chat/projects/$projectId"))
+            .patch(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentChatProject.serializer(), text)
+            }
+        }
+    }
+
+    /** 归档（从工作台移除）项目：`DELETE /api/agent-chat/projects/:id`。 */
+    suspend fun agentChatArchiveProject(projectId: String): AgentChatProject {
+        val request = Request.Builder().url(apiUrl("agent-chat/projects/$projectId")).delete().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                if (text.isBlank()) {
+                    AgentChatProject(id = projectId, status = "archived")
+                } else {
+                    json.decodeFromString(AgentChatProject.serializer(), text)
+                }
+            }
+        }
+    }
+
+    /** 保存项目顺序：`POST /api/agent-chat/projects/reorder` body `{project_ids}`（服务端全量覆盖）。 */
+    suspend fun agentChatReorderProjects(projectIds: List<String>) {
+        if (projectIds.isEmpty()) return
+        val body = json.encodeToString(
+            ReorderAgentChatProjectsRequest.serializer(),
+            ReorderAgentChatProjectsRequest(projectIds),
+        )
+        val request = Request.Builder()
+            .url(apiUrl("agent-chat/projects/reorder"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
+    /**
+     * 打开宿主（运行 Denova 的机器）目录选择器：`POST /api/host/dialogs/directory`。
+     *
+     * 该端点受 `localHostEffectMiddleware` 保护：远程客户端（Android）会收到 403
+     * `api.access.localHostEffect`。调用方必须把该错误如实展示，并且**不得**退化为使用手机本地目录。
+     */
+    suspend fun selectHostDirectory(initialPath: String = ""): HostDirectorySelection {
+        val body = json.encodeToString(
+            HostDirectoryRequest.serializer(),
+            HostDirectoryRequest(initialPath = initialPath),
+        )
+        val request = Request.Builder()
+            .url(apiUrl("host/dialogs/directory"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(HostDirectorySelection.serializer(), text)
+            }
+        }
+    }
+
+    // ---- 工作台：项目作用域 Agent（P4-B，/api/projects/:id/agent-chat/*）----
+
+    /** 项目内新建会话：`POST /api/projects/:id/agent-chat/sessions`。 */
+    suspend fun projectAgentCreateSession(
+        projectId: String,
+        title: String = "",
+        customAgentId: String? = null,
+    ): AgentChatSession {
+        val body = json.encodeToString(
+            CreateAgentChatSessionRequest.serializer(),
+            CreateAgentChatSessionRequest(title = title, customAgentId = customAgentId),
+        )
+        val request = Request.Builder()
+            .url(projectAgentChatUrl(projectId, "sessions"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentChatSession.serializer(), text)
+            }
+        }
+    }
+
+    /** 会话重命名：`POST .../agent-chat/sessions/rename` body `{session_id,title}`（title 不能为空）。 */
+    suspend fun projectAgentRenameSession(projectId: String, sessionId: String, title: String) {
+        postProjectAgentChat(
+            projectId,
+            "sessions/rename",
+            json.encodeToString(
+                RenameAgentChatSessionRequest.serializer(),
+                RenameAgentChatSessionRequest(sessionId, title),
+            ),
+        )
+    }
+
+    /** 删除会话：`POST .../agent-chat/sessions/delete` body `{session_id}`；运行中或最后一个会话被服务端拒绝。 */
+    suspend fun projectAgentDeleteSession(projectId: String, sessionId: String) {
+        postProjectAgentChat(
+            projectId,
+            "sessions/delete",
+            json.encodeToString(DeleteAgentChatSessionRequest.serializer(), DeleteAgentChatSessionRequest(sessionId)),
+        )
+    }
+
+    /** 项目 Agent 发送：`POST .../agent-chat/chat`，响应为 AI SDK UI message 流。 */
+    fun projectAgentPostChat(projectId: String, request: SendChatRequest): Flow<AgentUiFrame> = flow {
+        val body = json.encodeToString(SendChatRequest.serializer(), request)
+        val http = Request.Builder()
+            .url(projectAgentChatUrl(projectId, "chat"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        streamHttpClient.newCall(http).execute().use { resp ->
+            if (!resp.isSuccessful) throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
+            val source = resp.body?.source()
+                ?: throw GameStreamError(resp.code, null, "empty agent chat stream body")
+            emitAll(agentFramesFromSource(source))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /** 项目 Agent 挂接：`GET .../agent-chat/chat/stream?session_id=&task_id=&after=`。 */
+    fun projectAgentStream(
+        projectId: String,
+        sessionId: String,
+        taskId: String,
+        after: String?,
+    ): Flow<AgentUiFrame> = flow {
+        val url = projectAgentChatUrl(projectId, "chat/stream").newBuilder()
+            .addQueryParameter("session_id", sessionId)
+            .addQueryParameter("task_id", taskId)
+            .apply { after?.takeIf { it.isNotBlank() }?.let { addQueryParameter("after", it) } }
+            .build()
+        streamHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+            if (!resp.isSuccessful) throw toGameStreamError(resp.code, resp.body?.string().orEmpty())
+            val source = resp.body?.source()
+                ?: throw GameStreamError(resp.code, null, "empty agent chat stream body")
+            emitAll(agentFramesFromSource(source))
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /** 项目 Agent 活动投影：`GET .../agent-chat/chat/active?session_id=`。 */
+    suspend fun projectAgentActive(projectId: String, sessionId: String): AgentActiveView {
+        val url = projectAgentChatUrl(projectId, "chat/active").newBuilder()
+            .addQueryParameter("session_id", sessionId)
+            .build()
+        return getJson(url) { text -> json.decodeFromString(AgentActiveView.serializer(), text) }
+    }
+
+    /** 项目 Agent 命令（暂停 / 停止 / 追加 / 队列控制）：`POST .../agent-chat/chat/commands`。 */
+    suspend fun projectAgentSubmitCommand(
+        projectId: String,
+        request: AgentCommandRequest,
+    ): AgentCommandReceipt {
+        val body = json.encodeToString(AgentCommandRequest.serializer(), request)
+        val http = Request.Builder()
+            .url(projectAgentChatUrl(projectId, "chat/commands"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(http).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentCommandReceipt.serializer(), text)
+            }
+        }
+    }
+
+    /** 项目 Agent 恢复动作：`POST .../agent-chat/chat/recovery` body `{session_id, action}`。 */
+    suspend fun projectAgentRecover(
+        projectId: String,
+        sessionId: String,
+        action: RecoveryAction,
+    ): RecoveryReceipt {
+        val body = json.encodeToString(
+            AgentRecoveryRequest.serializer(),
+            AgentRecoveryRequest(action = action, sessionId = sessionId),
+        )
+        val request = Request.Builder()
+            .url(projectAgentChatUrl(projectId, "chat/recovery"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toGameStreamError(resp.code, text)
+                json.decodeFromString(RecoveryReceipt.serializer(), text)
+            }
+        }
+    }
+
+    /** 项目 Agent 历史：`GET .../agent-chat/session/messages?session_id=&limit=&before=`。 */
+    suspend fun projectAgentMessages(
+        projectId: String,
+        sessionId: String,
+        limit: Int,
+        before: String? = null,
+    ): AgentMessagesPage {
+        val url = projectAgentChatUrl(projectId, "session/messages").newBuilder()
+            .addQueryParameter("session_id", sessionId)
+            .addQueryParameter("limit", limit.toString())
+            .apply { before?.takeIf { it.isNotBlank() }?.let { addQueryParameter("before", it) } }
+            .build()
+        return getJson(url) { text -> json.decodeFromString(AgentMessagesPage.serializer(), text) }
+    }
+
+    /** 项目 Agent 回答提问：`POST .../agent-chat/session/asks/:id/answer`。 */
+    suspend fun projectAgentAnswerAsk(
+        projectId: String,
+        sessionId: String,
+        askId: String,
+        answers: List<AgentAskAnswer>,
+    ): AgentAskResolution = postProjectAskResolution(
+        projectId = projectId,
+        path = "session/asks/$askId/answer",
+        body = json.encodeToString(
+            SessionAskAnswerRequest.serializer(),
+            SessionAskAnswerRequest(sessionId = sessionId, answers = answers),
+        ),
+    )
+
+    /** 项目 Agent 取消提问：`POST .../agent-chat/session/asks/:id/cancel`。 */
+    suspend fun projectAgentCancelAsk(
+        projectId: String,
+        sessionId: String,
+        askId: String,
+        reason: String = AgentAskLogic.CANCEL_REASON_USER,
+    ): AgentAskResolution = postProjectAskResolution(
+        projectId = projectId,
+        path = "session/asks/$askId/cancel",
+        body = json.encodeToString(
+            SessionAskCancelRequest.serializer(),
+            SessionAskCancelRequest(sessionId = sessionId, reason = reason),
+        ),
+    )
+
+    private suspend fun postProjectAskResolution(
+        projectId: String,
+        path: String,
+        body: String,
+    ): AgentAskResolution {
+        val request = Request.Builder()
+            .url(projectAgentChatUrl(projectId, path))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentAskResolution.serializer(), text)
+            }
+        }
+    }
+
+    /** 项目 Agent 上下文分析：`POST .../agent-chat/chat/context-analysis`（探针文本不写历史）。 */
+    suspend fun projectAgentContextAnalysis(
+        projectId: String,
+        sessionId: String,
+        message: String = CONTEXT_ANALYSIS_PROBE,
+    ): AgentContextAnalysis {
+        val body = json.encodeToString(
+            AgentContextAnalysisRequest.serializer(),
+            AgentContextAnalysisRequest(sessionId = sessionId, message = message),
+        )
+        val request = Request.Builder()
+            .url(projectAgentChatUrl(projectId, "chat/context-analysis"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentContextAnalysis.serializer(), text)
+            }
+        }
+    }
+
+    private suspend fun postProjectAgentChat(projectId: String, path: String, body: String) {
+        val request = Request.Builder()
+            .url(projectAgentChatUrl(projectId, path))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
+    private fun projectAgentChatUrl(projectId: String, path: String): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments("api/projects/$projectId/agent-chat/$path")
+            .build()
 
     private fun sessionMessagesUrl(sessionId: String, limit: Int, before: String? = null): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder()

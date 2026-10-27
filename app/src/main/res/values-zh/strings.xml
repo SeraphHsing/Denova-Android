@@ -607,4 +607,52 @@
 
     <!-- 调试抽屉入口（仅 debug 构建） -->
     <string name="drawer_debug">调试日志</string>
+
+    <!-- 工作台（P4-B） -->
+    <string name="workbench_title">工作台</string>
+    <string name="workbench_projects">项目</string>
+    <string name="workbench_empty_projects">还没有项目</string>
+    <string name="workbench_empty_tab">在项目面板里选一个会话，或新建一个</string>
+    <string name="workbench_load_failed">项目加载失败</string>
+    <string name="workbench_project_add">添加项目</string>
+    <string name="workbench_project_add_host">选择宿主目录</string>
+    <string name="workbench_project_add_directory">新建项目目录</string>
+    <string name="workbench_project_directory_name">目录名</string>
+    <string name="workbench_project_directory_parent">父目录（可留空，宿主绝对路径）</string>
+    <string name="workbench_project_create">创建</string>
+    <string name="workbench_project_rename">重命名项目</string>
+    <string name="workbench_project_move_up">上移</string>
+    <string name="workbench_project_move_down">下移</string>
+    <string name="workbench_project_archive">从工作台移除</string>
+    <string name="workbench_project_archive_confirm">从工作台移除「%1$s」？目录与会话仍保留在服务端。</string>
+    <string name="workbench_project_missing">宿主目录不存在</string>
+    <string name="workbench_project_current">当前打开</string>
+    <string name="workbench_project_add_failed">添加项目失败</string>
+    <string name="workbench_project_create_failed">新建项目目录失败</string>
+    <string name="workbench_project_rename_failed">重命名项目失败</string>
+    <string name="workbench_project_archive_failed">移除项目失败</string>
+    <string name="workbench_project_reorder_failed">保存项目顺序失败</string>
+    <string name="workbench_host_directory_remote">目录选择只能在运行 Denova 的本机使用。请在宿主上操作，或改用「新建项目目录」。</string>
+    <string name="workbench_session_new">新建会话</string>
+    <string name="workbench_session_untitled">未命名会话</string>
+    <string name="workbench_session_rename">重命名会话</string>
+    <string name="workbench_session_delete">删除会话</string>
+    <string name="workbench_session_delete_confirm">删除「%1$s」？已保存的对话记录会被移除。</string>
+    <string name="workbench_session_running">运行中</string>
+    <string name="workbench_session_create_failed">新建会话失败</string>
+    <string name="workbench_session_rename_failed">重命名会话失败</string>
+    <string name="workbench_session_delete_failed">删除会话失败</string>
+    <string name="workbench_group_primary">主区</string>
+    <string name="workbench_group_secondary">副区</string>
+    <string name="workbench_tab_close">关闭标签</string>
+    <string name="workbench_tab_to_secondary">送到副区</string>
+    <string name="workbench_tab_to_primary">送到主区</string>
+    <string name="workbench_tab_move_left">左移</string>
+    <string name="workbench_tab_move_right">右移</string>
+    <string name="workbench_tab_more">标签操作</string>
+    <string name="workbench_rename">重命名</string>
+    <string name="workbench_confirm">确认</string>
+    <string name="workbench_cancel">取消</string>
+    <string name="workbench_show_more_sessions">显示更多</string>
+    <string name="workbench_session_count">%1$d 个会话</string>
 </resources>

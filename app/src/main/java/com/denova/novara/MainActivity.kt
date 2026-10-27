@@ -1,7 +1,8 @@
 package com.denova.novara
 
 import android.os.Bundle
-import androidx.activity.compose.BackHandler
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +18,7 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -72,6 +74,9 @@ import com.denova.novara.feature.shell.RightDrawer
 import com.denova.novara.feature.shell.appDestinations
 import com.denova.novara.feature.terminal.TerminalScreen
 import com.denova.novara.feature.terminal.TerminalViewModel
+import com.denova.novara.feature.workbench.WorkbenchScreen
+import com.denova.novara.feature.workbench.WorkbenchTreeContent
+import com.denova.novara.feature.workbench.WorkbenchViewModel
 import com.denova.novara.ui.theme.NovaraTheme
 import kotlinx.coroutines.launch
 
@@ -100,6 +105,7 @@ class MainActivity : AppCompatActivity() {
                 val changesViewModel: ChangesViewModel = viewModel(factory = container.viewModelFactory)
                 val versionsViewModel: VersionsViewModel = viewModel(factory = container.viewModelFactory)
     val chaptersViewModel: ChaptersViewModel = viewModel(factory = container.viewModelFactory)
+                val workbenchViewModel: WorkbenchViewModel = viewModel(factory = container.viewModelFactory)
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val state by connectionViewModel.state.collectAsState()
                 val projectState by projectDirectoryViewModel.state.collectAsState()
@@ -129,13 +135,25 @@ class MainActivity : AppCompatActivity() {
                     if (drawerState.isOpen) showRightDrawer = false
                 }
                 // NAV-009：系统返回逐层收起最上层（右抽屉 → 左抽屉 → 页面本身）。
-                BackHandler(enabled = showRightDrawer) { showRightDrawer = false }
-                BackHandler(enabled = !showRightDrawer && drawerState.isOpen) {
-                    scope.launch { drawerState.close() }
+                // 登记位置必须在 NavHost **之后**（见下方 Box 末尾）：Compose 的返回分发按登记顺序
+                // 「后登记者优先」，写在 NavHost 之前会被导航图的回调抢先，真机上表现为
+                // 「抽屉开着按返回却退到了上一页」（P4-B 工作台实测）。
+                fun closeTopLayer(): Boolean = when {
+                    showRightDrawer -> {
+                        showRightDrawer = false
+                        true
+                    }
+                    drawerState.isOpen -> {
+                        scope.launch { drawerState.close() }
+                        true
+                    }
+                    else -> false
                 }
                 // 去 query 归一化，保证带参数的 route 也能在抽屉里高亮。
                 val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
                     ?.substringBefore('?')
+                // 换页时收起右抽屉：右抽屉内容按当前页面切换，留着会把上一页的「项目目录」盖在新页面上。
+                LaunchedEffect(currentRoute) { showRightDrawer = false }
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     when (state) {
@@ -153,6 +171,9 @@ class MainActivity : AppCompatActivity() {
                                     changesViewModel.bindClient(client)
                 versionsViewModel.bindClient(client)
         chaptersViewModel.bindClient(client)
+                                    workbenchViewModel.bindClient(client)
+                                    // 工作台不切换前台书籍：只在进入页面/抽屉时读取项目树。
+                                    workbenchViewModel.refresh()
                                 }
                             }
                             ModalNavigationDrawer(
@@ -340,6 +361,17 @@ class MainActivity : AppCompatActivity() {
                                             initialPrompt = entry.arguments?.getString("prompt").orEmpty(),
                                         )
                                     }
+                                    composable("workbench") {
+                                        WorkbenchScreen(
+                                            viewModel = workbenchViewModel,
+                                            client = connectionViewModel.client,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenRightDrawer = {
+                                                scope.launch { drawerState.close() }
+                                                showRightDrawer = true
+                                            },
+                                        )
+                                    }
                                     composable(
                                         route = "terminal/{projectId}",
                                         arguments = listOf(navArgument("projectId") { type = NavType.StringType }),
@@ -369,10 +401,14 @@ class MainActivity : AppCompatActivity() {
                     // 右项目 / 控制台抽屉（按当前页面）。
                     if (showRightDrawer) {
                         val isGame = currentRoute == "game"
-                        LaunchedEffect(showRightDrawer, currentProjectId, isGame, rightTab) {
+                        val isWorkbench = currentRoute == "workbench"
+                        LaunchedEffect(showRightDrawer, currentProjectId, isGame, isWorkbench, rightTab) {
                             if (isGame) {
                                 // 打开控制台时刷新分支列表（切换 / 删除后与服务端对齐）。
                                 gameViewModel.loadBranches()
+                            } else if (isWorkbench) {
+                                // 工作台：抽屉打开即重读项目树（会话运行状态也来自服务端）。
+                                workbenchViewModel.refresh()
                             } else {
                                 when (rightTab) {
                                     0 -> projectDirectoryViewModel.load(currentProjectId)
@@ -383,10 +419,10 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                         RightDrawer(
-                            title = if (isGame) {
-                                stringResource(R.string.right_drawer_console)
-                            } else {
-                                stringResource(R.string.right_drawer_project)
+                            title = when {
+                                isGame -> stringResource(R.string.right_drawer_console)
+                                isWorkbench -> stringResource(R.string.workbench_projects)
+                                else -> stringResource(R.string.right_drawer_project)
                             },
                             onDismiss = { showRightDrawer = false },
                         ) {
@@ -424,6 +460,38 @@ class MainActivity : AppCompatActivity() {
                                     onSwitchBranch = { gameViewModel.switchBranch(it) },
                                     onDeleteBranch = { gameViewModel.deleteBranch(it) },
                                     onSavePlan = { gameViewModel.saveBranchPlan(it) },
+                                )
+                            } else if (isWorkbench) {
+                                // 工作台项目 / 会话树（WB-001 / WB-002）：选中会话即开页签并收起抽屉。
+                                val workbenchState by workbenchViewModel.state.collectAsState()
+                                WorkbenchTreeContent(
+                                    state = workbenchState,
+                                    onRefresh = { workbenchViewModel.refresh() },
+                                    onSelectProject = workbenchViewModel::selectProject,
+                                    onToggleProject = workbenchViewModel::toggleProject,
+                                    onOpenSession = { projectId, sessionId ->
+                                        workbenchViewModel.openSession(projectId, sessionId)
+                                        showRightDrawer = false
+                                    },
+                                    onCreateSession = { projectId ->
+                                        workbenchViewModel.createSession(projectId)
+                                        showRightDrawer = false
+                                    },
+                                    onRenameSession = workbenchViewModel::renameSession,
+                                    onDeleteSession = { project, session ->
+                                        workbenchViewModel.confirmDeleteSession(project.id, session)
+                                    },
+                                    onRenameProject = workbenchViewModel::renameProject,
+                                    onArchiveProject = workbenchViewModel::confirmArchiveProject,
+                                    onMoveProject = workbenchViewModel::moveProject,
+                                    onAddFromHost = workbenchViewModel::addProjectFromHost,
+                                    onCreateDirectory = { name, parent ->
+                                        workbenchViewModel.createDirectoryProject(name, parent)
+                                    },
+                                    onDismissNotice = workbenchViewModel::clearNotice,
+                                    onDismissConfirm = workbenchViewModel::dismissConfirm,
+                                    onConfirmDeleteSession = workbenchViewModel::deleteSession,
+                                    onConfirmArchiveProject = workbenchViewModel::archiveProject,
                                 )
                             } else {
                                 // 写作页右抽屉：项目文件 / 变更审阅。
@@ -526,6 +594,27 @@ class MainActivity : AppCompatActivity() {
                             client = connectionViewModel.client,
                             onClose = { showDebug = false },
                         )
+                    }
+
+                    // NAV-009：抽屉开着时返回键只收起抽屉，不退出当前页面。
+                    //
+                    // 用 `OnBackPressedDispatcher.addCallback`（**不带** LifecycleOwner）在每次抽屉打开时
+                    // 追加一个回调：分发器按「后注册优先」处理，这样才排在 NavHost 自己的返回回调之前。
+                    // 早前用 `BackHandler` 写在 NavHost 之前/之后都会被导航图抢先，真机表现为
+                    // 「抽屉开着按返回却退到了上一页，抽屉还留在上一页上」。
+                    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+                    DisposableEffect(backDispatcher, showRightDrawer, drawerState.isOpen) {
+                        if (backDispatcher == null || (!showRightDrawer && !drawerState.isOpen)) {
+                            onDispose { }
+                        } else {
+                            val callback = object : OnBackPressedCallback(true) {
+                                override fun handleOnBackPressed() {
+                                    closeTopLayer()
+                                }
+                            }
+                            backDispatcher.addCallback(callback)
+                            onDispose { callback.remove() }
+                        }
                     }
                 }
             }

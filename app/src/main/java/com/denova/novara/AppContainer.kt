@@ -20,6 +20,7 @@ import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.terminal.TerminalViewModel
 import com.denova.novara.feature.chapters.ChaptersViewModel
 import com.denova.novara.feature.versions.VersionsViewModel
+import com.denova.novara.feature.workbench.WorkbenchViewModel
 
 /**
  * P2 组合根（手动注入，单 app 模块）。
@@ -47,6 +48,7 @@ class AppContainer(private val application: Application) {
         initializer { ChangesViewModel(application) }
         initializer { VersionsViewModel(application) }
         initializer { ChaptersViewModel(application) }
+        initializer { WorkbenchViewModel(application) }
         initializer { DebugPanelViewModel(application) }
         initializer { SettingsViewModel(PreferencesStore(application), AppCompatLocaleApplier) }
     }

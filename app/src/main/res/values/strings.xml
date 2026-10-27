@@ -607,4 +607,52 @@
 
     <!-- 调试抽屉入口（仅 debug 构建） -->
     <string name="drawer_debug">Debug log</string>
+
+    <!-- 工作台（P4-B） -->
+    <string name="workbench_title">Workbench</string>
+    <string name="workbench_projects">Projects</string>
+    <string name="workbench_empty_projects">No projects yet</string>
+    <string name="workbench_empty_tab">Pick a conversation in the project panel, or start a new one</string>
+    <string name="workbench_load_failed">Failed to load projects</string>
+    <string name="workbench_project_add">Add project</string>
+    <string name="workbench_project_add_host">Choose folder on host</string>
+    <string name="workbench_project_add_directory">New project folder</string>
+    <string name="workbench_project_directory_name">Folder name</string>
+    <string name="workbench_project_directory_parent">Parent path (optional, host absolute path)</string>
+    <string name="workbench_project_create">Create</string>
+    <string name="workbench_project_rename">Rename project</string>
+    <string name="workbench_project_move_up">Move up</string>
+    <string name="workbench_project_move_down">Move down</string>
+    <string name="workbench_project_archive">Remove from workbench</string>
+    <string name="workbench_project_archive_confirm">Remove “%1$s” from the workbench? The folder and its conversations stay on the server.</string>
+    <string name="workbench_project_missing">Folder missing on host</string>
+    <string name="workbench_project_current">Currently open</string>
+    <string name="workbench_project_add_failed">Failed to add project</string>
+    <string name="workbench_project_create_failed">Failed to create project folder</string>
+    <string name="workbench_project_rename_failed">Failed to rename project</string>
+    <string name="workbench_project_archive_failed">Failed to remove project</string>
+    <string name="workbench_project_reorder_failed">Failed to save project order</string>
+    <string name="workbench_host_directory_remote">The folder picker only works on the machine running Denova. Open Denova there, or add a project folder instead.</string>
+    <string name="workbench_session_new">New conversation</string>
+    <string name="workbench_session_untitled">Untitled conversation</string>
+    <string name="workbench_session_rename">Rename conversation</string>
+    <string name="workbench_session_delete">Delete conversation</string>
+    <string name="workbench_session_delete_confirm">Delete “%1$s”? The saved transcript is removed.</string>
+    <string name="workbench_session_running">Running</string>
+    <string name="workbench_session_create_failed">Failed to create conversation</string>
+    <string name="workbench_session_rename_failed">Failed to rename conversation</string>
+    <string name="workbench_session_delete_failed">Failed to delete conversation</string>
+    <string name="workbench_group_primary">Main</string>
+    <string name="workbench_group_secondary">Side</string>
+    <string name="workbench_tab_close">Close tab</string>
+    <string name="workbench_tab_to_secondary">Send to side pane</string>
+    <string name="workbench_tab_to_primary">Send to main pane</string>
+    <string name="workbench_tab_move_left">Move left</string>
+    <string name="workbench_tab_move_right">Move right</string>
+    <string name="workbench_tab_more">Tab actions</string>
+    <string name="workbench_rename">Rename</string>
+    <string name="workbench_confirm">Confirm</string>
+    <string name="workbench_cancel">Cancel</string>
+    <string name="workbench_show_more_sessions">Show more</string>
+    <string name="workbench_session_count">%1$d conversations</string>
 </resources>

@@ -15,9 +15,10 @@ class AppDestinationTest {
     }
 
     @Test
-    fun `exactly three destinations are implemented`() {
+    fun `exactly four destinations are implemented`() {
+        // P4-B：工作台宿主页面落地，导航项由 WIP 变为可进入。
         val implemented = appDestinations.filter { it.implemented }.map { it.route }
-        assertEquals(listOf("editor", "game", "agent"), implemented)
+        assertEquals(listOf("editor", "game", "agent", "workbench"), implemented)
     }
 
     @Test

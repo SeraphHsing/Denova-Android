@@ -534,16 +534,30 @@ fun AgentScreen(
     initialFile: String = "",
     /** 进入后填进输入框的预置正文（WRI-001 引导）；**只填不发**，用户手动发送。 */
     initialPrompt: String = "",
+    /** 工作台标签内嵌渲染（P4-B）：不画顶栏与会话输入框，由宿主提供页签与项目身份。 */
+    inline: Boolean = false,
+    /** 内嵌时的固定会话身份：调用方（工作台页签）已经决定了会话，不能回落到「上次写作会话」。 */
+    fixedSessionId: String = "",
+    /** 是否由本组件自动 `start()`；工作台由宿主先绑定项目通道再挂接，故传 false。 */
+    autoStart: Boolean = true,
 ) {
     val state by viewModel.state.collectAsState()
     val selections by viewModel.selections.collectAsState()
     val askSelections by viewModel.askSelections.collectAsState()
-    var sessionId by remember { mutableStateOf("") }
+    var sessionId by remember { mutableStateOf(fixedSessionId) }
     var showContextPanel by remember { mutableStateOf(false) }
 
     // 进入页面自动回到会话（AGT-013）：优先上次挂接的会话，其次服务端 active / 最近会话。
     // 进程被杀后重启也能直接落回同一会话，pending ask 与任务入口由服务端投影恢复。
-    LaunchedEffect(projectId, initialFile) {
+    // 内嵌（工作台）时会话由宿主指定，且工作台会话不写写作会话锚点。
+    LaunchedEffect(projectId, initialFile, fixedSessionId) {
+        if (fixedSessionId.isNotBlank()) {
+            if (sessionId != fixedSessionId) sessionId = fixedSessionId
+            if (autoStart && state.sessionId != fixedSessionId) {
+                viewModel.start(fixedSessionId, projectId, remember = false)
+            }
+            return@LaunchedEffect
+        }
         if (sessionId.isBlank()) {
             val saved = viewModel.savedSessionId().takeIf { it.isNotBlank() }
             val chosen = saved ?: viewModel.ensureSession()
@@ -561,24 +575,26 @@ fun AgentScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .then(if (inline) Modifier else Modifier.windowInsetsPadding(WindowInsets.statusBars))
             .imePadding(),
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text(stringResource(R.string.agent_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-        }
+        if (!inline) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+                IconButton(onClick = onOpenDrawer) { Text("☰") }
+                Text(stringResource(R.string.agent_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+                TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+            }
 
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-            OutlinedTextField(
-                value = sessionId,
-                onValueChange = { sessionId = it },
-                label = { Text("session ID") },
-                singleLine = true,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-            )
-            OutlinedButton(onClick = { viewModel.start(sessionId.trim(), projectId) }) { Text(stringResource(R.string.common_attach)) }
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                OutlinedTextField(
+                    value = sessionId,
+                    onValueChange = { sessionId = it },
+                    label = { Text("session ID") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
+                OutlinedButton(onClick = { viewModel.start(sessionId.trim(), projectId) }) { Text(stringResource(R.string.common_attach)) }
+            }
         }
 
         val phaseText = when (state.ui.phase) {

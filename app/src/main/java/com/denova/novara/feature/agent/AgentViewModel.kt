@@ -12,6 +12,7 @@ import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.AgentCommandReceipt
 import com.denova.novara.core.network.AgentCommandRequest
+import com.denova.novara.core.network.AgentGateway
 import com.denova.novara.core.network.DenovaApiException
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.persistence.PreferencesStore
@@ -119,13 +120,19 @@ data class AgentScreenState(
     val contextAnalysis: AgentContextAnalysis? = null,
 )
 
-/** 写作 Agent ViewModel：绑定 client → 恢复协调器 → 投影；发送先落命令事务再 POST。 */
+/**
+ * Agent 会话 ViewModel：绑定 [AgentGateway] → 恢复协调器 → 投影；发送先落命令事务再 POST。
+ *
+ * P4-B 起同一套界面服务两套作用域：写作（`/api/chat`）与工作台项目 Agent
+ * （`/api/projects/:id/agent-chat/…`）。作用域差异全部收敛在 [AgentGateway] 实现里，
+ * 本类只按会话身份工作，不假设「当前书籍」。
+ */
 class AgentViewModel(application: Application) : AndroidViewModel(application) {
 
     private val json = Json { ignoreUnknownKeys = true }
     private val commands = CommandStore((application as NovaraApplication).container.database.commandDao())
     private val prefs = PreferencesStore(application)
-    private var client: DenovaClient? = null
+    private var client: AgentGateway? = null
     private var coordinator: AgentStreamRecoveryCoordinator? = null
     private var streamJob: Job? = null
     private var sendJob: Job? = null
@@ -148,9 +155,13 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     private val _askSelections = MutableStateFlow<Map<String, Map<String, List<String>>>>(emptyMap())
     val askSelections: StateFlow<Map<String, Map<String, List<String>>>> = _askSelections.asStateFlow()
 
-    fun bindClient(client: DenovaClient) {
-        this.client = client
-        this.coordinator = AgentStreamRecoveryCoordinator(client, reloadCanonical = ::reloadCanonical)
+    /** 写作作用域绑定（前台 Writing）：直接使用 [DenovaClient] 的全局会话端点。 */
+    fun bindClient(client: DenovaClient) = bindGateway(client)
+
+    /** 绑定任意作用域的 Agent 通道：写作或工作台项目（P4-B）。 */
+    fun bindGateway(gateway: AgentGateway) {
+        this.client = gateway
+        this.coordinator = AgentStreamRecoveryCoordinator(gateway, reloadCanonical = ::reloadCanonical)
     }
 
     /**
@@ -180,12 +191,17 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     /** 上次挂接的会话 id：进程被杀后据此自动回到同一会话（服务端 active 仍是任务事实源）。 */
     suspend fun savedSessionId(): String = prefs.lastAgentSession()
 
-    /** 挂接 session 的活动 Agent 流。 */
-    fun start(sessionId: String, projectId: String = "") {
+    /**
+     * 挂接 session 的活动 Agent 流。
+     *
+     * [remember] 为 false 时不写「上次写作会话」锚点：工作台的项目会话与前台写作会话是两套身份，
+     * 不能让工作台标签覆盖写作页的恢复锚点（P4-B）。
+     */
+    fun start(sessionId: String, projectId: String = "", remember: Boolean = true) {
         if (coordinator == null) return
         if (sessionId.isBlank()) return
-        DenovaLog.i("Agent", "start session=$sessionId project=${projectId.take(12)}")
-        viewModelScope.launch { prefs.setLastAgentSession(sessionId) }
+        DenovaLog.i("Agent", "start session=$sessionId project=${projectId.take(12)} remember=$remember")
+        if (remember) viewModelScope.launch { prefs.setLastAgentSession(sessionId) }
         // 项目作用域随会话一起带入：图片部件要用它拼 `/files/asset`。
         _state.value = AgentScreenState(sessionId = sessionId, projectId = projectId)
         streamJob?.cancel()
@@ -207,6 +223,16 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             }
             if (sessionScope.isCurrent(generation, sessionId)) finishStream(generation, sessionId)
         }
+    }
+
+    /** 关闭工作台标签时释放：停掉流与轮询，不向服务端发送任何命令（任务继续由服务端负责）。 */
+    fun release() {
+        streamJob?.cancel()
+        sendJob?.cancel()
+        queueTicker?.cancel()
+        streamJob = null
+        sendJob = null
+        queueTicker = null
     }
 
     /**
@@ -490,7 +516,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
      * 落地后直接挂接，不再为了挂接二次全量拉取（此前是 limit=20 判定 + limit=50 重建）。
      */
     private suspend fun reconcile(
-        client: DenovaClient,
+        client: AgentGateway,
         sessionId: String,
         commandId: String,
         message: String,
