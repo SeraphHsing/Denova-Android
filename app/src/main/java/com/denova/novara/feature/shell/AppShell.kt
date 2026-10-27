@@ -11,8 +11,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -80,8 +80,15 @@ fun AppDrawer(
     // 排序模式与搜索词都是抽屉内的临时界面状态，不参与业务状态。
     var reorderMode by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    // 外层不滚动：底部开关固定，只有中间的书架与导航列表滚动。
-    // 之前整列 verticalScroll 时，内容高度超出抽屉可视区，下方条目（书籍管理/设置等）会渲染出来却点不到。
+    // 过滤与分组要在组合作用域里算（stringResource 是 @Composable，不能写在 LazyListScope 内）。
+    val visible = activityItems.filter { spec ->
+        query.isBlank() || stringResource(spec.labelRes).contains(query.trim(), ignoreCase = true)
+    }
+    val grouped = ActivityNav.grouped(visible)
+    // 标题固定，其余内容全部放进同一个 LazyColumn。
+    // 之前是「固定底栏 + 中间 Column(weight + verticalScroll)」：横屏时可视高度只剩百来像素，
+    // 中间的滚动列被压到几乎为零，导航分组整块不渲染（2026-10-27 真机 + 语义树确认）。
+    // 换成单个 LazyColumn 后任意高度都能滚动到每一项，也不再出现「渲染出来却点不到」的裁剪问题。
     Column(
         Modifier
             .fillMaxSize()
@@ -93,190 +100,209 @@ fun AppDrawer(
             modifier = Modifier.padding(16.dp),
         )
         HorizontalDivider()
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-        // 新手引导（WRI-001）：三步核心，完成或跳过就不再出现。
-        if (onboardingStep != null) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(stringResource(R.string.onboarding_progress, OnboardingLogic.progressLabel(onboardingStep)), style = MaterialTheme.typography.labelLarge)
-                    TextButton(onClick = onSkipOnboarding) { Text(stringResource(R.string.onboarding_skip)) }
-                }
-                Text(stringResource(OnboardingLogic.stepTitle(onboardingStep)), style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    stringResource(OnboardingLogic.stepBody(onboardingStep)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-                when (onboardingStep) {
-                    OnboardingStep.BOOK -> TextButton(onClick = onCreateBook) { Text(stringResource(R.string.onboarding_go_create)) }
-                    OnboardingStep.AGENT -> TextButton(onClick = onFillFirstPrompt) { Text(stringResource(R.string.onboarding_fill_example)) }
-                    OnboardingStep.MODEL -> Text(stringResource(R.string.onboarding_model_hint), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-            HorizontalDivider()
-        }
-        // 当前书籍切换（P3 链路起点）：选择后作为编辑器 / 项目目录的工作区。
-        Text(
-            stringResource(R.string.current_book),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-        )
-        if (books.isEmpty()) {
-            Text(
-                stringResource(R.string.book_empty),
-                color = MaterialTheme.colorScheme.outline,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        } else {
-            books.forEach { book ->
-                val selected = book.projectId == currentProjectId
-                TextButton(onClick = { onSelectBook(book) }, modifier = Modifier.fillMaxWidth()) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(Modifier.weight(1f)) {
+            // 新手引导（WRI-001）：三步核心，完成或跳过就不再出现。
+            if (onboardingStep != null) {
+                item {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(stringResource(R.string.onboarding_progress, OnboardingLogic.progressLabel(onboardingStep)), style = MaterialTheme.typography.labelLarge)
+                            TextButton(onClick = onSkipOnboarding) { Text(stringResource(R.string.onboarding_skip)) }
+                        }
+                        Text(stringResource(OnboardingLogic.stepTitle(onboardingStep)), style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            book.name,
-                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
+                            stringResource(OnboardingLogic.stepBody(onboardingStep)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline,
                         )
-                        if (selected) Text("✓", color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-        }
-        // 建书入口常驻：引导卡只在新手期出现，跳过后仍要能新建书籍（对齐 Web 书籍管理入口）。
-        TextButton(onClick = onCreateBook, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.drawer_new_book), style = MaterialTheme.typography.bodyMedium)
-        }
-        HorizontalDivider()
-        // 一级导航：分组（创作 / 工具 / 设置）+ 图标 + 尾部状态（当前 ✓ / 其余 ›）。
-        // 排序与搜索都是抽屉内的临时状态，不写业务状态（NAV-004 / NAV-006）。
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(stringResource(R.string.drawer_nav_section), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = { reorderMode = !reorderMode }) {
-                Text(stringResource(if (reorderMode) R.string.drawer_sort_done else R.string.drawer_sort))
-            }
-            if (reorderMode) {
-                TextButton(onClick = onResetActivityOrder) { Text(stringResource(R.string.drawer_sort_reset)) }
-            }
-        }
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            singleLine = true,
-            label = { Text(stringResource(R.string.drawer_search_actions)) },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        )
-        val visible = activityItems.filter { spec ->
-            query.isBlank() || stringResource(spec.labelRes).contains(query.trim(), ignoreCase = true)
-        }
-        ActivityNav.grouped(visible).forEach { (group, items) ->
-            // 设置组按基线不带分组标题。
-            if (group != ActivityGroup.SETTINGS) {
-                Text(
-                    when (group) {
-                        ActivityGroup.CREATION -> stringResource(R.string.group_creation)
-                        else -> stringResource(R.string.group_tools)
-                    },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                )
-            }
-            items.forEach { spec ->
-                val destination = destinationOf(spec.id)
-                val selected = spec.id == currentRoute
-                if (destination == null) return@forEach
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    TextButton(
-                        onClick = { onNavigate(destination) },
-                        enabled = spec.implemented,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(
-                                spec.icon,
-                                contentDescription = null,
-                                tint = if (selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                            )
-                            Text(
-                                stringResource(spec.labelRes),
-                                modifier = Modifier.weight(1f),
-                                color = if (selected) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                            )
-                            when {
-                                // 未实现：只标 WIP，不给可点击的视觉暗示（不给 ›，也没有跳转）。
-                                !spec.implemented -> Text(
-                                    stringResource(R.string.dest_placeholder),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline,
-                                )
-                                selected -> Icon(
-                                    Icons.Filled.Check,
-                                    contentDescription = stringResource(R.string.dest_current),
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                                else -> Icon(
-                                    Icons.Filled.KeyboardArrowRight,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.outline,
-                                )
-                            }
+                        when (onboardingStep) {
+                            OnboardingStep.BOOK -> TextButton(onClick = onCreateBook) { Text(stringResource(R.string.onboarding_go_create)) }
+                            OnboardingStep.AGENT -> TextButton(onClick = onFillFirstPrompt) { Text(stringResource(R.string.onboarding_fill_example)) }
+                            OnboardingStep.MODEL -> Text(stringResource(R.string.onboarding_model_hint), style = MaterialTheme.typography.bodySmall)
                         }
                     }
-                    if (reorderMode && group != ActivityGroup.SETTINGS) {
-                        TextButton(onClick = { onMoveActivity(spec.id, -1) }) { Text("↑") }
-                        TextButton(onClick = { onMoveActivity(spec.id, 1) }) { Text("↓") }
+                    HorizontalDivider()
+                }
+            }
+
+            // 当前书籍切换（P3 链路起点）：选择后作为编辑器 / 项目目录的工作区。
+            item {
+                Text(
+                    stringResource(R.string.current_book),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            if (books.isEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.book_empty),
+                        color = MaterialTheme.colorScheme.outline,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
+                }
+            } else {
+                items(books.size) { index ->
+                    val book = books[index]
+                    val selected = book.projectId == currentProjectId
+                    TextButton(onClick = { onSelectBook(book) }, modifier = Modifier.fillMaxWidth()) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                book.name,
+                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                            )
+                            if (selected) Text("✓", color = MaterialTheme.colorScheme.primary)
+                        }
                     }
                 }
             }
-        }
-        if (visible.isEmpty()) {
-            Text(
-                stringResource(R.string.drawer_no_match),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            )
-        }
-        }
-        HorizontalDivider()
-        TextButton(onClick = onToggleDarkTheme, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.dark_mode), modifier = Modifier.weight(1f))
-            Switch(checked = darkTheme, onCheckedChange = null)
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(stringResource(R.string.language), modifier = Modifier.weight(1f))
-            LanguageOption("中文", "zh", language, onSelectLanguage)
-            LanguageOption("English", "en", language, onSelectLanguage)
-        }
-        if (onOpenDebug != null) {
-            HorizontalDivider()
-            TextButton(onClick = onOpenDebug, modifier = Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.drawer_debug))
+            // 建书入口常驻：引导卡只在新手期出现，跳过后仍要能新建书籍（对齐 Web 书籍管理入口）。
+            item {
+                TextButton(onClick = onCreateBook, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.drawer_new_book), style = MaterialTheme.typography.bodyMedium)
+                }
+                HorizontalDivider()
+            }
+
+            // 一级导航：分组（创作 / 工具 / 设置）+ 图标 + 尾部状态（当前 ✓ / 其余 ›）。
+            // 排序与搜索都是抽屉内的临时状态，不写业务状态（NAV-004 / NAV-006）。
+            item {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.drawer_nav_section), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { reorderMode = !reorderMode }) {
+                        Text(stringResource(if (reorderMode) R.string.drawer_sort_done else R.string.drawer_sort))
+                    }
+                    if (reorderMode) {
+                        TextButton(onClick = onResetActivityOrder) { Text(stringResource(R.string.drawer_sort_reset)) }
+                    }
+                }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.drawer_search_actions)) },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                )
+            }
+
+            grouped.forEach { (group, specs) ->
+                // 设置组按基线不带分组标题。
+                if (group != ActivityGroup.SETTINGS) {
+                    item(key = "group-${group.name}") {
+                        Text(
+                            when (group) {
+                                ActivityGroup.CREATION -> stringResource(R.string.group_creation)
+                                else -> stringResource(R.string.group_tools)
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+                items(specs.size, key = { index -> "nav-${specs[index].id}" }) { index ->
+                    val spec = specs[index]
+                    val destination = destinationOf(spec.id)
+                    val selected = spec.id == currentRoute
+                    if (destination == null) return@items
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(
+                            onClick = { onNavigate(destination) },
+                            enabled = spec.implemented,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Icon(
+                                    spec.icon,
+                                    contentDescription = null,
+                                    tint = if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                )
+                                Text(
+                                    stringResource(spec.labelRes),
+                                    modifier = Modifier.weight(1f),
+                                    color = if (selected) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                                )
+                                when {
+                                    // 未实现：只标 WIP，不给可点击的视觉暗示（不给 ›，也没有跳转）。
+                                    !spec.implemented -> Text(
+                                        stringResource(R.string.dest_placeholder),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                    )
+                                    selected -> Icon(
+                                        Icons.Filled.Check,
+                                        contentDescription = stringResource(R.string.dest_current),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                    else -> Icon(
+                                        Icons.Filled.KeyboardArrowRight,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.outline,
+                                    )
+                                }
+                            }
+                        }
+                        if (reorderMode && group != ActivityGroup.SETTINGS) {
+                            TextButton(onClick = { onMoveActivity(spec.id, -1) }) { Text("↑") }
+                            TextButton(onClick = { onMoveActivity(spec.id, 1) }) { Text("↓") }
+                        }
+                    }
+                }
+            }
+            if (visible.isEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.drawer_no_match),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+            }
+
+            item {
+                HorizontalDivider()
+                TextButton(onClick = onToggleDarkTheme, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.dark_mode), modifier = Modifier.weight(1f))
+                    Switch(checked = darkTheme, onCheckedChange = null)
+                }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.language), modifier = Modifier.weight(1f))
+                    LanguageOption("中文", "zh", language, onSelectLanguage)
+                    LanguageOption("English", "en", language, onSelectLanguage)
+                }
+                if (onOpenDebug != null) {
+                    HorizontalDivider()
+                    TextButton(onClick = onOpenDebug, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.drawer_debug))
+                    }
+                }
             }
         }
     }
