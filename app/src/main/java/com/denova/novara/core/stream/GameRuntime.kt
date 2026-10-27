@@ -53,6 +53,8 @@ data class GameActiveView(
     @SerialName("runtime_recoverable") val runtimeRecoverable: Boolean = false,
     @SerialName("recovery_paused") val recoveryPaused: Boolean = false,
     @SerialName("stream_attached") val streamAttached: Boolean = false,
+    /** 目标操作 id：`suspend` / `abort` 命令的必填 `target_operation_id` 来源（GAM-012）。 */
+    @SerialName("active_operation_id") val activeOperationId: String? = null,
     val phase: String? = null,
     @SerialName("recovery_actions") val recoveryActions: List<RecoveryAction> = emptyList(),
 )

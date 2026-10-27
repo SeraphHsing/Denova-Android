@@ -243,6 +243,12 @@
     <string name="game_console_turn_regenerate">重生成</string>
     <string name="game_console_version">v%1$d/%2$d</string>
     <string name="game_regenerate_no_input">这一轮没有可重放的输入</string>
+    <string name="game_ask_title">需要你回答</string>
+    <string name="game_ask_submit">回答</string>
+    <string name="game_runtime_suspend">暂停</string>
+    <string name="game_runtime_resume">续接</string>
+    <string name="game_runtime_abandon">放弃挂起</string>
+    <string name="game_runtime_operation_changed">运行已在别处变化，请先刷新再放弃</string>
     <string name="game_console_branch_fork">分叉</string>
     <string name="game_console_branch_switch">切换</string>
     <string name="game_console_branch_delete">删除</string>

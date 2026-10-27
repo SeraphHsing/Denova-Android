@@ -1,5 +1,7 @@
 package com.denova.novara.core.network
 
+import com.denova.novara.core.stream.AgentAskAnswer
+import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.stream.TurnEvent
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -138,4 +140,39 @@ data class UpdateBranchPlanRequest(
 data class UpdateBranchPlanResult(
     @SerialName("branch_plan") val branchPlan: BranchPlan = BranchPlan(),
     @SerialName("context_revision") val contextRevision: Long = 0,
+)
+
+// ---- 提问与运行时命令（P4-A / GAM-011、GAM-012、GAM-013）----
+
+/** `POST /api/interactive/chat/asks/:askId/answer`。 */
+@Serializable
+data class GameAskAnswerRequest(
+    @SerialName("story_id") val storyId: String,
+    @SerialName("branch_id") val branchId: String,
+    val answers: List<AgentAskAnswer> = emptyList(),
+)
+
+/** `POST /api/interactive/chat/asks/:askId/cancel`。 */
+@Serializable
+data class GameAskCancelRequest(
+    @SerialName("story_id") val storyId: String,
+    @SerialName("branch_id") val branchId: String,
+    val reason: String = AgentAskLogic.CANCEL_REASON_USER,
+)
+
+/**
+ * `POST /api/interactive/chat/commands`（story 作用域）。
+ *
+ * - `suspend` / `abort`：必须带 `target_operation_id`（来自 active 投影的 `active_operation_id`）。
+ * - `abandon_pending`：只带 `resume_interruption_id`，丢弃与它匹配的挂起输入。
+ */
+@Serializable
+data class GameCommandRequest(
+    val type: String,
+    @SerialName("command_id") val commandId: String? = null,
+    @SerialName("target_operation_id") val targetOperationId: String? = null,
+    @SerialName("story_id") val storyId: String,
+    @SerialName("branch_id") val branchId: String,
+    val reason: String? = null,
+    @SerialName("resume_interruption_id") val resumeInterruptionId: String? = null,
 )

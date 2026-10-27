@@ -23,6 +23,7 @@ import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.BranchPlan
 import com.denova.novara.core.network.BranchSummary
 import com.denova.novara.core.network.DenovaApiException
+import com.denova.novara.core.network.GameCommandRequest
 import com.denova.novara.core.network.SendInteractiveChatRequest
 import com.denova.novara.core.network.StorySummary
 import com.denova.novara.core.stream.StoryPaging
@@ -38,6 +39,8 @@ import com.denova.novara.core.stream.GameStageState
 import com.denova.novara.core.stream.GameStreamError
 import com.denova.novara.core.stream.GameStreamEvent
 import com.denova.novara.core.stream.DrawLatencyMeter
+import com.denova.novara.core.stream.AgentAskInteraction
+import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.stream.GameStreamRecoveryCoordinator
 import com.denova.novara.core.stream.NarrativeBuilder
 import com.denova.novara.core.stream.RehydrateRequest
@@ -75,6 +78,9 @@ private const val EARLIER_PAGE_SIZE = 20
 /** 流式正文所属的伪轮次 id（不参与锚点跳转）。 */
 private const val LIVE_TURN_ID = "__live__"
 
+/** 续接挂起运行时的占位输入（与 Web `Continue.` 一致）。 */
+private const val RESUME_MESSAGE = "Continue."
+
 /**
  * 渐进式恢复：首屏只取最近若干轮，让「恢复可操作」不必等全量历史；
  * 全量随后台任务补全（history 耗时随 limit 近似线性：3 轮 ≈0.22s，50 轮 ≈2.1s）。
@@ -107,6 +113,13 @@ data class GameUiState(
     /** 是否还有更早的历史可翻页。 */
     val historyHasMore: Boolean = false,
     val loadingEarlier: Boolean = false,
+    /** 当前挂起的提问（GAM-011）；已解决时保留供展示。 */
+    val ask: AgentAskInteraction? = null,
+    /** 提问回答 / 暂停续接 / 放弃挂起的在途标记。 */
+    val runtimeBusy: Boolean = false,
+    val runtimeError: UiText? = null,
+    /** active 投影报告的挂起输入 id：非空即可「续接 / 放弃挂起」（重启后也能恢复入口）。 */
+    val pendingInterruptionId: String? = null,
     /** 分支列表（快照 `graph.branches` 或 `GET /branches`）。 */
     val branches: List<BranchSummary> = emptyList(),
     val branchPlan: BranchPlan? = null,
@@ -220,6 +233,257 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
         // 登录后预取故事列表；进入游戏页时页面再按需刷新（不重复挂接）。
         if (_library.value.stories.isEmpty()) loadStories()
+    }
+
+    /**
+     * 挂接时探测一次 active：流不会重放 `suspended` 历史，重启后必须靠投影恢复
+     * 「已暂停 / 有待续接输入」的入口，否则用户既续接不了、也放弃不了，新发送还会被服务端拒绝。
+     */
+    private fun probeActivePhase() {
+        val client = client ?: return
+        val storyId = _uiState.value.storyId
+        val branchId = _uiState.value.branchId
+        if (storyId.isBlank()) return
+        viewModelScope.launch {
+            val active = try {
+                client.active(storyId, branchId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "active probe failed", e)
+                return@launch
+            }
+            if (_uiState.value.storyId != storyId || _uiState.value.branchId != branchId) return@launch
+            val pending = active.pendingInterruptionId?.takeIf { it.isNotBlank() }
+            val stage = when {
+                active.phase == "suspended" -> GameStageState(phase = GamePhase.SUSPENDED)
+                else -> _uiState.value.stage
+            }
+            _uiState.value = _uiState.value.copy(stage = stage, pendingInterruptionId = pending)
+            DenovaLog.i(
+                "Game",
+                "active probe active=${active.active} phase=${active.phase} pending=${pending != null} " +
+                    "actions=${active.recoveryActions.map { it.kind }}",
+            )
+        }
+    }
+
+    // ---- 提问与运行时控制（P4-A / GAM-011、GAM-012、GAM-013）----
+
+    /** 回答提问：只提交已作答的问题；`ask_stale` 时刷新投影而不是重试。 */
+    fun answerAsk(selected: Map<String, List<String>>) {
+        val client = client ?: return
+        val state = _uiState.value
+        val ask = state.ask ?: return
+        if (!AgentAskLogic.canSubmit(ask, selected) || state.runtimeBusy) return
+        _uiState.value = state.copy(runtimeBusy = true, runtimeError = null)
+        viewModelScope.launch {
+            val resolution = try {
+                client.answerInteractiveAsk(state.storyId, state.branchId, ask.id, AgentAskLogic.answers(ask, selected))
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: DenovaApiException) {
+                DenovaLog.w("Game", "answer ask failed code=${e.code} status=${e.status}", e)
+                _uiState.value = _uiState.value.copy(
+                    runtimeBusy = false,
+                    runtimeError = AgentAskLogic.askError(e.code, e.message),
+                )
+                if (AgentAskLogic.needsRefresh(e.code)) refreshSnapshot()
+                return@launch
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "answer ask failed", e)
+                _uiState.value = _uiState.value.copy(
+                    runtimeBusy = false,
+                    runtimeError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            _uiState.value = _uiState.value.copy(
+                runtimeBusy = false,
+                ask = AgentAskLogic.applyResolution(ask, resolution),
+            )
+            DenovaLog.i("Game", "ask resolved id=${ask.id} status=${resolution.status}")
+        }
+    }
+
+    /** 取消提问（与 Web 一致，原因 `user_cancelled`）。 */
+    fun cancelAsk() {
+        val client = client ?: return
+        val state = _uiState.value
+        val ask = state.ask ?: return
+        if (state.runtimeBusy) return
+        _uiState.value = state.copy(runtimeBusy = true, runtimeError = null)
+        viewModelScope.launch {
+            val resolution = try {
+                client.cancelInteractiveAsk(state.storyId, state.branchId, ask.id)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "cancel ask failed", e)
+                _uiState.value = _uiState.value.copy(
+                    runtimeBusy = false,
+                    runtimeError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            _uiState.value = _uiState.value.copy(
+                runtimeBusy = false,
+                ask = AgentAskLogic.applyResolution(ask, resolution),
+            )
+            DenovaLog.i("Game", "ask cancelled id=${ask.id}")
+        }
+    }
+
+    /**
+     * 暂停当前运行（GAM-012）：命令必须打到 active 投影给出的操作，
+     * 因此先取 `GET /chat/active` 再发 `suspend`，绝不复用本地旧 id。
+     */
+    fun suspendGame() {
+        val client = client ?: return
+        val state = _uiState.value
+        if (state.storyId.isBlank() || state.runtimeBusy) return
+        _uiState.value = state.copy(runtimeBusy = true, runtimeError = null)
+        viewModelScope.launch {
+            val active = try {
+                client.active(state.storyId, state.branchId)
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "suspend: active lookup failed", e)
+                _uiState.value = _uiState.value.copy(runtimeBusy = false, runtimeError = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            val operationId = active.activeOperationId
+            if (!active.active || operationId.isNullOrBlank()) {
+                DenovaLog.w("Game", "suspend skipped: no active operation")
+                _uiState.value = _uiState.value.copy(runtimeBusy = false)
+                return@launch
+            }
+            try {
+                client.submitGameCommand(
+                    GameCommandRequest(
+                        type = "suspend",
+                        commandId = UUID.randomUUID().toString(),
+                        targetOperationId = operationId,
+                        storyId = state.storyId,
+                        branchId = state.branchId,
+                    ),
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "suspend failed", e)
+                _uiState.value = _uiState.value.copy(runtimeBusy = false, runtimeError = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            DenovaLog.i("Game", "suspend submitted op=$operationId")
+            _uiState.value = _uiState.value.copy(runtimeBusy = false)
+        }
+    }
+
+    /**
+     * 续接挂起的运行（GAM-012）：与 Web `resumeTask` 同路径——
+     * 取 active 里服务端投影的 `recovery_actions[kind=resume]`，用它调 `/chat/recovery` 再重挂流；
+     * 只有脱离引擎的旧挂起（`pending_interruption_id` 且无 active）才走「重发输入」。
+     */
+    fun resumeGame() {
+        val client = client ?: return
+        val state = _uiState.value
+        if (state.storyId.isBlank() || state.runtimeBusy) return
+        _uiState.value = state.copy(runtimeBusy = true, runtimeError = null)
+        viewModelScope.launch {
+            val active = try {
+                client.active(state.storyId, state.branchId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "resume: active lookup failed", e)
+                _uiState.value = _uiState.value.copy(runtimeBusy = false, runtimeError = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            val detached = active.pendingInterruptionId?.takeIf { it.isNotBlank() }
+            if (!active.active && !active.runtimeRecoverable && detached != null) {
+                DenovaLog.i("Game", "resume detached interruption=$detached")
+                _uiState.value = _uiState.value.copy(runtimeBusy = false)
+                send(state.storyId, state.branchId, RESUME_MESSAGE, resumeInterruptionId = detached)
+                return@launch
+            }
+            val action = active.recoveryActions.firstOrNull { it.kind.equals("resume", ignoreCase = true) }
+            if (action != null) {
+                try {
+                    client.recover(state.storyId, state.branchId, action)
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    DenovaLog.w("Game", "resume: recovery rejected", e)
+                    _uiState.value = _uiState.value.copy(runtimeBusy = false, runtimeError = e.message?.let { UiText.raw(it) })
+                    return@launch
+                }
+                DenovaLog.i("Game", "resume action submitted kind=resume op=${action.operationId}")
+            } else if (active.active) {
+                DenovaLog.i("Game", "resume: no resume action, re-attach current task=${active.taskId}")
+            } else {
+                DenovaLog.w("Game", "resume skipped: nothing recoverable")
+                _uiState.value = _uiState.value.copy(runtimeBusy = false)
+                return@launch
+            }
+            _uiState.value = _uiState.value.copy(runtimeBusy = false)
+            // 重新挂接：有活动 task 就带游标续观，没有则等下一个事件。
+            start(state.storyId, state.branchId)
+        }
+    }
+
+    /** 放弃挂起输入（GAM-013）：只丢弃与当前挂起 id 匹配的那条。 */
+    fun abandonPendingTurn() {
+        val client = client ?: return
+        val state = _uiState.value
+        if (state.storyId.isBlank() || state.runtimeBusy) return
+        _uiState.value = state.copy(runtimeBusy = true, runtimeError = null)
+        viewModelScope.launch {
+            val active = try {
+                client.active(state.storyId, state.branchId)
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "abandon: active lookup failed", e)
+                _uiState.value = _uiState.value.copy(runtimeBusy = false, runtimeError = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            val interruptionId = active.pendingInterruptionId?.takeIf { it.isNotBlank() }
+            // 与 Web 相同的守卫：只有「没有活动运行且 phase=idle」的挂起输入才允许丢弃。
+            if (interruptionId == null || active.active || active.phase != "idle") {
+                DenovaLog.w(
+                    "Game",
+                    "abandon skipped: active=${active.active} phase=${active.phase} pending=$interruptionId",
+                )
+                _uiState.value = _uiState.value.copy(
+                    runtimeBusy = false,
+                    runtimeError = UiText.of(R.string.game_runtime_operation_changed),
+                )
+                return@launch
+            }
+            try {
+                client.submitGameCommand(
+                    GameCommandRequest(
+                        type = "abandon_pending",
+                        storyId = state.storyId,
+                        branchId = state.branchId,
+                        resumeInterruptionId = interruptionId,
+                    ),
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "abandon pending failed", e)
+                _uiState.value = _uiState.value.copy(runtimeBusy = false, runtimeError = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            DenovaLog.i("Game", "abandoned pending interruption=$interruptionId")
+            _uiState.value = _uiState.value.copy(runtimeBusy = false, stage = GameStageState())
+            refreshSnapshot()
+        }
+    }
+
+    fun dismissRuntimeError() {
+        if (_uiState.value.runtimeError != null) {
+            _uiState.value = _uiState.value.copy(runtimeError = null)
+        }
     }
 
     // ---- 轮次版本与重生成（P4-A / GAM-010）----
@@ -733,6 +997,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         historyCursor = null
         historyHasMore = false
         pendingRegeneration = false
+        probeActivePhase()
         refreshSnapshot()
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
@@ -773,6 +1038,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         branchId: String,
         message: String,
         regenerateFromTurnId: String? = null,
+        resumeInterruptionId: String? = null,
     ) {
         val client = client ?: return
         val text = message.trim()
@@ -784,6 +1050,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             branch = branchId.ifBlank { null },
             message = text,
             regenerateFromTurnId = regenerateFromTurnId,
+            resumeInterruptionId = resumeInterruptionId,
         )
         val record = CommandRecord(
             commandId = commandId,
@@ -898,6 +1165,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 narrative.reset(current.baseline)
                 _blocks.value = narrative.snapshot
                 _uiState.value = current.copy(stage = stage, connected = true, error = null)
+            }
+
+            // 提问（GAM-011）：data 就是 AskInteraction 体，按字段合并避免 ask_resolved 抹掉答案。
+            GameEventType.ASK_PENDING,
+            GameEventType.ASK_RESOLVED -> {
+                val incoming = runCatching {
+                    json.decodeFromString(AgentAskInteraction.serializer(), event.data ?: "")
+                }.getOrNull()
+                _uiState.value = current.copy(
+                    stage = stage,
+                    connected = true,
+                    error = null,
+                    ask = incoming?.let { AgentAskLogic.merge(current.ask, it) } ?: current.ask,
+                )
             }
 
             // 轮次落库即代表规范状态推进：重取快照刷新行动选项与台账。

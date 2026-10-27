@@ -243,6 +243,12 @@
     <string name="game_console_turn_regenerate">Regenerate</string>
     <string name="game_console_version">v%1$d/%2$d</string>
     <string name="game_regenerate_no_input">This turn has no replayable input</string>
+    <string name="game_ask_title">The agent asked</string>
+    <string name="game_ask_submit">Answer</string>
+    <string name="game_runtime_suspend">Pause</string>
+    <string name="game_runtime_resume">Resume</string>
+    <string name="game_runtime_abandon">Discard pending</string>
+    <string name="game_runtime_operation_changed">The run changed elsewhere; reload before discarding</string>
     <string name="game_console_branch_fork">Fork</string>
     <string name="game_console_branch_switch">Switch</string>
     <string name="game_console_branch_delete">Delete</string>

@@ -109,6 +109,8 @@ data class SendInteractiveChatRequest(
     val message: String,
     /** 从该轮重生成（GAM-010）：服务端回退到它再重新跑这一轮。 */
     @SerialName("regenerate_from_turn_id") val regenerateFromTurnId: String? = null,
+    /** 续接挂起的输入（GAM-012）：来自 active 投影的 `pending_interruption_id`。 */
+    @SerialName("resume_interruption_id") val resumeInterruptionId: String? = null,
 )
 
 /**
@@ -1151,6 +1153,72 @@ class DenovaClient(
                 val body = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
                 json.decodeFromString(InteractiveSnapshot.serializer(), body)
+            }
+        }
+    }
+
+    // ---- 提问与运行时命令（P4-A / GAM-011、GAM-012、GAM-013）----
+
+    /** 回答游戏提问：`POST /api/interactive/chat/asks/:askId/answer`。 */
+    suspend fun answerInteractiveAsk(
+        storyId: String,
+        branchId: String,
+        askId: String,
+        answers: List<AgentAskAnswer>,
+    ): AgentAskResolution {
+        val body = json.encodeToString(
+            GameAskAnswerRequest.serializer(),
+            GameAskAnswerRequest(storyId, branchId, answers),
+        )
+        return postInteractiveAsk(askId, "answer", body)
+    }
+
+    /** 取消游戏提问：`POST /api/interactive/chat/asks/:askId/cancel`。 */
+    suspend fun cancelInteractiveAsk(
+        storyId: String,
+        branchId: String,
+        askId: String,
+        reason: String = AgentAskLogic.CANCEL_REASON_USER,
+    ): AgentAskResolution {
+        val body = json.encodeToString(
+            GameAskCancelRequest.serializer(),
+            GameAskCancelRequest(storyId, branchId, reason),
+        )
+        return postInteractiveAsk(askId, "cancel", body)
+    }
+
+    private suspend fun postInteractiveAsk(askId: String, action: String, body: String): AgentAskResolution {
+        val request = Request.Builder()
+            .url(
+                server.baseUrl.toHttpUrl().newBuilder()
+                    .addPathSegments("api/interactive/chat/asks/$askId/$action")
+                    .build(),
+            )
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(AgentAskResolution.serializer(), text)
+            }
+        }
+    }
+
+    /** 运行时命令：`POST /api/interactive/chat/commands`（`suspend` / `abort` / `abandon_pending`）。 */
+    suspend fun submitGameCommand(command: GameCommandRequest) {
+        val body = json.encodeToString(GameCommandRequest.serializer(), command)
+        val request = Request.Builder()
+            .url(
+                server.baseUrl.toHttpUrl().newBuilder()
+                    .addPathSegments("api/interactive/chat/commands")
+                    .build(),
+            )
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
             }
         }
     }

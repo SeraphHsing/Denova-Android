@@ -71,6 +71,8 @@ import com.denova.novara.R
 import com.denova.novara.core.game.StoryCreationForm
 import com.denova.novara.core.game.StoryLibrary
 import com.denova.novara.core.i18n.resolve
+import com.denova.novara.core.stream.AgentAskInteraction
+import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.StorySummary
 import com.denova.novara.core.stream.GameActivity
@@ -197,6 +199,55 @@ fun GameScreen(
         }
         uiState.error?.let {
             Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
+        }
+
+        // 运行时控制（GAM-012 / GAM-013）：运行中可暂停；挂起或存在待续接输入时可续接 / 放弃。
+        val hasPendingInterruption = !uiState.pendingInterruptionId.isNullOrBlank()
+        if (uiState.stage.phase == GamePhase.RUNNING ||
+            uiState.stage.phase == GamePhase.SUSPENDED ||
+            hasPendingInterruption
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (uiState.stage.phase == GamePhase.RUNNING) {
+                    TextButton(
+                        onClick = { viewModel.suspendGame() },
+                        enabled = !uiState.runtimeBusy,
+                    ) { Text(stringResource(R.string.game_runtime_suspend)) }
+                } else {
+                    TextButton(
+                        onClick = { viewModel.resumeGame() },
+                        enabled = !uiState.runtimeBusy,
+                    ) { Text(stringResource(R.string.game_runtime_resume)) }
+                    if (hasPendingInterruption) {
+                        TextButton(
+                            onClick = { viewModel.abandonPendingTurn() },
+                            enabled = !uiState.runtimeBusy,
+                        ) { Text(stringResource(R.string.game_runtime_abandon)) }
+                    }
+                }
+            }
+        }
+        uiState.runtimeError?.let {
+            Text(
+                it.resolve(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 12.dp),
+            )
+        }
+
+        // 提问卡片（GAM-011）：挂起时铺在输入区上方；已解决时只留一行状态。
+        uiState.ask?.let { ask ->
+            AskCard(
+                ask = ask,
+                busy = uiState.runtimeBusy,
+                onSubmit = { selected -> viewModel.answerAsk(selected) },
+                onCancel = { viewModel.cancelAsk() },
+            )
         }
 
         // 叙事单独收集 blocks 流：高频更新只重组本面板
@@ -604,6 +655,74 @@ private fun StoryCreationDialog(
                         onClick = onSubmit,
                         enabled = !state.submitting && !state.loadingResources,
                     ) { Text(stringResource(R.string.game_create_submit)) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 提问卡片（GAM-011）：每个问题一行选项；单选点选替换、多选切换。
+ * 未全部作答时提交按钮不可用，避免发空答案被服务端以 `invalid_ask_answer` 拒绝。
+ */
+@Composable
+private fun AskCard(
+    ask: AgentAskInteraction,
+    busy: Boolean,
+    onSubmit: (Map<String, List<String>>) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var selected by remember(ask.id) { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+        tonalElevation = 3.dp,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Text(
+                if (ask.isPending) {
+                    stringResource(R.string.game_ask_title)
+                } else {
+                    AgentAskLogic.statusText(ask).resolve()
+                },
+                style = MaterialTheme.typography.titleSmall,
+            )
+            ask.questions.forEach { question ->
+                Text(
+                    question.question,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    question.options.forEach { option ->
+                        FilterChip(
+                            selected = selected[question.id]?.contains(option.id) == true,
+                            onClick = {
+                                selected = selected + (
+                                    question.id to AgentAskLogic.toggle(
+                                        question,
+                                        selected[question.id].orEmpty(),
+                                        option.id,
+                                    )
+                                    )
+                            },
+                            label = { Text(option.label.ifBlank { option.id }, maxLines = 1) },
+                        )
+                    }
+                }
+            }
+            if (ask.isPending) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onCancel, enabled = !busy) {
+                        Text(stringResource(R.string.common_cancel))
+                    }
+                    TextButton(
+                        onClick = { onSubmit(selected) },
+                        enabled = !busy && AgentAskLogic.canSubmit(ask, selected),
+                    ) { Text(stringResource(R.string.game_ask_submit)) }
                 }
             }
         }
