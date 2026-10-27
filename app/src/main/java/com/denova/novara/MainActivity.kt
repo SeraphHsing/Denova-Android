@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,6 +84,9 @@ import com.denova.novara.ui.theme.NovaraTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
+
+    /** 资料库草稿要跨页面存活（LOR-004），所以放在 Activity 作用域。 */
+    private val loreViewModel: com.denova.novara.feature.lore.LoreViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!logcatInstalled) {
@@ -407,6 +411,7 @@ class MainActivity : AppCompatActivity() {
                                             client = connectionViewModel.client,
                                             projectId = currentProjectId,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            viewModel = loreViewModel,
                                         )
                                     }
                                     appDestinations.filter { !it.implemented }.forEach { destination ->

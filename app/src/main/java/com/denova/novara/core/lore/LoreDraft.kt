@@ -10,6 +10,7 @@ import com.denova.novara.core.network.LoreItemSummary
  * 标签、启用状态都还在（Web 侧同样把表单当本地状态）。保存时才组装 [LoreItemInput]，
  * 并把服务端 `base_revision` 一起带上，冲突交给 409 提示，不静默覆盖。
  */
+@kotlinx.serialization.Serializable
 data class LoreDraft(
     val id: String = "",
     val categoryId: String = "world",

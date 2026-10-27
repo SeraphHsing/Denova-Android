@@ -1455,7 +1455,7 @@ class DenovaClient(
             okHttpClient.newCall(request).execute().use { resp ->
                 val text = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toException(resp.code, text)
-                json.decodeFromString(LoreItemResponse.serializer(), text).item
+                json.decodeFromString(LoreItemSummary.serializer(), text)
             }
         }
     }
@@ -1469,7 +1469,7 @@ class DenovaClient(
         writeJson(
             url = loreUrl(projectId, "items/$itemId/materials"),
             payload = json.encodeToString(LoreMaterialMutation.serializer(), mutation),
-        ) { json.decodeFromString(LoreItemResponse.serializer(), it).item }
+        ) { json.decodeFromString(LoreItemSummary.serializer(), it) }
 
     suspend fun loreAssets(projectId: String): List<LoreMaterial> =
         getJson(loreUrl(projectId, "assets")) {
@@ -1479,7 +1479,7 @@ class DenovaClient(
     /** 生成条目配图：`POST .../items/:id/image/generate`（失败时服务端给 `api.lore.image*` 原因）。 */
     suspend fun generateLoreImage(projectId: String, itemId: String): LoreItemSummary =
         writeJson(url = loreUrl(projectId, "items/$itemId/image/generate"), payload = "{}") {
-            json.decodeFromString(LoreItemResponse.serializer(), it).item
+            json.decodeFromString(LoreItemSummary.serializer(), it)
         }
 
     /** 生成条目语音：`POST .../items/:id/speech/generate`，返回更新后的条目（含新 MP3 材料）。 */
@@ -1487,7 +1487,7 @@ class DenovaClient(
         writeJson(
             url = loreUrl(projectId, "items/$itemId/speech/generate"),
             payload = json.encodeToString(LoreSpeechRequest.serializer(), request),
-        ) { json.decodeFromString(LoreItemResponse.serializer(), it).item }
+        ) { json.decodeFromString(LoreItemSummary.serializer(), it) }
 
     suspend fun loreIndex(projectId: String): LoreIndexSnapshot =
         getJson(loreUrl(projectId, "index")) { json.decodeFromString(LoreIndexSnapshot.serializer(), it) }

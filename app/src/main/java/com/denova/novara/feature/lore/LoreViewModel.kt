@@ -2,6 +2,7 @@ package com.denova.novara.feature.lore
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.denova.novara.R
 import com.denova.novara.core.i18n.UiText
@@ -72,13 +73,39 @@ data class LoreUiState(
  * 资料库：分类与条目（LOR-001）、材料与媒体（LOR-002）、索引与分类预览（LOR-003）、
  * 跨页草稿（LOR-004）。服务端是唯一事实源，所有写操作完成后都重读。
  */
-class LoreViewModel(application: Application) : AndroidViewModel(application) {
+class LoreViewModel(
+    application: Application,
+    private val savedState: SavedStateHandle,
+) : AndroidViewModel(application) {
 
     private var client: DenovaClient? = null
     private val _state = MutableStateFlow(LoreUiState())
     val state: StateFlow<LoreUiState> = _state.asStateFlow()
 
     private var loadJob: Job? = null
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+    init {
+        // Activity 重建（返回键 / 配置变化）会重建 ViewModel：草稿从 SavedStateHandle 恢复，
+        // 否则「正在编辑的条目」在离开页面后就没了（LOR-004）。
+        savedState.get<String>(KEY_DRAFT)?.let { raw ->
+            runCatching { json.decodeFromString(LoreDraft.serializer(), raw) }
+                .onSuccess { draft ->
+                    _state.value = _state.value.copy(
+                        draft = draft,
+                        selectedItemId = draft.id.ifBlank { null },
+                    )
+                }
+        }
+    }
+
+    private fun persistDraft(draft: LoreDraft?) {
+        if (draft == null) {
+            savedState.remove(KEY_DRAFT)
+        } else {
+            savedState[KEY_DRAFT] = json.encodeToString(LoreDraft.serializer(), draft)
+        }
+    }
 
     fun bindClient(client: DenovaClient) {
         this.client = client
@@ -146,6 +173,7 @@ class LoreViewModel(application: Application) : AndroidViewModel(application) {
             notice = null,
             error = null,
         )
+        persistDraft(_state.value.draft)
     }
 
     fun startNewItem() {
@@ -156,15 +184,18 @@ class LoreViewModel(application: Application) : AndroidViewModel(application) {
             notice = null,
             error = null,
         )
+        persistDraft(_state.value.draft)
     }
 
     fun closeEditor() {
         _state.value = _state.value.copy(draft = null, selectedItemId = null)
+        persistDraft(null)
     }
 
     fun updateDraft(transform: (LoreDraft) -> LoreDraft) {
         val draft = _state.value.draft ?: return
         _state.value = _state.value.copy(draft = transform(draft))
+        persistDraft(_state.value.draft)
     }
 
     fun saveDraft() {
@@ -520,6 +551,10 @@ class LoreViewModel(application: Application) : AndroidViewModel(application) {
                 _state.value = _state.value.copy(busy = false, error = failureText(e, R.string.lore_load_failed))
             }
         }
+    }
+
+    private companion object {
+        const val KEY_DRAFT = "lore_draft"
     }
 
     private fun failureText(error: Exception, fallback: Int): UiText {

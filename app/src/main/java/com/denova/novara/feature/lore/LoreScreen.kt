@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -77,12 +78,9 @@ fun LoreScreen(
     client: DenovaClient?,
     projectId: String,
     onOpenDrawer: () -> Unit,
+    // 由 Activity 持有：资料库草稿要跨页面存活（LOR-004），不能绑在导航目的地的作用域上。
+    viewModel: LoreViewModel,
 ) {
-    val application = LocalContext.current.applicationContext as Application
-    val factory: ViewModelProvider.Factory = remember(application) {
-        viewModelFactory { initializer { LoreViewModel(application) } }
-    }
-    val viewModel: LoreViewModel = viewModel(factory = factory)
     LaunchedEffect(client) { client?.let { viewModel.bindClient(it) } }
     LaunchedEffect(projectId, client) { if (client != null) viewModel.load(projectId) }
     LoreContent(state = viewModel.state.collectAsState().value, viewModel = viewModel, onOpenDrawer = onOpenDrawer)
@@ -103,7 +101,8 @@ private fun LoreContent(
     var speechFor by remember { mutableStateOf<LoreItemSummary?>(null) }
 
     Column(
-        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
+        // imePadding：表单底部（保存 / 材料）要能被键盘顶上来，否则手机上永远点不到。
+        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding(),
     ) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
