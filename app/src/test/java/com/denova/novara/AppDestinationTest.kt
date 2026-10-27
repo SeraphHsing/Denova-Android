@@ -15,10 +15,10 @@ class AppDestinationTest {
     }
 
     @Test
-    fun `exactly four destinations are implemented`() {
-        // P4-B：工作台宿主页面落地，导航项由 WIP 变为可进入。
+    fun `implemented destinations match the shipped pages`() {
+        // P4-B：工作台宿主页面落地；P4-C：书籍管理页落地。其余保持 WIP，直到对应页面接上。
         val implemented = appDestinations.filter { it.implemented }.map { it.route }
-        assertEquals(listOf("editor", "game", "agent", "workbench"), implemented)
+        assertEquals(listOf("editor", "game", "agent", "workbench", "books"), implemented)
     }
 
     @Test

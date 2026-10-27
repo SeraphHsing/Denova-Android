@@ -1479,6 +1479,252 @@ class DenovaClient(
         }
     }
 
+    // ---- 书籍管理（P4-C / BOK-001·002·003）----
+
+    /** 服务端当前工作区：`GET /api/workspace/current`。 */
+    suspend fun currentWorkspace(): WorkspaceCurrentResponse =
+        getJson(apiUrl("workspace/current")) { json.decodeFromString(WorkspaceCurrentResponse.serializer(), it) }
+
+    /** 书籍元信息：`GET /api/books/info?path=`。 */
+    suspend fun bookInfo(path: String): BookMeta {
+        val url = apiUrl("books/info").newBuilder().addQueryParameter("path", path).build()
+        return getJson(url) { json.decodeFromString(BookMeta.serializer(), it) }
+    }
+
+    /** 更新书籍元信息：`PUT /api/books/info`（title 为空表示不改标题）。 */
+    suspend fun updateBookInfo(path: String, title: String, author: String, description: String): BookMeta {
+        val body = json.encodeToString(
+            BookInfoRequest.serializer(),
+            BookInfoRequest(path = path, title = title, author = author, description = description),
+        )
+        val request = Request.Builder()
+            .url(apiUrl("books/info"))
+            .put(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(BookMeta.serializer(), text)
+            }
+        }
+    }
+
+    /** 从书架移除（磁盘目录保留）：`POST /api/books/remove`。 */
+    suspend fun removeBook(path: String): BookRemoveResponse {
+        val body = json.encodeToString(BookRemoveRequest.serializer(), BookRemoveRequest(path))
+        val request = Request.Builder()
+            .url(apiUrl("books/remove"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(BookRemoveResponse.serializer(), text)
+            }
+        }
+    }
+
+    /** 保存书籍顺序：`POST /api/books/reorder`（提交完整路径表）。 */
+    suspend fun reorderBooks(paths: List<String>) {
+        val body = json.encodeToString(BookReorderRequest.serializer(), BookReorderRequest(paths))
+        val request = Request.Builder()
+            .url(apiUrl("books/reorder"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
+    /** 切换排序模式：`POST /api/books/sort-mode`（`manual` / `recent`）。 */
+    suspend fun setBookSortMode(mode: String) {
+        val body = json.encodeToString(BookSortModeRequest.serializer(), BookSortModeRequest(mode))
+        val request = Request.Builder()
+            .url(apiUrl("books/sort-mode"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
+    /** 导出书籍：`GET /api/books/export?path=&format=`，返回文件名与字节（不落盘由界面决定）。 */
+    suspend fun exportBook(path: String, format: String = "txt"): BookExportFile {
+        val url = apiUrl("books/export").newBuilder()
+            .addQueryParameter("path", path)
+            .addQueryParameter("format", format)
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                val bytes = resp.body?.bytes() ?: ByteArray(0)
+                if (!resp.isSuccessful) {
+                    throw toException(resp.code, bytes.toString(Charsets.UTF_8))
+                }
+                BookExportFile(
+                    fileName = resp.header("Content-Disposition")?.let(::fileNameFromDisposition).orEmpty()
+                        .ifBlank { "book.$format" },
+                    bytes = bytes,
+                )
+            }
+        }
+    }
+
+    /** 上传封面：`POST /api/books/cover/upload`（multipart `path` + `file`）。 */
+    suspend fun uploadBookCover(path: String, file: UploadFile): BookCoverResult {
+        val body = multipartBody(
+            fields = mapOf("path" to path),
+            fileField = "file",
+            file = file,
+        )
+        val request = Request.Builder().url(apiUrl("books/cover/upload")).post(body).build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(BookCoverResult.serializer(), text)
+            }
+        }
+    }
+
+    /** 生成封面：`POST /api/books/cover/generate`（需要可用的图像 Agent / 预设）。 */
+    suspend fun generateBookCover(payload: BookCoverGenerateRequest): BookCoverResult {
+        val body = json.encodeToString(BookCoverGenerateRequest.serializer(), payload)
+        val request = Request.Builder()
+            .url(apiUrl("books/cover/generate"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(BookCoverResult.serializer(), text)
+            }
+        }
+    }
+
+    /** 预览小说章节切分：`POST /api/books/import-novel/preview`（**不写入** workspace）。 */
+    suspend fun previewNovelImport(
+        file: UploadFile,
+        sampleChars: Int = 0,
+        splitRegex: String = "",
+        splitStrategy: String = "",
+    ): NovelImportPreview {
+        val body = multipartBody(
+            fields = buildMap {
+                if (sampleChars > 0) put("sample_chars", sampleChars.toString())
+                if (splitRegex.isNotBlank()) put("split_regex", splitRegex)
+                if (splitStrategy.isNotBlank()) put("split_strategy", splitStrategy)
+            },
+            fileField = "file",
+            file = file,
+        )
+        val request = Request.Builder().url(apiUrl("books/import-novel/preview")).post(body).build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(NovelImportPreview.serializer(), text)
+            }
+        }
+    }
+
+    /** 提交小说导入：`POST /api/books/import-novel`（服务端会新建书籍并切换工作区）。 */
+    suspend fun importNovel(
+        file: UploadFile,
+        bookTitle: String = "",
+        author: String = "",
+        description: String = "",
+        sampleChars: Int = 0,
+        splitRegex: String = "",
+        splitStrategy: String = "",
+    ): NovelImportResult {
+        val body = multipartBody(
+            fields = buildMap {
+                if (bookTitle.isNotBlank()) put("book_title", bookTitle)
+                if (author.isNotBlank()) put("author", author)
+                if (description.isNotBlank()) put("description", description)
+                if (sampleChars > 0) put("sample_chars", sampleChars.toString())
+                if (splitRegex.isNotBlank()) put("split_regex", splitRegex)
+                if (splitStrategy.isNotBlank()) put("split_strategy", splitStrategy)
+            },
+            fileField = "file",
+            file = file,
+        )
+        val request = Request.Builder().url(apiUrl("books/import-novel")).post(body).build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(NovelImportResult.serializer(), text)
+            }
+        }
+    }
+
+    /** 预览酒馆角色卡：`POST /api/imports/character-card/preview`（只解析，不写入）。 */
+    suspend fun previewCharacterCard(file: UploadFile): CharacterCardPreview {
+        val body = multipartBody(emptyMap(), fileField = "file", file = file)
+        val request = Request.Builder().url(apiUrl("imports/character-card/preview")).post(body).build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(CharacterCardPreview.serializer(), text)
+            }
+        }
+    }
+
+    /** 以角色卡新建书籍：`POST /api/books/import-character-card`（target 固定为 new_book）。 */
+    suspend fun importCharacterCardAsNewBook(file: UploadFile, bookTitle: String = ""): CharacterCardImportResult {
+        val body = multipartBody(
+            fields = buildMap { if (bookTitle.isNotBlank()) put("book_title", bookTitle) },
+            fileField = "file",
+            file = file,
+        )
+        val request = Request.Builder().url(apiUrl("books/import-character-card")).post(body).build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(CharacterCardImportResult.serializer(), text)
+            }
+        }
+    }
+
+    /** 封面地址（带版本参数，避免缓存旧图）；由界面交给认证图片加载器。 */
+    fun bookCoverUrl(path: String, version: String): HttpUrl =
+        apiUrl("books/cover").newBuilder()
+            .addQueryParameter("path", path)
+            .addQueryParameter("v", version)
+            .build()
+
+    private fun multipartBody(
+        fields: Map<String, String>,
+        fileField: String,
+        file: UploadFile,
+    ): okhttp3.MultipartBody {
+        val builder = okhttp3.MultipartBody.Builder().setType(okhttp3.MultipartBody.FORM)
+        fields.forEach { (name, value) -> builder.addFormDataPart(name, value) }
+        val mime = file.mimeType.ifBlank { "application/octet-stream" }.toMediaType()
+        builder.addFormDataPart(fileField, file.fileName, file.bytes.toRequestBody(mime))
+        return builder.build()
+    }
+
+    /** `Content-Disposition: attachment; filename="x.txt"; filename*=UTF-8''%E4%B8%AD.txt` */
+    private fun fileNameFromDisposition(header: String): String {
+        val encoded = Regex("filename\\*=UTF-8''([^;]+)").find(header)?.groupValues?.getOrNull(1)
+        if (!encoded.isNullOrBlank()) {
+            return runCatching { java.net.URLDecoder.decode(encoded, "UTF-8") }.getOrDefault(encoded)
+        }
+        val plain = Regex("filename=\"([^\"]+)\"").find(header)?.groupValues?.getOrNull(1)
+        return plain.orEmpty()
+    }
+
     // ---- 终端（G5）----
 
     /** 创建 PTY 会话；`owner_tab_id` 决定归属，重进时据此找回同一 PTY。 */

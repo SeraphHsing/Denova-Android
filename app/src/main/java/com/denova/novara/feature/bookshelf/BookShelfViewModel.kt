@@ -46,6 +46,12 @@ class BookShelfViewModel(application: Application) : AndroidViewModel(applicatio
         this.client = client
     }
 
+    /** 强制重读（书籍管理页新建 / 导入 / 移除后同步抽屉里的书籍列表）。 */
+    fun refresh() {
+        _state.value = _state.value.copy(books = emptyList())
+        load()
+    }
+
     fun load() {
         val c = client ?: return
         if (_state.value.books.isNotEmpty() || _state.value.loading) return
