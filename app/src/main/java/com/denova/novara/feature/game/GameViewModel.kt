@@ -120,6 +120,10 @@ data class GameUiState(
     val runtimeError: UiText? = null,
     /** active 投影报告的挂起输入 id：非空即可「续接 / 放弃挂起」（重启后也能恢复入口）。 */
     val pendingInterruptionId: String? = null,
+    /** 正在编辑叙事的那一轮（GAM-015）；null 表示编辑弹窗关闭。 */
+    val editingTurnId: String? = null,
+    val editingBusy: Boolean = false,
+    val editingError: UiText? = null,
     /** 分支列表（快照 `graph.branches` 或 `GET /branches`）。 */
     val branches: List<BranchSummary> = emptyList(),
     val branchPlan: BranchPlan? = null,
@@ -265,6 +269,64 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 "active probe active=${active.active} phase=${active.phase} pending=${pending != null} " +
                     "actions=${active.recoveryActions.map { it.kind }}",
             )
+        }
+    }
+
+    // ---- 剧情编辑（P4-A / GAM-015）----
+
+    /** 该轮当前正文（编辑弹窗初值）。 */
+    fun turnNarrative(turnId: String): String? = loadedTurns.firstOrNull { it.id == turnId }?.narrative
+
+    fun beginEditTurn(turnId: String) {
+        if (loadedTurns.none { it.id == turnId }) return
+        _uiState.value = _uiState.value.copy(editingTurnId = turnId, editingError = null)
+    }
+
+    fun cancelEditTurn() {
+        _uiState.value = _uiState.value.copy(editingTurnId = null, editingBusy = false, editingError = null)
+    }
+
+    /**
+     * 保存叙事编辑：`expected_narrative` 用**本地所见的正文**做乐观锁，
+     * 服务端若已被别处修改会拒绝（409），此时提示重新加载而不是覆盖。
+     */
+    fun saveTurnNarrative(turnId: String, narrative: String) {
+        val client = client ?: return
+        val state = _uiState.value
+        val turn = loadedTurns.firstOrNull { it.id == turnId }
+        if (turn == null || state.storyId.isBlank() || state.editingBusy) return
+        val expected = turn.narrative.orEmpty()
+        if (narrative == expected) {
+            _uiState.value = state.copy(editingTurnId = null, editingError = null)
+            return
+        }
+        _uiState.value = state.copy(editingBusy = true, editingError = null)
+        viewModelScope.launch {
+            val updated = try {
+                client.updateTurnNarrative(state.storyId, turnId, state.branchId, narrative, expected)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: DenovaApiException) {
+                DenovaLog.w("Game", "update narrative rejected status=${e.status}", e)
+                _uiState.value = _uiState.value.copy(
+                    editingBusy = false,
+                    editingError = e.message?.let { UiText.raw(it) }
+                        ?: UiText.of(R.string.game_narrative_conflict),
+                )
+                return@launch
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "update narrative failed", e)
+                _uiState.value = _uiState.value.copy(
+                    editingBusy = false,
+                    editingError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            // 用服务端返回的轮次替换本地副本，再整段重建叙事（该轮块内容随之更新）。
+            loadedTurns = loadedTurns.map { if (it.id == turnId) updated else it }
+            rebuildNarrative(keepStreamTail = false)
+            _uiState.value = _uiState.value.copy(editingTurnId = null, editingBusy = false, editingError = null)
+            DenovaLog.i("Game", "turn narrative updated turn=$turnId len=${updated.narrative.orEmpty().length}")
         }
     }
 

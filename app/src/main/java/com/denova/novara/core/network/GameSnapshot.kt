@@ -142,6 +142,26 @@ data class UpdateBranchPlanResult(
     @SerialName("context_revision") val contextRevision: Long = 0,
 )
 
+// ---- 剧情编辑（P4-A / GAM-015）----
+
+/**
+ * `PATCH .../turns/:turnId/narrative`（GAM-015）。
+ *
+ * `expected_narrative` 是乐观锁：必须等于服务端当前正文，否则服务端拒绝（409），
+ * 避免用过期文本覆盖别人刚改过的这一轮。
+ */
+@Serializable
+data class UpdateTurnNarrativeRequest(
+    @SerialName("branch_id") val branchId: String,
+    val narrative: String,
+    @SerialName("expected_narrative") val expectedNarrative: String,
+)
+
+@Serializable
+data class UpdateTurnNarrativeResult(
+    val turn: TurnEvent = TurnEvent(),
+)
+
 // ---- 提问与运行时命令（P4-A / GAM-011、GAM-012、GAM-013）----
 
 /** `POST /api/interactive/chat/asks/:askId/answer`。 */

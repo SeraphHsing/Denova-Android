@@ -249,6 +249,9 @@
     <string name="game_runtime_resume">Resume</string>
     <string name="game_runtime_abandon">Discard pending</string>
     <string name="game_runtime_operation_changed">The run changed elsewhere; reload before discarding</string>
+    <string name="game_turn_edit">Edit</string>
+    <string name="game_turn_edit_title">Edit turn narrative</string>
+    <string name="game_narrative_conflict">This turn changed elsewhere; reload before saving</string>
     <string name="game_console_branch_fork">Fork</string>
     <string name="game_console_branch_switch">Switch</string>
     <string name="game_console_branch_delete">Delete</string>

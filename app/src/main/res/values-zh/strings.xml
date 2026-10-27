@@ -249,6 +249,9 @@
     <string name="game_runtime_resume">续接</string>
     <string name="game_runtime_abandon">放弃挂起</string>
     <string name="game_runtime_operation_changed">运行已在别处变化，请先刷新再放弃</string>
+    <string name="game_turn_edit">编辑</string>
+    <string name="game_turn_edit_title">编辑这一轮叙事</string>
+    <string name="game_narrative_conflict">这一轮已在别处修改，请先重新加载再保存</string>
     <string name="game_console_branch_fork">分叉</string>
     <string name="game_console_branch_switch">切换</string>
     <string name="game_console_branch_delete">删除</string>

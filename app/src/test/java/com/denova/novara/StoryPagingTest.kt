@@ -3,6 +3,7 @@ package com.denova.novara
 import com.denova.novara.core.network.BranchesResponse
 import com.denova.novara.core.network.SendInteractiveChatRequest
 import com.denova.novara.core.network.UpdateBranchPlanResult
+import com.denova.novara.core.network.UpdateTurnNarrativeRequest
 import com.denova.novara.core.stream.NarrativeBuilder
 import com.denova.novara.core.stream.StoryPaging
 import com.denova.novara.core.stream.StoryTurnText
@@ -139,6 +140,20 @@ class StoryPagingTest {
         val regen = plain.copy(regenerateFromTurnId = "t7")
         val regenText = json.encodeToString(SendInteractiveChatRequest.serializer(), regen)
         assertTrue(regenText.contains("\"regenerate_from_turn_id\":\"t7\""))
+    }
+
+    @Test
+    fun `narrative edit request carries expected text`() {
+        val request = UpdateTurnNarrativeRequest(
+            branchId = "main",
+            narrative = "新正文",
+            expectedNarrative = "旧正文",
+        )
+        val text = json.encodeToString(UpdateTurnNarrativeRequest.serializer(), request)
+
+        assertTrue(text.contains("\"branch_id\":\"main\""))
+        assertTrue(text.contains("\"narrative\":\"新正文\""))
+        assertTrue(text.contains("\"expected_narrative\":\"旧正文\""))
     }
 
     @Test

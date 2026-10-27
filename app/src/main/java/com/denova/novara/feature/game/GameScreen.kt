@@ -282,11 +282,14 @@ fun GameScreen(
 
         // 发送玩家输入（POST 实时流；先落本地命令事务再发送）
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            // GAM-004：Enter 只换行、点「发送」才提交（与 Web 一致）。因此不能用 singleLine，
+            // 否则回车被输入框吞掉，既发不出去也换不了行。
             OutlinedTextField(
                 value = input,
                 onValueChange = { input = it },
                 label = { Text(stringResource(R.string.game_player_input)) },
-                singleLine = true,
+                minLines = 1,
+                maxLines = 4,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
             OutlinedButton(

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -64,6 +65,13 @@ fun GameConsoleContent(
     onForkTurn: (String) -> Unit,
     onSwitchVersion: (String, Int) -> Unit,
     onRegenerate: (String) -> Unit,
+    onEditTurn: (String) -> Unit,
+    editingTurnId: String?,
+    editingNarrative: String?,
+    editingBusy: Boolean,
+    editingError: UiText?,
+    onSaveEdit: (String, String) -> Unit,
+    onCancelEdit: () -> Unit,
     onSwitchBranch: (String) -> Unit,
     onDeleteBranch: (String) -> Unit,
     onSavePlan: (String) -> Unit,
@@ -197,6 +205,9 @@ fun GameConsoleContent(
                                 ) {
                                     Text(stringResource(R.string.game_console_turn_regenerate))
                                 }
+                                TextButton(onClick = { onEditTurn(anchor.turnId) }, enabled = !branchBusy) {
+                                    Text(stringResource(R.string.game_turn_edit))
+                                }
                             }
                         }
                     }
@@ -275,6 +286,17 @@ fun GameConsoleContent(
         }
     }
 
+    if (editingTurnId != null) {
+        NarrativeEditDialog(
+            turnId = editingTurnId,
+            initial = editingNarrative.orEmpty(),
+            busy = editingBusy,
+            error = editingError,
+            onSave = onSaveEdit,
+            onCancel = onCancelEdit,
+        )
+    }
+
     pendingDelete?.let { branchId ->
         AlertDialog(
             onDismissRequest = { pendingDelete = null },
@@ -293,6 +315,55 @@ fun GameConsoleContent(
             },
         )
     }
+}
+
+/**
+ * 叙事编辑弹窗（GAM-015）：初值是该轮当前正文，保存时由 ViewModel 带上
+ * `expected_narrative` 做乐观锁；冲突时保留草稿并提示重新加载。
+ */
+@Composable
+private fun NarrativeEditDialog(
+    turnId: String,
+    initial: String,
+    busy: Boolean,
+    error: UiText?,
+    onSave: (String, String) -> Unit,
+    onCancel: () -> Unit,
+) {
+    var draft by remember(turnId) { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = { if (!busy) onCancel() },
+        title = { Text(stringResource(R.string.game_turn_edit_title)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = draft,
+                    onValueChange = { draft = it },
+                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                    minLines = 6,
+                    maxLines = 16,
+                )
+                error?.let {
+                    Text(
+                        it.resolve(),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onSave(turnId, draft) }, enabled = !busy && draft.isNotBlank()) {
+                Text(stringResource(R.string.game_console_plan_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancel, enabled = !busy) {
+                Text(stringResource(R.string.common_cancel))
+            }
+        },
+    )
 }
 
 @Composable

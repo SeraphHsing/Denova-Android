@@ -27,6 +27,7 @@ import com.denova.novara.core.stream.RecoveryAction
 import com.denova.novara.core.stream.RecoveryReceipt
 import com.denova.novara.core.stream.RecoveryRequest
 import com.denova.novara.core.stream.StoryHistoryPage
+import com.denova.novara.core.stream.TurnEvent
 import com.denova.novara.core.stream.parseGameStreamError
 import com.denova.novara.core.terminal.TerminalCreateRequest
 import com.denova.novara.core.terminal.TerminalSessionInfo
@@ -1153,6 +1154,34 @@ class DenovaClient(
                 val body = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
                 json.decodeFromString(InteractiveSnapshot.serializer(), body)
+            }
+        }
+    }
+
+    /**
+     * 编辑某轮叙事（GAM-015）：`PATCH .../turns/:turnId/narrative` body `{branch_id, narrative, expected_narrative}`。
+     * 返回该轮的新内容（服务端会追加一次编辑事件并保持 turn 身份不变）。
+     */
+    suspend fun updateTurnNarrative(
+        storyId: String,
+        turnId: String,
+        branchId: String,
+        narrative: String,
+        expectedNarrative: String,
+    ): TurnEvent {
+        val body = json.encodeToString(
+            UpdateTurnNarrativeRequest.serializer(),
+            UpdateTurnNarrativeRequest(branchId, narrative, expectedNarrative),
+        )
+        val request = Request.Builder()
+            .url(interactiveStoryUrl(storyId, "turns/$turnId/narrative"))
+            .patch(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(UpdateTurnNarrativeResult.serializer(), text).turn
             }
         }
     }

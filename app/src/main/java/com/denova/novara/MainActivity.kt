@@ -414,6 +414,13 @@ class MainActivity : AppCompatActivity() {
                                         gameViewModel.switchTurnVersion(turnId, direction)
                                     },
                                     onRegenerate = { gameViewModel.regenerateTurn(it) },
+                                    onEditTurn = { gameViewModel.beginEditTurn(it) },
+                                    editingTurnId = gameUi.editingTurnId,
+                                    editingNarrative = gameUi.editingTurnId?.let { gameViewModel.turnNarrative(it) },
+                                    editingBusy = gameUi.editingBusy,
+                                    editingError = gameUi.editingError,
+                                    onSaveEdit = { turnId, text -> gameViewModel.saveTurnNarrative(turnId, text) },
+                                    onCancelEdit = { gameViewModel.cancelEditTurn() },
                                     onSwitchBranch = { gameViewModel.switchBranch(it) },
                                     onDeleteBranch = { gameViewModel.deleteBranch(it) },
                                     onSavePlan = { gameViewModel.saveBranchPlan(it) },
