@@ -222,6 +222,16 @@
     <string name="game_story_delete">Delete</string>
     <string name="game_story_delete_title">Delete story</string>
     <string name="game_story_delete_confirm">Delete \"%1$s\"? This cannot be undone.</string>
+    <string name="game_console_overview">%1$d turns · %2$d branches · %3$d earlier</string>
+    <string name="game_console_actors">Characters</string>
+    <string name="game_console_world">World</string>
+    <string name="game_console_changes">This turn</string>
+    <string name="game_console_empty">No state yet</string>
+    <string name="game_console_state_pending">State is being computed…</string>
+    <string name="game_console_state_failed">State failed: %1$s</string>
+    <string name="game_console_no_actors">No characters in state</string>
+    <string name="game_console_no_world">No world facts in state</string>
+    <string name="game_console_no_fields">No fields</string>
     <string name="game_create">New story</string>
     <string name="game_create_title">New story</string>
     <string name="game_create_story_title">Title (optional)</string>

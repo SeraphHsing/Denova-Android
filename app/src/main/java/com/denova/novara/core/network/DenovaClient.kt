@@ -1127,6 +1127,24 @@ class DenovaClient(
         }
     }
 
+    /**
+     * 故事快照（GAM-003 / GAM-006）：`GET /api/interactive/stories/:id/snapshot?branch=`。
+     * 返回尾部轮次窗口、规范状态、当前轮（行动选项来源）与分支图；更早历史仍走 [interactiveHistory]。
+     */
+    suspend fun interactiveSnapshot(storyId: String, branchId: String): InteractiveSnapshot {
+        val request = Request.Builder()
+            .url(interactiveSnapshotUrl(storyId, branchId))
+            .get()
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
+                json.decodeFromString(InteractiveSnapshot.serializer(), body)
+            }
+        }
+    }
+
     // ---- 故事库（P4-A / GAM-001、GAM-002）----
 
     /** 故事列表：`GET /api/interactive/stories` → `{current_story_id, stories[]}`。 */
@@ -1434,6 +1452,11 @@ class DenovaClient(
                     "api/interactive/stories/$storyId"
                 },
             )
+            .build()
+
+    private fun interactiveSnapshotUrl(storyId: String, branchId: String): HttpUrl =
+        interactiveStoryUrl(storyId, "snapshot").newBuilder()
+            .apply { if (branchId.isNotBlank()) addQueryParameter("branch", branchId) }
             .build()
 
     private fun interactiveHistoryUrl(storyId: String, branchId: String, limit: Int): HttpUrl =

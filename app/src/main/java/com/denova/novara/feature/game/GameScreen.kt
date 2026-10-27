@@ -17,8 +17,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -29,6 +31,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -198,6 +201,33 @@ fun GameScreen(
 
         // 叙事单独收集 blocks 流：高频更新只重组本面板
         NarrativePane(viewModel = viewModel, modifier = Modifier.weight(1f))
+
+        // 推荐行动（GAM-005）：点选只填入输入框供改写，不直接发送（与 Web 一致）。
+        // 运行中 / 暂停中不展示——那是上一轮的选项，此时点击只会误导（Web 同样隐藏）。
+        val choicesAvailable = uiState.choices.isNotEmpty() &&
+            !uiState.sending &&
+            uiState.stage.phase != GamePhase.RUNNING &&
+            uiState.stage.phase != GamePhase.SUSPENDED
+        if (choicesAvailable) {
+            LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(uiState.choices) { choice ->
+                    AssistChip(
+                        onClick = { input = choice },
+                        label = {
+                            Text(
+                                choice,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 260.dp),
+                            )
+                        },
+                    )
+                }
+            }
+        }
 
         // 发送玩家输入（POST 实时流；先落本地命令事务再发送）
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {

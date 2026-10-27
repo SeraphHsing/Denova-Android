@@ -14,7 +14,10 @@ import com.denova.novara.core.game.StoryCreation
 import com.denova.novara.core.game.StoryCreationForm
 import com.denova.novara.core.game.StoryCreationIssue
 import com.denova.novara.core.game.StoryCreationResources
+import com.denova.novara.core.game.GameChoices
+import com.denova.novara.core.game.StoryLedger
 import com.denova.novara.core.game.StoryLibrary
+import com.denova.novara.core.game.StoryStateLedgerBuilder
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.SendInteractiveChatRequest
@@ -56,6 +59,9 @@ private const val CHUNK_FLUSH_INTERVAL_MS = 60L
 /** 默认分支 id（与 Web 一致；分支切换属 P4-A 后续切片）。 */
 private const val DEFAULT_BRANCH = "main"
 
+/** 轮次状态仍在校算：台账可先展示，稍后补取快照。 */
+private const val STATE_STATUS_PENDING = "pending"
+
 /**
  * 渐进式恢复：首屏只取最近若干轮，让「恢复可操作」不必等全量历史；
  * 全量随后台任务补全（history 耗时随 limit 近似线性：3 轮 ≈0.22s，50 轮 ≈2.1s）。
@@ -63,7 +69,7 @@ private const val DEFAULT_BRANCH = "main"
 private const val FAST_BASELINE_TURNS = 3
 private const val FULL_BASELINE_TURNS = 50
 
-/** 游戏 UI 状态：投影阶段 + 累积叙事 + 连接态。 */
+/** 游戏 UI 状态：投影阶段 + 累积叙事 + 连接态 + 快照派生的行动选项。 */
 data class GameUiState(
     val storyId: String = "",
     val branchId: String = "",
@@ -73,6 +79,16 @@ data class GameUiState(
     val connected: Boolean = false,
     val sending: Boolean = false,
     val error: UiText? = null,
+    /** 当前轮的推荐行动（点选只填入输入框，不直接发送，与 Web 一致）。 */
+    val choices: List<String> = emptyList(),
+    /** 快照是否已加载（决定台账与选项区是否可展示）。 */
+    val snapshotLoaded: Boolean = false,
+    /** 当前分支总轮次 / 快照窗口之前被省略的轮次数（GAM-007 分页用）。 */
+    val turnCount: Int = 0,
+    val turnStart: Int = 0,
+    val hasEarlierTurns: Boolean = false,
+    /** 分支数（`graph.branches`），供右侧控制台概览。 */
+    val branchCount: Int = 0,
 )
 
 /**
@@ -134,6 +150,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _library = MutableStateFlow(StoryLibraryState())
     val library: StateFlow<StoryLibraryState> = _library.asStateFlow()
     private var libraryJob: Job? = null
+
+    /** 状态台账（GAM-006）：只由快照重建，独立成流避免高频叙事影响右侧抽屉。 */
+    private val _ledger = MutableStateFlow(StoryLedger())
+    val ledger: StateFlow<StoryLedger> = _ledger.asStateFlow()
+    private var snapshotJob: Job? = null
+
+    /** 快照请求期间又有新请求（turn persisted / 流结束）时，当前请求结束后补一次。 */
+    private var snapshotQueued = false
 
     /** 故事世代：切换故事即推进，迟到回包据此丢弃（GAM-002 任务隔离）。 */
     private var storyEpoch = 0L
@@ -438,6 +462,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _blocks.value = emptyList()
         resetPerfCounters()
         _uiState.value = GameUiState(storyId = storyId, branchId = branchId)
+        // 旧故事的台账与行动选项不得残留到新故事。
+        _ledger.value = StoryLedger()
+        refreshSnapshot()
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
             // 渐进恢复：先加载最近 FAST_BASELINE_TURNS 轮让界面立刻可操作，
@@ -543,6 +570,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 DenovaLog.w("Game", "send failed code=${e.code} status=${e.status}")
                 updateUiIfCurrent(epoch) { it.copy(error = e.message?.let { msg -> UiText.raw(msg) }) }
                 if (epoch == storyEpoch) finishStream()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // 切故事 / 主动停止会取消发送：命令状态由上层语义决定，这里不吞取消。
+                throw e
             } catch (e: Exception) {
                 commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
                 DenovaLog.w("Game", "send uncertain", e)
@@ -593,6 +623,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 narrative.reset(current.baseline)
                 _blocks.value = narrative.snapshot
                 _uiState.value = current.copy(stage = stage, connected = true, error = null)
+            }
+
+            // 轮次落库即代表规范状态推进：重取快照刷新行动选项与台账。
+            GameEventType.INTERACTIVE_TURN_PERSISTED -> {
+                _uiState.value = current.copy(stage = stage, connected = true, error = null)
+                refreshSnapshot()
             }
 
             else -> _uiState.value = current.copy(stage = stage, connected = true, error = null)
@@ -689,6 +725,83 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             current.stage
         }
         _uiState.value = current.copy(stage = stage, connected = false, sending = false)
+        // 收尾刷新：有轮次落库时快照已由 `interactive_turn_persisted` 刷新，这里只重取列表
+        // （更新 turn_count / updated_at）；无落库但确实跑过流时才补一次快照。
+        if (current.stage.receivedPersistedTurn) {
+            loadStories()
+        } else if (current.stage.phase != GamePhase.IDLE) {
+            refreshSnapshot()
+        }
+    }
+
+    /**
+     * 重取快照（GAM-003 / GAM-006）：行动选项与状态台账都只认快照。
+     * 请求在途时只置「补一次」标记，避免轮次持久化与流结束时的重复请求堆积。
+     */
+    fun refreshSnapshot() {
+        val state = _uiState.value
+        if (state.storyId.isBlank()) return
+        if (snapshotJob?.isActive == true) {
+            snapshotQueued = true
+            return
+        }
+        snapshotJob = viewModelScope.launch {
+            var runOnce = true
+            while (runOnce || snapshotQueued) {
+                runOnce = false
+                snapshotQueued = false
+                val current = _uiState.value
+                loadSnapshot(current.storyId, current.branchId)
+            }
+        }
+    }
+
+    private suspend fun loadSnapshot(storyId: String, branchId: String) {
+        val client = client ?: return
+        if (storyId.isBlank()) return
+        var pendingRetries = 0
+        while (true) {
+            val snapshot = try {
+                client.interactiveSnapshot(storyId, branchId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "snapshot load failed", e)
+                return
+            }
+            // 期间切了故事：丢弃迟到快照，不写新故事的台账与行动选项。
+            if (_uiState.value.storyId != storyId) return
+            val ledger = StoryStateLedgerBuilder.build(snapshot)
+            _ledger.value = ledger
+            val choices = GameChoices.of(snapshot.currentTurn)
+            _uiState.value = _uiState.value.copy(
+                choices = choices,
+                snapshotLoaded = true,
+                turnCount = snapshot.turnCount,
+                turnStart = snapshot.turnStart,
+                hasEarlierTurns = snapshot.hasEarlierTurns || snapshot.turnStart > 0,
+                branchCount = snapshot.graph.branches.size,
+            )
+            // 轮次数以快照为准：列表项可能还是挂接前的旧值，先就地更新避免顶部行显示滞后。
+            _library.value = _library.value.copy(
+                stories = _library.value.stories.map {
+                    if (it.id == storyId) it.copy(turnCount = snapshot.turnCount) else it
+                },
+            )
+            DenovaLog.i(
+                "Game",
+                "snapshot turns=${snapshot.turns.size} total=${snapshot.turnCount} start=${snapshot.turnStart}" +
+                    " actors=${ledger.actors.size} world=${ledger.world.size} changes=${ledger.changes.size}" +
+                    " choices=${choices.size} stateStatus=${snapshot.currentTurn?.stateStatus.orEmpty()}",
+            )
+            // 状态仍在校算（pending）：稍后补取，避免台账停在半成品。
+            if (snapshot.currentTurn?.stateStatus == STATE_STATUS_PENDING && pendingRetries < 2) {
+                pendingRetries++
+                delay(1500)
+                continue
+            }
+            return
+        }
     }
 
     private suspend fun loadBaseline(
@@ -749,6 +862,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         libraryJob?.cancel()
         creationResourceJob?.cancel()
         creationSubmitJob?.cancel()
+        snapshotJob?.cancel()
         super.onCleared()
     }
 }

@@ -1097,13 +1097,4 @@ private fun ChapterRowItem(
     }
 }
 
-@Composable
-fun GameConsoleContent() {
-    Column(Modifier.fillMaxWidth()) {
-        Text(
-            stringResource(R.string.game_console_placeholder),
-            color = MaterialTheme.colorScheme.outline,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-}
+// 游戏控制台（状态台账）已迁至 GameConsoleContent.kt（GAM-006）。

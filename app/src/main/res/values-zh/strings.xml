@@ -222,6 +222,16 @@
     <string name="game_story_delete">删除</string>
     <string name="game_story_delete_title">删除故事</string>
     <string name="game_story_delete_confirm">删除「%1$s」？此操作不可撤销。</string>
+    <string name="game_console_overview">%1$d 轮 · %2$d 分支 · 更早 %3$d 轮</string>
+    <string name="game_console_actors">角色</string>
+    <string name="game_console_world">世界</string>
+    <string name="game_console_changes">本轮变更</string>
+    <string name="game_console_empty">还没有状态台账</string>
+    <string name="game_console_state_pending">状态正在计算…</string>
+    <string name="game_console_state_failed">状态计算失败：%1$s</string>
+    <string name="game_console_no_actors">状态里还没有角色</string>
+    <string name="game_console_no_world">状态里还没有世界事实</string>
+    <string name="game_console_no_fields">没有字段</string>
     <string name="game_create">新建故事</string>
     <string name="game_create_title">新建故事</string>
     <string name="game_create_story_title">标题（可选）</string>

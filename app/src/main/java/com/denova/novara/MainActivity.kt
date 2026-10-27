@@ -388,7 +388,15 @@ class MainActivity : AppCompatActivity() {
                             onDismiss = { showRightDrawer = false },
                         ) {
                             if (isGame) {
-                                GameConsoleContent()
+                                val gameLedger by gameViewModel.ledger.collectAsState()
+                                val gameUi by gameViewModel.uiState.collectAsState()
+                                GameConsoleContent(
+                                    ledger = gameLedger,
+                                    turnCount = gameUi.turnCount,
+                                    turnStart = gameUi.turnStart,
+                                    branchCount = gameUi.branchCount,
+                                    onRefresh = { gameViewModel.refreshSnapshot() },
+                                )
                             } else {
                                 // 写作页右抽屉：项目文件 / 变更审阅。
                                 Column(Modifier.fillMaxSize()) {
