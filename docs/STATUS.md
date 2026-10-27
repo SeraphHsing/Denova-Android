@@ -1,7 +1,7 @@
 # 项目状态
 
 **更新日期：** 2026-10-27  
-**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六关卡已按 [05 §3.1 证据台账](android-web-parity/05-roadmap.md#31-p1-证据台账2026-10-24-核对) 逐条核对并**于 2026-10-24 退出**：G5 / G4 / G2 判据齐备，G3 核心判据（并发合并读回、草稿事务提交前后终止进程）通过，G1 通过（降级：HTTPS/WSS 环境受限、迟到 401 留待 P3），G6 通过（范围受限 SD-01）；未满足项 9 条（环境受限 2、留待 P3 7）已全部定性，无悬空缺口（P3 回补：G3-b/c/d 已于 2026-10-25 全部补测通过，G3 关卡无留项，留待 P3 降为 2 条：G1-d 迟到 401 与 G6-b 权限分层）。复刻矩阵已回写 **39 条 `已完成`**（AUTH-002 / AUTH-003 / AUTH-005 / WRI-001 / WRI-002 / WRI-003 / WRI-004 / WRI-005 / WRI-006 / WRI-007 / WRI-008 / WRI-009 / WRI-010 / WRI-011 / WRI-012 / WRI-013 / WRI-014 / WRI-015 / WRI-016 / AGT-001 / AGT-002 / AGT-003 / AGT-004 / AGT-005 / AGT-006 / AGT-007 / AGT-008 / AGT-009 / AGT-010 / AGT-011 / AGT-012 / AGT-013 / VER-001  / VER-002 / NAV-005 / NAV-007 / WB-004 / WB-007 / WB-009），其余 79 条 `未开始`，口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；**P2 工程基础已落地，P3（写作链路）已收官，P4-A（游戏）进行中**。  
+**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六关卡已按 [05 §3.1 证据台账](android-web-parity/05-roadmap.md#31-p1-证据台账2026-10-24-核对) 逐条核对并**于 2026-10-24 退出**：G5 / G4 / G2 判据齐备，G3 核心判据（并发合并读回、草稿事务提交前后终止进程）通过，G1 通过（降级：HTTPS/WSS 环境受限、迟到 401 留待 P3），G6 通过（范围受限 SD-01）；未满足项 9 条（环境受限 2、留待 P3 7）已全部定性，无悬空缺口（P3 回补：G3-b/c/d 已于 2026-10-25 全部补测通过，G3 关卡无留项，留待 P3 降为 2 条：G1-d 迟到 401 与 G6-b 权限分层）。复刻矩阵 118 条中已回写 **53 条 `已完成`**、其余 **65 条 `未开始`**（口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；逐条状态以 [parity-matrix.csv](android-web-parity/parity-matrix.csv) 为准）；**P2 工程基础已落地，P3（写作链路）已收官，P4-A（游戏）已收口，P4-B（工作台）进行中**。  
 **产品实现状态：** P1 原型链路可用（连接认证 / 编辑器 / 游戏流 / 写作流 / 终端）；目标形态的公共界面（单 Activity 导航、左右抽屉、DesignTokens、主题与中英文）和业务页面尚未实现。
 
 ## 当前基线
@@ -170,6 +170,8 @@
 
 - 2026-10-27 **P4-A 补验（开场生成 / 历史翻页）**：`SendInteractiveChatRequest` 增 `start_opening`（0 轮故事的首轮生成），`GameViewModel.startOpening()` + 舞台「生成开场」入口；**首屏基线由一次取 50 轮改为一页 20 轮**，叙事滚到最旧端可继续翻（`onNarrativeTopReached` + `snapshotFlow` 触底判定），控制台「加载更早」保留。**真机通过（GAM-003）**：新建 0 轮 `opening=ai` 故事 → `start opening` → `first-frame=435ms`、`flushes=50 blocks=5`、`snapshot total=0→1 actors=4 choices=5 stateStatus=ready`；**35 类事件投影**补 `GameEventProjectionTest`（36 枚举 / 25 类 handled 全部可投影、10 类未处理事件不改状态、终态与标志位逐条断言）。**真机通过（GAM-007）**：40 轮故事首屏 `turns=20 hasMore=true`（58730 字 ≈1.7s，原全量 2.7s）→ `earlier history loaded added=20 total=40 hasMore=false` → 轮次 1..40 全可及、跳转第 2 轮 `block=9`。**GAM-011 仍未触发**：提示词诱导「先用 ask 工具提问」被模型忽略，直接推进一轮（total 40→41），未出现提问卡片；需审批型工具场景，维持未开始。矩阵 **GAM-003 / GAM-007 回写 `已完成`**（49 条已完成 / 69 条未开始）。证据 [p4a-opening-paging](evidence/p4a-opening-paging/xiaomi-14-pro/result.md)；验证 67 套件 / 476 用例 / 0 失败 + `lintDebug` + `assembleDebug` 全绿。
 
+- 2026-10-27 **进入 P4-B（工作台）第一切片：工作台宿主 + 项目/会话管理 + 主副会话**。新增 `core/workbench/WorkbenchTabs.kt`（页签去重 / 关闭后激活 / 区内重排 / 跨区转移，11 个 JVM 用例）、`core/network/AgentChatProjects.kt`（项目 / 会话 / 历史 DTO，3 个解析用例）与 `core/network/AgentGateway.kt`——把**写作作用域**（`/api/sessions`、`/api/chat`、`/api/session/*`）与**项目作用域**（`/api/projects/:id/agent-chat/…`）收敛到同一 `AgentGateway` 接口，`AgentViewModel` 改依赖接口、`AgentScreen` 支持 `inline` 内嵌，因此工作台会话复用同一套消息部件 / 工具卡 / 提问 / 队列 / 恢复界面。`DenovaClient` 增 22 个端点（项目树 / 活动 / 历史 / 导出 / 项目 CRUD / 排序 / 宿主目录选择 + 项目作用域会话与 Agent 全链路）。`feature/workbench` 新增宿主页面（顶栏 + 主区/副区切换 + 页签条 + ＋新建会话）与项目·会话树（新建目录项目 / 重命名 / 上移下移 / 归档移除 / 会话新建·重命名·删除 / 显示更多）。**真机（小米 14 Pro）通过**：项目 `directory project created=project-c183` → 重命名 → 上移（`reordered … delta=-1`，刷新后顺序保持）→ 归档（`projects=6`）；会话新建 / 重命名 `wb-rename` / 删除（计数回到 12、页签自动关闭）；主区 A 送副区 + 主区开 B → 两区独立，主区输入 `draftA` 切副区为空、切回仍在；项目作用域发送 `ping` → `pong!`（会话 id `s-vSBEnLx…`、`duration_ms=5751`）且重启后从服务端历史完整重建；宿主目录选择被 403 `localHostEffect` 拒绝并如实提示、不使用手机目录。**同轮修复三个真机缺陷**：①切区重新进入组合时无条件 `start()` 重置页面状态（草稿丢失、历史重取）；②右抽屉打开时返回键先退页面并把上一页的右抽屉重新显示（改用 `OnBackPressedDispatcher` 后注册优先 + 路由变化收起右抽屉）；③工作台导航项由 WIP 改为可进入（`implemented=true`）。矩阵 **WB-001 / WB-002 / WB-003 / WB-010 回写 `已完成`**（53 条已完成 / 65 条未开始）。证据 [p4b-workbench](evidence/p4b-workbench/xiaomi-14-pro/result.md)；JVM 69 套件 / 490 用例 / 0 失败 + `lintDebug` + `assembleDebug` 全绿。未覆盖：页签跨进程恢复、终端与文件页签（B2/B3）、项目树自动滚动到新选中项、历史搜索导出（B5）、审阅页签、仪器测试未执行。
+
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
 ## 已完成（退出条件满足）
@@ -203,6 +205,8 @@
 
    **P4-A（游戏）已开工（2026-10-27）**：**P4-A（游戏）已收口**：七个切片 + 一轮补验，17 条 GAM 中 **10 条真机回写**（GAM-003 / 004 / 005 / 007 / 008 / 009 / 010 / 012 / 015 / 017），证据见 `docs/evidence/p4a-*`。
 剩余 7 条与原因：GAM-001（开场配置文本未逐字回读、lore 无候选）、GAM-002（按故事保留输入草稿未做）、GAM-006（世界侧实体数据为空）、GAM-011（提示词诱导未触发 ask，需审批型工具场景）、GAM-013（`suspend` 不产生 pending interruption）、GAM-014（双重流时序未构造）、GAM-016（图片附件与上下文未实现）。后续按 05-roadmap 进入 **P4-B**。
+
+  **P4-B（工作台）已开工（2026-10-27）**：第一切片完成工作台宿主、项目/会话管理与主副会话（WB-001 / 002 / 003 / 010 回写），并把写作 / 工作台两套 Agent 作用域收敛到 `AgentGateway`。剩余按切片推进：B2 终端页签与旋转重连（WB-008）、B3 文件页签与嵌入编辑（WB-004 工作台宿主形态）、B4 变更审阅页签（WB-005）、B5 历史搜索与导出（WB-006）。NAV-001 仍需页面补齐后逐项验收（当前 4/13 可进入）。
 4. **P3 需回补的 P1 台账条目：** 只剩 G1-d 迟到 401 端到端（阻塞点：当前 UI 在 Checking 期间地址与连接按钮不可用，构造不出「登录在途时 status 返回」，需先补可并发的入口，工具 `tools/g3d_slow_proxy.py --status-delay-ms` 已就绪）；G6-b 权限分层随 P4-D。G2-c 全节点与 G4-d 跨包升级安装已于 2026-10-26 补测通过，G3 关卡（G3-b/c/d）已于 2026-10-25 全部补齐。补齐并验收后再更新对应矩阵行。
 5. **遗留（不阻塞阶段推进）：** 其余 103 条首批场景仍需在 P2/P3 期间按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
 
