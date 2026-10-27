@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -99,18 +101,33 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
         }
 
         // 故事选择行：显示当前故事与轮次，点开列表切换 / 改名 / 删除。
+        // 标题用 weight(1f) + 单行省略：服务端标题可能很长（AI 生成的叙事句），
+        // 否则会把轮次/更新时间挤成竖排单字（真机复现过）。
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = { showPicker = true }, enabled = !library.busy) {
-                Text(currentStory?.title?.ifBlank { currentStory.id } ?: stringResource(R.string.game_story_pick_placeholder))
+            TextButton(
+                onClick = { showPicker = true },
+                enabled = !library.busy,
+                modifier = Modifier.weight(1f, fill = false),
+            ) {
+                Text(
+                    text = currentStory?.title?.ifBlank { currentStory.id }
+                        ?: stringResource(R.string.game_story_pick_placeholder),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
                 Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null)
             }
             currentStory?.let {
-                Text(storySubtitle(it), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    storySubtitle(it),
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1,
+                )
             }
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.width(8.dp))
             if (library.loading || library.busy) {
                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
             }
@@ -247,10 +264,16 @@ private fun StoryPickerDialog(
         title = { Text(stringResource(R.string.game_story_picker_title)) },
         text = {
             Column {
+                // 打开时把当前故事滚进可见区：列表可能很长，当前项常在末尾。
+                val listState = rememberLazyListState()
+                LaunchedEffect(state.currentStoryId, state.stories.size) {
+                    val index = state.stories.indexOfFirst { it.id == state.currentStoryId }
+                    if (index >= 0) listState.scrollToItem(index)
+                }
                 when {
                     state.stories.isEmpty() && state.loading -> Text(stringResource(R.string.game_story_loading))
                     state.stories.isEmpty() -> Text(stringResource(R.string.game_story_empty))
-                    else -> LazyColumn(modifier = Modifier.heightIn(max = 380.dp)) {
+                    else -> LazyColumn(state = listState, modifier = Modifier.heightIn(max = 380.dp)) {
                         items(state.stories, key = { it.id }) { story ->
                             Row(
                                 modifier = Modifier
@@ -264,8 +287,14 @@ private fun StoryPickerDialog(
                                         text = story.title.ifBlank { story.id },
                                         style = MaterialTheme.typography.bodyLarge,
                                         fontWeight = if (story.id == state.currentStoryId) FontWeight.SemiBold else FontWeight.Normal,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                     )
-                                    Text(storySubtitle(story), style = MaterialTheme.typography.bodySmall)
+                                    Text(
+                                        storySubtitle(story),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        maxLines = 1,
+                                    )
                                 }
                                 if (story.id == state.currentStoryId) {
                                     Text("✓", modifier = Modifier.padding(horizontal = 4.dp))
