@@ -1112,10 +1112,18 @@ class DenovaClient(
         }
     }
 
-    /** 读取 story 的 canonical 历史（rehydrate 后重建叙事基线）。 */
-    suspend fun interactiveHistory(storyId: String, branchId: String, limit: Int): StoryHistoryPage {
+    /**
+     * 读取 story 的 canonical 历史（rehydrate 后重建叙事基线）。
+     * [before] 传上一页的 `before_cursor` 即可继续向前翻（GAM-007）。
+     */
+    suspend fun interactiveHistory(
+        storyId: String,
+        branchId: String,
+        limit: Int,
+        before: String? = null,
+    ): StoryHistoryPage {
         val request = Request.Builder()
-            .url(interactiveHistoryUrl(storyId, branchId, limit))
+            .url(interactiveHistoryUrl(storyId, branchId, limit, before))
             .get()
             .build()
         return withContext(Dispatchers.IO) {
@@ -1141,6 +1149,94 @@ class DenovaClient(
                 val body = resp.body?.string().orEmpty()
                 if (!resp.isSuccessful) throw toGameStreamError(resp.code, body)
                 json.decodeFromString(InteractiveSnapshot.serializer(), body)
+            }
+        }
+    }
+
+    // ---- 分支与分支方案（P4-A / GAM-008、GAM-009）----
+
+    /** 分支列表：`GET /api/interactive/stories/:id/branches`。 */
+    suspend fun interactiveBranches(storyId: String): BranchesResponse {
+        val request = Request.Builder().url(interactiveBranchUrl(storyId)).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(BranchesResponse.serializer(), text)
+            }
+        }
+    }
+
+    /** 从指定轮创建分支：`POST .../branches` body `{parent_event_id, title}`。 */
+    suspend fun createInteractiveBranch(
+        storyId: String,
+        parentEventId: String,
+        title: String = "",
+    ): BranchSummary {
+        val body = json.encodeToString(
+            CreateBranchRequest.serializer(),
+            CreateBranchRequest(parentEventId, title),
+        )
+        val request = Request.Builder()
+            .url(interactiveBranchUrl(storyId))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(BranchSummary.serializer(), text)
+            }
+        }
+    }
+
+    /** 切换分支：`POST .../switch-branch` body `{branch_id}`。 */
+    suspend fun switchInteractiveBranch(storyId: String, branchId: String) {
+        val body = json.encodeToString(SwitchBranchRequest.serializer(), SwitchBranchRequest(branchId))
+        val request = Request.Builder()
+            .url(interactiveStoryUrl(storyId, "switch-branch"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
+    /** 删除分支：`DELETE .../branches/:branchId`。 */
+    suspend fun deleteInteractiveBranch(storyId: String, branchId: String) {
+        val request = Request.Builder().url(interactiveBranchUrl(storyId, branchId)).delete().build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
+    /**
+     * 保存分支方案：`PUT .../branches/:branchId/plan` body `{markdown, base_revision}`。
+     * revision 不匹配返回 409（`DenovaApiException` 携带服务端文案），调用方据此提示重新加载。
+     */
+    suspend fun updateBranchPlan(
+        storyId: String,
+        branchId: String,
+        markdown: String,
+        baseRevision: String,
+    ): UpdateBranchPlanResult {
+        val body = json.encodeToString(
+            UpdateBranchPlanRequest.serializer(),
+            UpdateBranchPlanRequest(markdown, baseRevision),
+        )
+        val request = Request.Builder()
+            .url(interactiveBranchUrl(storyId, branchId, "plan"))
+            .put(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(UpdateBranchPlanResult.serializer(), text)
             }
         }
     }
@@ -1459,12 +1555,32 @@ class DenovaClient(
             .apply { if (branchId.isNotBlank()) addQueryParameter("branch", branchId) }
             .build()
 
-    private fun interactiveHistoryUrl(storyId: String, branchId: String, limit: Int): HttpUrl =
+    private fun interactiveHistoryUrl(
+        storyId: String,
+        branchId: String,
+        limit: Int,
+        before: String? = null,
+    ): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder()
             .addPathSegments("api/interactive/stories/$storyId/history")
-            .addQueryParameter("branch", branchId)
+            .apply { if (branchId.isNotBlank()) addQueryParameter("branch", branchId) }
             .addQueryParameter("limit", limit.toString())
+            .apply { before?.takeIf { it.isNotBlank() }?.let { addQueryParameter("before", it) } }
             .build()
+
+    /** 分支作用域端点：`api/interactive/stories/:id/branches[/:branchId[/suffix]]`。 */
+    private fun interactiveBranchUrl(
+        storyId: String,
+        branchId: String? = null,
+        suffix: String? = null,
+    ): HttpUrl {
+        val path = buildString {
+            append("api/interactive/stories/$storyId/branches")
+            if (branchId != null) append("/$branchId")
+            if (suffix != null) append("/$suffix")
+        }
+        return server.baseUrl.toHttpUrl().newBuilder().addPathSegments(path).build()
+    }
 
     private fun toGameStreamError(status: Int, body: String): GameStreamError =
         parseGameStreamError(status, body, json)

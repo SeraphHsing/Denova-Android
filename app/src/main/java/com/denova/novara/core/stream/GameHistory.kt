@@ -75,14 +75,5 @@ data class ActorStateOp(
 
 /** 从 canonical 历史 turn 列表重建叙事基线（玩家输入 + agent 叙事交替）。 */
 fun buildCanonicalNarrative(turns: List<TurnEvent>): String =
-    turns.mapNotNull { turn ->
-        buildString {
-            // 跳过内部提示（如 `[Source: story opening configuration...]`），不展示给用户。
-            val user = turn.user?.takeIf { it.isNotBlank() && !it.trimStart().startsWith("[Source:") }
-            if (user != null) append("> ").append(user.trim())
-            if (!turn.narrative.isNullOrBlank()) {
-                if (isNotEmpty()) append("\n\n")
-                append(turn.narrative.trim())
-            }
-        }.takeIf { it.isNotBlank() }
-    }.joinToString("\n\n")
+    turns.mapNotNull { turn -> StoryTurnText.of(turn).takeIf { it.isNotBlank() } }
+        .joinToString("\n\n")

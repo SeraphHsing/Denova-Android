@@ -94,3 +94,37 @@ data class BranchSummary(
     @SerialName("from_event") val fromEvent: String? = null,
     @SerialName("created_at") val createdAt: String = "",
 )
+
+// ---- 分支与分支方案（P4-A / GAM-008、GAM-009）----
+
+/** `GET /api/interactive/stories/:id/branches`。 */
+@Serializable
+data class BranchesResponse(
+    val branches: List<BranchSummary> = emptyList(),
+)
+
+/** `POST .../branches`：从某一轮分叉（`parent_event_id` 就是该轮 turn id）。 */
+@Serializable
+data class CreateBranchRequest(
+    @SerialName("parent_event_id") val parentEventId: String,
+    val title: String = "",
+)
+
+/** `POST .../switch-branch`。 */
+@Serializable
+data class SwitchBranchRequest(
+    @SerialName("branch_id") val branchId: String,
+)
+
+/** `PUT .../branches/:branchId/plan`：方案是带 revision 的文档，冲突返回 409。 */
+@Serializable
+data class UpdateBranchPlanRequest(
+    val markdown: String,
+    @SerialName("base_revision") val baseRevision: String,
+)
+
+@Serializable
+data class UpdateBranchPlanResult(
+    @SerialName("branch_plan") val branchPlan: BranchPlan = BranchPlan(),
+    @SerialName("context_revision") val contextRevision: Long = 0,
+)

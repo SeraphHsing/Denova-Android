@@ -370,7 +370,10 @@ class MainActivity : AppCompatActivity() {
                     if (showRightDrawer) {
                         val isGame = currentRoute == "game"
                         LaunchedEffect(showRightDrawer, currentProjectId, isGame, rightTab) {
-                            if (!isGame) {
+                            if (isGame) {
+                                // 打开控制台时刷新分支列表（切换 / 删除后与服务端对齐）。
+                                gameViewModel.loadBranches()
+                            } else {
                                 when (rightTab) {
                                     0 -> projectDirectoryViewModel.load(currentProjectId)
                                     1 -> changesViewModel.load(currentProjectId)
@@ -392,10 +395,24 @@ class MainActivity : AppCompatActivity() {
                                 val gameUi by gameViewModel.uiState.collectAsState()
                                 GameConsoleContent(
                                     ledger = gameLedger,
+                                    turnAnchors = gameUi.turnAnchors,
+                                    branchId = gameUi.branchId,
+                                    branches = gameUi.branches,
+                                    branchPlan = gameUi.branchPlan,
+                                    branchBusy = gameUi.branchBusy,
+                                    branchError = gameUi.branchError,
                                     turnCount = gameUi.turnCount,
                                     turnStart = gameUi.turnStart,
                                     branchCount = gameUi.branchCount,
+                                    historyHasMore = gameUi.historyHasMore,
+                                    loadingEarlier = gameUi.loadingEarlier,
                                     onRefresh = { gameViewModel.refreshSnapshot() },
+                                    onLoadEarlier = { gameViewModel.loadEarlierHistory() },
+                                    onSelectTurn = { gameViewModel.scrollToTurn(it) },
+                                    onForkTurn = { gameViewModel.createBranchFromTurn(it, "") },
+                                    onSwitchBranch = { gameViewModel.switchBranch(it) },
+                                    onDeleteBranch = { gameViewModel.deleteBranch(it) },
+                                    onSavePlan = { gameViewModel.saveBranchPlan(it) },
                                 )
                             } else {
                                 // 写作页右抽屉：项目文件 / 变更审阅。

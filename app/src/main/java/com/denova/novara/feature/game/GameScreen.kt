@@ -835,6 +835,7 @@ private fun RenameStoryDialog(story: StorySummary, onConfirm: (String) -> Unit, 
 @Composable
 private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifier) {
     val blocks by viewModel.blocks.collectAsState()
+    val scrollTarget by viewModel.scrollTarget.collectAsState()
     // D03 恢复耗时埋点：叙事首次可见 = 恢复后「可操作」终点（每次进入写作/游戏界面记一次）。
     var visibilityMarked by remember { mutableStateOf(false) }
     if (!visibilityMarked && blocks.isNotEmpty()) {
@@ -860,9 +861,19 @@ private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifie
 
     // 渐进恢复会先放少量基线、再整段替换为全量；此时需锚回最新内容，
     // 否则列表会停在旧端（空白）。只在「批量变更」时滚动，避免流式追加时逐帧重排。
+    // 轮次跳转（GAM-007）优先：reverseLayout 下块 b 的位置是 size-1-b。
     val listState = rememberLazyListState()
     var lastBlockCount by remember { mutableIntStateOf(0) }
-    LaunchedEffect(blocks.size) {
+    LaunchedEffect(blocks.size, scrollTarget) {
+        val target = scrollTarget
+        if (target != null) {
+            if (blocks.isNotEmpty()) {
+                listState.scrollToItem((blocks.size - 1 - target).coerceIn(0, blocks.size - 1))
+            }
+            viewModel.onScrollTargetHandled()
+            lastBlockCount = blocks.size
+            return@LaunchedEffect
+        }
         if (blocks.size > lastBlockCount + 20) listState.scrollToItem(0)
         lastBlockCount = blocks.size
     }

@@ -20,8 +20,15 @@ import com.denova.novara.core.game.StoryLibrary
 import com.denova.novara.core.game.StoryStateLedgerBuilder
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
+import com.denova.novara.core.network.BranchPlan
+import com.denova.novara.core.network.BranchSummary
+import com.denova.novara.core.network.DenovaApiException
 import com.denova.novara.core.network.SendInteractiveChatRequest
 import com.denova.novara.core.network.StorySummary
+import com.denova.novara.core.stream.StoryPaging
+import com.denova.novara.core.stream.StoryTurnText
+import com.denova.novara.core.stream.TurnAnchor
+import com.denova.novara.core.stream.TurnEvent
 import com.denova.novara.core.network.characterLoreItems
 import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GameEventType
@@ -62,6 +69,12 @@ private const val DEFAULT_BRANCH = "main"
 /** 轮次状态仍在校算：台账可先展示，稍后补取快照。 */
 private const val STATE_STATUS_PENDING = "pending"
 
+/** 向前翻页的每页轮次数（服务端默认 10，这里取 20 减少往返）。 */
+private const val EARLIER_PAGE_SIZE = 20
+
+/** 流式正文所属的伪轮次 id（不参与锚点跳转）。 */
+private const val LIVE_TURN_ID = "__live__"
+
 /**
  * 渐进式恢复：首屏只取最近若干轮，让「恢复可操作」不必等全量历史；
  * 全量随后台任务补全（history 耗时随 limit 近似线性：3 轮 ≈0.22s，50 轮 ≈2.1s）。
@@ -89,6 +102,16 @@ data class GameUiState(
     val hasEarlierTurns: Boolean = false,
     /** 分支数（`graph.branches`），供右侧控制台概览。 */
     val branchCount: Int = 0,
+    /** 已加载轮次的跳转锚点（GAM-007），序号按分支总轮次换算。 */
+    val turnAnchors: List<TurnAnchor> = emptyList(),
+    /** 是否还有更早的历史可翻页。 */
+    val historyHasMore: Boolean = false,
+    val loadingEarlier: Boolean = false,
+    /** 分支列表（快照 `graph.branches` 或 `GET /branches`）。 */
+    val branches: List<BranchSummary> = emptyList(),
+    val branchPlan: BranchPlan? = null,
+    val branchBusy: Boolean = false,
+    val branchError: UiText? = null,
 )
 
 /**
@@ -159,6 +182,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     /** 快照请求期间又有新请求（turn persisted / 流结束）时，当前请求结束后补一次。 */
     private var snapshotQueued = false
 
+    // ---- 叙事分页状态（GAM-007）：已加载轮次「旧 → 新」 ----
+    private var loadedTurns: List<TurnEvent> = emptyList()
+    private var historyCursor: String? = null
+    private var historyHasMore = false
+    private var branchJob: Job? = null
+
     /** 故事世代：切换故事即推进，迟到回包据此丢弃（GAM-002 任务隔离）。 */
     private var storyEpoch = 0L
 
@@ -175,6 +204,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _blocks = MutableStateFlow<List<String>>(emptyList())
     val blocks: StateFlow<List<String>> = _blocks.asStateFlow()
 
+    /** 一次性滚动请求（叙事块索引）；UI 消费后调 [onScrollTargetHandled] 清空。 */
+    private val _scrollTarget = MutableStateFlow<Int?>(null)
+    val scrollTarget: StateFlow<Int?> = _scrollTarget.asStateFlow()
+
     /** 登录后绑定当前连接的 client，建立恢复协调器。 */
     fun bindClient(client: DenovaClient) {
         this.client = client
@@ -184,6 +217,169 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         )
         // 登录后预取故事列表；进入游戏页时页面再按需刷新（不重复挂接）。
         if (_library.value.stories.isEmpty()) loadStories()
+    }
+
+    // ---- 分支与分支方案（P4-A / GAM-008、GAM-009）----
+
+    /** 重新拉取分支列表（切换 / 创建 / 删除后对齐服务端）。 */
+    fun loadBranches() {
+        val client = client ?: return
+        val storyId = _uiState.value.storyId
+        if (storyId.isBlank()) return
+        branchJob?.cancel()
+        branchJob = viewModelScope.launch {
+            val branches = try {
+                client.interactiveBranches(storyId).branches
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "load branches failed", e)
+                _uiState.value = _uiState.value.copy(
+                    branchBusy = false,
+                    branchError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            if (_uiState.value.storyId != storyId) return@launch
+            _uiState.value = _uiState.value.copy(
+                branches = branches,
+                branchCount = branches.size,
+                branchBusy = false,
+            )
+            DenovaLog.i("Game", "branches loaded count=${branches.size}")
+        }
+    }
+
+    /** 切换分支：服务端切换成功后才重挂舞台（当前分支身份必须与服务端一致）。 */
+    fun switchBranch(branchId: String) {
+        val client = client ?: return
+        val state = _uiState.value
+        if (branchId.isBlank() || branchId == state.branchId) return
+        if (state.storyId.isBlank() || state.branchBusy) return
+        _uiState.value = state.copy(branchBusy = true, branchError = null)
+        branchJob?.cancel()
+        branchJob = viewModelScope.launch {
+            try {
+                client.switchInteractiveBranch(state.storyId, branchId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "switch branch failed id=$branchId", e)
+                _uiState.value = _uiState.value.copy(
+                    branchBusy = false,
+                    branchError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            _uiState.value = _uiState.value.copy(branchBusy = false, branchId = branchId)
+            DenovaLog.i("Game", "branch switched id=$branchId")
+            start(state.storyId, branchId)
+        }
+    }
+
+    /** 从指定轮创建分支，成功即切过去（与 Web `handleCreateBranch` 一致）。 */
+    fun createBranchFromTurn(turnId: String, title: String) {
+        val client = client ?: return
+        val state = _uiState.value
+        if (turnId.isBlank() || state.storyId.isBlank() || state.branchBusy) return
+        _uiState.value = state.copy(branchBusy = true, branchError = null)
+        branchJob?.cancel()
+        branchJob = viewModelScope.launch {
+            val branch = try {
+                client.createInteractiveBranch(state.storyId, turnId, title.trim())
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "create branch failed turn=$turnId", e)
+                _uiState.value = _uiState.value.copy(
+                    branchBusy = false,
+                    branchError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            DenovaLog.i("Game", "branch created id=${branch.id} from=$turnId")
+            val merged = _uiState.value.branches + branch
+            _uiState.value = _uiState.value.copy(
+                branchBusy = false,
+                branches = merged,
+                branchCount = merged.size,
+            )
+            switchBranch(branch.id)
+        }
+    }
+
+    /** 删除分支；删掉的正是当前分支时回到 `main`（服务端通常拒绝删当前分支，此处兜底）。 */
+    fun deleteBranch(branchId: String) {
+        val client = client ?: return
+        val state = _uiState.value
+        if (branchId.isBlank() || state.storyId.isBlank() || state.branchBusy) return
+        _uiState.value = state.copy(branchBusy = true, branchError = null)
+        branchJob?.cancel()
+        branchJob = viewModelScope.launch {
+            try {
+                client.deleteInteractiveBranch(state.storyId, branchId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "delete branch failed id=$branchId", e)
+                _uiState.value = _uiState.value.copy(
+                    branchBusy = false,
+                    branchError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            DenovaLog.i("Game", "branch deleted id=$branchId")
+            val remaining = _uiState.value.branches.filterNot { it.id == branchId }
+            _uiState.value = _uiState.value.copy(
+                branchBusy = false,
+                branches = remaining,
+                // 概览的分支数来自快照，删除后先本地对齐，等下次快照再核对。
+                branchCount = remaining.size,
+            )
+            if (branchId == state.branchId) start(state.storyId, DEFAULT_BRANCH)
+        }
+    }
+
+    /**
+     * 保存分支方案：以快照里的 `branch_plan.revision` 作为 `base_revision`。
+     * 409 冲突按服务端文案提示（不静默覆盖，也不自动重试）。
+     */
+    fun saveBranchPlan(markdown: String) {
+        val client = client ?: return
+        val state = _uiState.value
+        if (markdown.isBlank() || state.storyId.isBlank() || state.branchBusy) return
+        val revision = state.branchPlan?.revision.orEmpty()
+        _uiState.value = state.copy(branchBusy = true, branchError = null)
+        branchJob?.cancel()
+        branchJob = viewModelScope.launch {
+            val result = try {
+                client.updateBranchPlan(state.storyId, state.branchId, markdown, revision)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: DenovaApiException) {
+                DenovaLog.w("Game", "branch plan save rejected status=${e.status} code=${e.code}", e)
+                _uiState.value = _uiState.value.copy(
+                    branchBusy = false,
+                    branchError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "branch plan save failed", e)
+                _uiState.value = _uiState.value.copy(
+                    branchBusy = false,
+                    branchError = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            _uiState.value = _uiState.value.copy(branchBusy = false, branchPlan = result.branchPlan)
+            DenovaLog.i("Game", "branch plan saved revision=${result.branchPlan.revision}")
+        }
+    }
+
+    fun dismissBranchError() {
+        if (_uiState.value.branchError != null) {
+            _uiState.value = _uiState.value.copy(branchError = null)
+        }
     }
 
     // ---- 故事库（P4-A / GAM-002）----
@@ -462,8 +658,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _blocks.value = emptyList()
         resetPerfCounters()
         _uiState.value = GameUiState(storyId = storyId, branchId = branchId)
-        // 旧故事的台账与行动选项不得残留到新故事。
+        // 旧故事的台账、行动选项与分页状态不得残留到新故事。
         _ledger.value = StoryLedger()
+        loadedTurns = emptyList()
+        historyCursor = null
+        historyHasMore = false
         refreshSnapshot()
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
@@ -781,7 +980,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 turnStart = snapshot.turnStart,
                 hasEarlierTurns = snapshot.hasEarlierTurns || snapshot.turnStart > 0,
                 branchCount = snapshot.graph.branches.size,
+                branches = snapshot.graph.branches,
+                branchPlan = snapshot.branchPlan,
             )
+            // 轮次总数可能刚变化：重算锚点序号（分块索引不变）。
+            _uiState.value = _uiState.value.copy(turnAnchors = buildAnchors())
             // 轮次数以快照为准：列表项可能还是挂接前的旧值，先就地更新避免顶部行显示滞后。
             _library.value = _library.value.copy(
                 stories = _library.value.stories.map {
@@ -816,15 +1019,15 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val startedAt = System.nanoTime()
         try {
             val page = client.interactiveHistory(storyId, branchId, limit = limit)
-            val baseline = buildCanonicalNarrative(page.turns)
-            val tail = if (mergeStreamTail) streamTail.toString() else ""
-            narrative.reset(baseline)
-            if (tail.isNotEmpty()) narrative.append(tail)
-            _blocks.value = narrative.snapshot
-            _uiState.value = _uiState.value.copy(baseline = baseline)
+            if (_uiState.value.storyId != storyId) return
+            loadedTurns = page.turns
+            historyCursor = page.beforeCursor
+            historyHasMore = page.hasMore
+            rebuildNarrative(keepStreamTail = mergeStreamTail)
             DenovaLog.i(
                 "Game",
-                "canonical baseline loaded stage=$stage turns=${page.turns.size} len=${baseline.length}",
+                "canonical baseline loaded stage=$stage turns=${page.turns.size} hasMore=${page.hasMore} " +
+                    "len=${_uiState.value.baseline.length}",
             )
             DenovaLog.i("Perf", "baseline-$stage=${(System.nanoTime() - startedAt) / 1_000_000}ms")
         } catch (e: Exception) {
@@ -832,27 +1035,111 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * 向前翻一页历史（GAM-007）：合并到 [loadedTurns] 前部并整段重建叙事分块，
+     * 完成后请求 UI 把视图滚回「翻页前顶部的那一轮」，避免重建后跳回底部。
+     */
+    fun loadEarlierHistory() {
+        val client = client ?: return
+        val state = _uiState.value
+        if (state.storyId.isBlank() || state.loadingEarlier || !historyHasMore) return
+        val cursor = historyCursor ?: return
+        val anchorTurnId = state.turnAnchors.firstOrNull()?.turnId
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(loadingEarlier = true, error = null)
+            val page = try {
+                client.interactiveHistory(state.storyId, state.branchId, EARLIER_PAGE_SIZE, cursor)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "load earlier history failed", e)
+                _uiState.value = _uiState.value.copy(
+                    loadingEarlier = false,
+                    error = e.message?.let { UiText.raw(it) },
+                )
+                return@launch
+            }
+            // 期间切了故事或分支：丢弃该页。
+            if (_uiState.value.storyId != state.storyId || _uiState.value.branchId != state.branchId) return@launch
+            val before = loadedTurns.size
+            loadedTurns = StoryPaging.mergeOlder(page.turns, loadedTurns)
+            historyCursor = page.beforeCursor
+            historyHasMore = page.hasMore
+            rebuildNarrative()
+            _uiState.value = _uiState.value.copy(loadingEarlier = false)
+            _scrollTarget.value = anchorTurnId?.let { narrative.blockIndexFor(it) }
+            DenovaLog.i(
+                "Game",
+                "earlier history loaded added=${loadedTurns.size - before} total=${loadedTurns.size} " +
+                    "hasMore=${page.hasMore}",
+            )
+        }
+    }
+
+    /** 跳到指定轮次（GAM-007）：把该轮首块索引交给 UI 滚动。 */
+    fun scrollToTurn(turnId: String) {
+        val block = narrative.blockIndexFor(turnId)
+        if (block == null) {
+            DenovaLog.w("Game", "scroll target not found turn=$turnId")
+            return
+        }
+        _scrollTarget.value = block
+        DenovaLog.i("Game", "scroll to turn=$turnId block=$block")
+    }
+
+    /** UI 完成跳转滚动后清空请求，避免重复定位。 */
+    fun onScrollTargetHandled() {
+        if (_scrollTarget.value != null) _scrollTarget.value = null
+    }
+
+    /**
+     * 用 [loadedTurns] 重建叙事分块与锚点。
+     * [keepStreamTail] 为 true 时把本次挂接后累积的流式正文接在末尾（渐进式恢复用）。
+     */
+    private fun rebuildNarrative(keepStreamTail: Boolean = true) {
+        val turns = loadedTurns
+        narrative.resetTurns(turns.map { it.id to StoryTurnText.of(it) })
+        if (keepStreamTail && streamTail.isNotEmpty()) {
+            narrative.beginTurn(LIVE_TURN_ID)
+            narrative.append(streamTail.toString())
+        }
+        _blocks.value = narrative.snapshot
+        val baseline = buildCanonicalNarrative(turns)
+        _uiState.value = _uiState.value.copy(
+            baseline = baseline,
+            historyHasMore = historyHasMore,
+            turnAnchors = buildAnchors(),
+        )
+    }
+
+    /** 锚点序号按分支总轮次换算：快照晚到时只要总数变化就刷新。 */
+    private fun buildAnchors(): List<TurnAnchor> {
+        val total = _uiState.value.turnCount
+        val first = (total - loadedTurns.size + 1).coerceAtLeast(1)
+        return StoryPaging.anchors(loadedTurns, first, narrative::blockIndexFor)
+    }
+
     private suspend fun reloadCanonical(request: RehydrateRequest?) {
         val client = client
         val storyId = _uiState.value.storyId
         val branchId = _uiState.value.branchId
         DenovaLog.w("Game", "rehydrate required task=${request?.taskId} cursor=${request?.cursor}; reload canonical history")
-        val baseline = if (client != null && storyId.isNotBlank()) {
+        if (client != null && storyId.isNotBlank()) {
             try {
                 val page = client.interactiveHistory(storyId, branchId, limit = FULL_BASELINE_TURNS)
-                buildCanonicalNarrative(page.turns)
+                if (_uiState.value.storyId == storyId) {
+                    loadedTurns = page.turns
+                    historyCursor = page.beforeCursor
+                    historyHasMore = page.hasMore
+                }
             } catch (e: Exception) {
                 DenovaLog.w("Game", "reload canonical history failed", e)
-                _uiState.value.baseline
             }
-        } else {
-            _uiState.value.baseline
         }
         dropPendingChunks()
         streamTail.setLength(0)
-        narrative.reset(baseline)
-        _blocks.value = narrative.snapshot
-        _uiState.value = _uiState.value.copy(baseline = baseline, stage = GameStageState())
+        rebuildNarrative(keepStreamTail = false)
+        _uiState.value = _uiState.value.copy(stage = GameStageState())
     }
 
     override fun onCleared() {
@@ -863,6 +1150,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         creationResourceJob?.cancel()
         creationSubmitJob?.cancel()
         snapshotJob?.cancel()
+        branchJob?.cancel()
         super.onCleared()
     }
 }
