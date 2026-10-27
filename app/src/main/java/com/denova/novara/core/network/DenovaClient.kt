@@ -1117,6 +1117,66 @@ class DenovaClient(
         }
     }
 
+    // ---- 故事库（P4-A / GAM-001、GAM-002）----
+
+    /** 故事列表：`GET /api/interactive/stories` → `{current_story_id, stories[]}`。 */
+    suspend fun interactiveStories(): StoryIndex {
+        val request = Request.Builder().url(interactiveStoriesUrl()).get().build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(StoryIndex.serializer(), text)
+            }
+        }
+    }
+
+    /**
+     * 选中故事：`POST /api/interactive/stories/:id/select`。
+     * 服务端把选择写进 index 的 `current_story_id`（全 workspace 共享）。
+     * `preview` 故事与不存在的 id 都返回 400，因此调用方必须先成功再更新本地选择。
+     */
+    suspend fun selectInteractiveStory(storyId: String) {
+        val request = Request.Builder()
+            .url(interactiveStoryUrl(storyId, "select"))
+            .post("{}".toRequestBody(jsonMediaType))
+            .build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
+    /**
+     * 改名：`PATCH /api/interactive/stories/:id` body `{title}` → 更新后的 `StorySummary`。
+     * 该端点没有 `base_revision` / `If-Match` 语义，服务端只追加 `story_config_updated` 事件。
+     */
+    suspend fun renameInteractiveStory(storyId: String, title: String): StorySummary {
+        val body = json.encodeToString(UpdateStoryTitleRequest.serializer(), UpdateStoryTitleRequest(title))
+        val request = Request.Builder()
+            .url(interactiveStoryUrl(storyId))
+            .patch(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(StorySummary.serializer(), text)
+            }
+        }
+    }
+
+    /** 删除故事：`DELETE /api/interactive/stories/:id`。 */
+    suspend fun deleteInteractiveStory(storyId: String) {
+        val request = Request.Builder().url(interactiveStoryUrl(storyId)).delete().build()
+        withContext(Dispatchers.IO) {
+            okHttpClient.newCall(request).execute().use { resp ->
+                if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
     // ---- 终端（G5）----
 
     /** 创建 PTY 会话；`owner_tab_id` 决定归属，重进时据此找回同一 PTY。 */
@@ -1275,6 +1335,21 @@ class DenovaClient(
 
     private fun agentActiveUrl(sessionId: String): HttpUrl =
         agentChatUrl("active").newBuilder().addQueryParameter("session_id", sessionId).build()
+
+    private fun interactiveStoriesUrl(): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder().addPathSegments("api/interactive/stories").build()
+
+    /** 故事作用域端点：`api/interactive/stories/:id[/suffix]`。 */
+    private fun interactiveStoryUrl(storyId: String, suffix: String? = null): HttpUrl =
+        server.baseUrl.toHttpUrl().newBuilder()
+            .addPathSegments(
+                if (suffix != null) {
+                    "api/interactive/stories/$storyId/$suffix"
+                } else {
+                    "api/interactive/stories/$storyId"
+                },
+            )
+            .build()
 
     private fun interactiveHistoryUrl(storyId: String, branchId: String, limit: Int): HttpUrl =
         server.baseUrl.toHttpUrl().newBuilder()

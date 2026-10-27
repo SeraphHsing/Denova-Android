@@ -10,9 +10,11 @@ import com.denova.novara.core.command.CommandRecord
 import com.denova.novara.core.command.CommandStatus
 import com.denova.novara.NovaraApplication
 import com.denova.novara.core.command.CommandStore
+import com.denova.novara.core.game.StoryLibrary
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.SendInteractiveChatRequest
+import com.denova.novara.core.network.StorySummary
 import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GameEventType
 import com.denova.novara.core.stream.GamePhase
@@ -44,6 +46,9 @@ private data class ChunkData(val content: String? = null, val subagent: Boolean?
 /** chunk 合批发布间隔：约 16 次/秒，兼顾流式观感与主线程负载。 */
 private const val CHUNK_FLUSH_INTERVAL_MS = 60L
 
+/** 默认分支 id（与 Web 一致；分支切换属 P4-A 后续切片）。 */
+private const val DEFAULT_BRANCH = "main"
+
 /**
  * 渐进式恢复：首屏只取最近若干轮，让「恢复可操作」不必等全量历史；
  * 全量随后台任务补全（history 耗时随 limit 近似线性：3 轮 ≈0.22s，50 轮 ≈2.1s）。
@@ -60,6 +65,18 @@ data class GameUiState(
     val baseline: String = "",
     val connected: Boolean = false,
     val sending: Boolean = false,
+    val error: UiText? = null,
+)
+
+/**
+ * 故事库状态（P4-A / GAM-002）：服务端列表 + 当前选择 + 操作态。
+ * 选择必须先在服务端成功（`POST .../select`），本地不自行改 `current_story_id`。
+ */
+data class StoryLibraryState(
+    val stories: List<StorySummary> = emptyList(),
+    val currentStoryId: String = "",
+    val loading: Boolean = false,
+    val busy: Boolean = false,
     val error: UiText? = null,
 )
 
@@ -96,6 +113,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
+    /** 故事库：进入游戏页时加载；切换 / 改名 / 删除成功后按服务端结果更新。 */
+    private val _library = MutableStateFlow(StoryLibraryState())
+    val library: StateFlow<StoryLibraryState> = _library.asStateFlow()
+    private var libraryJob: Job? = null
+
+    /** 故事世代：切换故事即推进，迟到回包据此丢弃（GAM-002 任务隔离）。 */
+    private var storyEpoch = 0L
+
     /**
      * 叙事分块单独成流：高频（~16 次/秒）更新只驱动叙事面板重组，
      * 不会连带重组状态行与输入框（后者含 IME 布局，代价高）。
@@ -110,12 +135,150 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             transport = client,
             reloadCanonical = ::reloadCanonical,
         )
+        // 登录后预取故事列表；进入游戏页时页面再按需刷新（不重复挂接）。
+        if (_library.value.stories.isEmpty()) loadStories()
+    }
+
+    // ---- 故事库（P4-A / GAM-002）----
+
+    /**
+     * 拉取故事列表（`GET /api/interactive/stories`）。
+     *
+     * 服务端 `current_story_id` 命中且舞台尚未开始时自动挂接该故事；
+     * 否则只更新列表，等用户点选——不替用户改动服务端的选择。
+     */
+    fun loadStories(autoAttach: Boolean = false) {
+        val client = client ?: return
+        libraryJob?.cancel()
+        libraryJob = viewModelScope.launch {
+            _library.value = _library.value.copy(loading = true, error = null)
+            val index = try {
+                client.interactiveStories()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "load stories failed", e)
+                _library.value = _library.value.copy(loading = false, error = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            val stories = StoryLibrary.visible(index.stories)
+            val current = StoryLibrary.current(stories, index.currentStoryId)
+            _library.value = StoryLibraryState(
+                stories = stories,
+                currentStoryId = current?.id.orEmpty(),
+                loading = false,
+            )
+            DenovaLog.i("Game", "stories loaded count=${stories.size} current=${current?.id}")
+            if (autoAttach && current != null && _uiState.value.storyId.isBlank()) {
+                start(current.id, DEFAULT_BRANCH)
+            }
+        }
+    }
+
+    /**
+     * 切换故事：先在服务端选中，成功后才更新本地并重新挂接。
+     * `preview` 故事或不存在的 id 服务端返回 400，本地保持原选择。
+     */
+    fun selectStory(storyId: String) {
+        val client = client ?: return
+        val target = storyId.trim()
+        if (target.isEmpty() || target == _library.value.currentStoryId) return
+        libraryJob?.cancel()
+        libraryJob = viewModelScope.launch {
+            _library.value = _library.value.copy(busy = true, error = null)
+            try {
+                client.selectInteractiveStory(target)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "select story failed id=$target", e)
+                _library.value = _library.value.copy(busy = false, error = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            _library.value = _library.value.copy(currentStoryId = target, busy = false)
+            DenovaLog.i("Game", "story selected id=$target")
+            start(target, DEFAULT_BRANCH)
+        }
+    }
+
+    /** 重命名：空标题本地拒绝（不发请求），成功后按服务端返回的摘要原位替换。 */
+    fun renameStory(storyId: String, title: String) {
+        val client = client ?: return
+        val name = title.trim()
+        if (name.isEmpty()) {
+            _library.value = _library.value.copy(error = UiText.of(R.string.game_story_rename_required))
+            return
+        }
+        val existing = _library.value.stories.firstOrNull { it.id == storyId }
+        if (existing != null && existing.title == name) return
+        libraryJob?.cancel()
+        libraryJob = viewModelScope.launch {
+            _library.value = _library.value.copy(busy = true, error = null)
+            val updated = try {
+                client.renameInteractiveStory(storyId, name)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "rename story failed id=$storyId", e)
+                _library.value = _library.value.copy(busy = false, error = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            _library.value = _library.value.copy(
+                stories = StoryLibrary.merged(_library.value.stories, updated),
+                busy = false,
+            )
+            DenovaLog.i("Game", "story renamed id=$storyId title=${updated.title}")
+        }
+    }
+
+    /** 删除故事；删掉的正是当前故事时回退到列表首个并重新挂接。 */
+    fun deleteStory(storyId: String) {
+        val client = client ?: return
+        libraryJob?.cancel()
+        libraryJob = viewModelScope.launch {
+            _library.value = _library.value.copy(busy = true, error = null)
+            try {
+                client.deleteInteractiveStory(storyId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "delete story failed id=$storyId", e)
+                _library.value = _library.value.copy(busy = false, error = e.message?.let { UiText.raw(it) })
+                return@launch
+            }
+            val (remaining, next) = StoryLibrary.afterDelete(
+                _library.value.stories,
+                storyId,
+                _library.value.currentStoryId,
+            )
+            val deletedCurrent = _library.value.currentStoryId == storyId
+            // 删的是当前故事时先清空选择，再走一次真正的服务端 select（否则会被去重逻辑短路）。
+            _library.value = _library.value.copy(
+                stories = remaining,
+                currentStoryId = if (deletedCurrent) "" else _library.value.currentStoryId,
+                busy = false,
+            )
+            DenovaLog.i("Game", "story deleted id=$storyId next=$next")
+            if (deletedCurrent) {
+                stop()
+                if (next.isNotBlank()) selectStory(next) else _uiState.value = GameUiState()
+            }
+        }
+    }
+
+    /** 清掉列表级错误提示（对话框关闭时调用）。 */
+    fun dismissLibraryError() {
+        _library.value = _library.value.copy(error = null)
     }
 
     /** 挂接指定 story/branch 的活动游戏流。 */
     fun start(storyId: String, branchId: String) {
         val c = coordinator ?: return
         DenovaLog.i("Game", "start story=$storyId branch=$branchId")
+        // 切换故事：结束在途发送，并推进世代，使迟到回包不写入新故事的舞台状态。
+        sendJob?.cancel()
+        sendJob = null
+        storyEpoch++
         dropPendingChunks()
         narrative.reset("")
         streamTail.setLength(0)
@@ -185,6 +348,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         perfTotalNanos = 0
         perfMaxNanos = 0
         resetPerfCounters()
+        // 发送结果只在同一故事世代内写舞台：切换故事后丢弃迟到回包（命令状态仍照常落库）。
+        val epoch = storyEpoch
         sendJob = viewModelScope.launch {
             commands.save(record) // 本地事务先落盘
             try {
@@ -200,6 +365,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     },
                     onEvent = { event ->
+                        if (epoch != storyEpoch) return@collectWithIdleGuard
                         if (!accepted) {
                             accepted = true
                             DenovaLog.i("GamePerf", "first-frame=${(System.nanoTime() - sendStartNanos) / 1_000_000.0}ms")
@@ -211,26 +377,33 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 if (!accepted) {
                     commands.updateStatus(commandId, CommandStatus.ACCEPTED)
-                    _uiState.value = _uiState.value.copy(sending = false)
+                    updateUiIfCurrent(epoch) { it.copy(sending = false) }
                 }
                 if (idleTerminated) {
                     DenovaLog.w("Game", "stream idle timeout; task finished")
-                    _uiState.value = _uiState.value.copy(error = UiText.of(R.string.agent_flow_idle_timeout))
+                    updateUiIfCurrent(epoch) { it.copy(error = UiText.of(R.string.agent_flow_idle_timeout)) }
                 }
-                finishStream()
+                if (epoch == storyEpoch) finishStream()
             } catch (e: GameStreamError) {
                 val rejected = e.status in 400..499 && e.code != null && e.code != "agent_runtime.stream_attached"
                 commands.updateStatus(commandId, if (rejected) CommandStatus.REJECTED else CommandStatus.UNCERTAIN)
                 DenovaLog.w("Game", "send failed code=${e.code} status=${e.status}")
-                _uiState.value = _uiState.value.copy(error = e.message?.let { UiText.raw(it) })
-                finishStream()
+                updateUiIfCurrent(epoch) { it.copy(error = e.message?.let { msg -> UiText.raw(msg) }) }
+                if (epoch == storyEpoch) finishStream()
             } catch (e: Exception) {
                 commands.updateStatus(commandId, CommandStatus.UNCERTAIN)
                 DenovaLog.w("Game", "send uncertain", e)
-                _uiState.value = _uiState.value.copy(error = e.message?.let { UiText.raw(it) })
-                finishStream()
+                updateUiIfCurrent(epoch) { it.copy(error = e.message?.let { msg -> UiText.raw(msg) }) }
+                if (epoch == storyEpoch) finishStream()
             }
         }
+    }
+
+    /** 发送到舞台当前故事/分支：UI 不需要知道分支身份。 */
+    fun sendCurrent(message: String) {
+        val state = _uiState.value
+        if (state.storyId.isBlank()) return
+        send(state.storyId, state.branchId.ifBlank { DEFAULT_BRANCH }, message)
     }
 
     fun stop() {
@@ -345,6 +518,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         pendingChunks.setLength(0)
     }
 
+    /** 只有当前故事世代的回包才允许写舞台状态。 */
+    private inline fun updateUiIfCurrent(epoch: Long, block: (GameUiState) -> GameUiState) {
+        if (epoch != storyEpoch) return
+        _uiState.value = block(_uiState.value)
+    }
+
     /** 流结束：若仍停在运行中，说明没收到 terminal 事件（流异常中断），标记断开。 */
     private fun finishStream() {
         flushPendingChunks()
@@ -414,6 +593,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         streamJob?.cancel()
         sendJob?.cancel()
         flushJob?.cancel()
+        libraryJob?.cancel()
         super.onCleared()
     }
 }

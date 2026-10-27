@@ -1,17 +1,28 @@
 package com.denova.novara.feature.game
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -23,30 +34,35 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.denova.novara.R
+import com.denova.novara.core.game.StoryLibrary
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.logging.DenovaLog
+import com.denova.novara.core.network.StorySummary
 import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GamePhase
 
 /**
- * 游戏舞台（G4）：输入 story/branch → 挂接活动流 → 展示投影阶段与累积叙事。
+ * 游戏舞台（P4-A）：故事库驱动入口（GAM-002）→ 挂接活动流 → 投影阶段与累积叙事。
  * 叙事按 chunk 累积；断线由 [GameViewModel] 内部恢复协调器自动重挂。
  */
 @Composable
 fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDrawer: () -> Unit, onBack: () -> Unit) {
     val uiState by viewModel.uiState.collectAsState()
+    val library by viewModel.library.collectAsState()
 
     // 后台被系统掐断连接后，回前台自动重挂（身份/结果仍对应）。
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -58,9 +74,16 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    var storyId by remember { mutableStateOf("") }
-    var branchId by remember { mutableStateOf("") }
+    // 进入页面加载故事列表；服务端 current_story_id 命中时自动挂接该故事。
+    LaunchedEffect(Unit) { viewModel.loadStories(autoAttach = true) }
+
+    var showPicker by remember { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<StorySummary?>(null) }
+    var deleteTarget by remember { mutableStateOf<StorySummary?>(null) }
     var input by remember { mutableStateOf("") }
+
+    val currentStory = library.stories.firstOrNull { it.id == library.currentStoryId }
+    val storyId = library.currentStoryId
 
     Column(
         modifier = Modifier
@@ -75,22 +98,33 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
             IconButton(onClick = onOpenRightDrawer) { Text("»") }
         }
 
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-            OutlinedTextField(
-                value = storyId,
-                onValueChange = { storyId = it },
-                label = { Text("story ID") },
-                singleLine = true,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
+        // 故事选择行：显示当前故事与轮次，点开列表切换 / 改名 / 删除。
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = { showPicker = true }, enabled = !library.busy) {
+                Text(currentStory?.title?.ifBlank { currentStory.id } ?: stringResource(R.string.game_story_pick_placeholder))
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null)
+            }
+            currentStory?.let {
+                Text(storySubtitle(it), style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.weight(1f))
+            if (library.loading || library.busy) {
+                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+            }
+            IconButton(onClick = { viewModel.loadStories() }, enabled = !library.loading) {
+                Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.common_refresh))
+            }
+        }
+        library.error?.let {
+            Text(
+                it.resolve(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 12.dp),
             )
-            OutlinedTextField(
-                value = branchId,
-                onValueChange = { branchId = it },
-                label = { Text(stringResource(R.string.game_branch_optional)) },
-                singleLine = true,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-            )
-            OutlinedButton(onClick = { viewModel.start(storyId.trim(), branchId.trim()) }) { Text(stringResource(R.string.common_attach)) }
         }
 
         // 投影状态
@@ -133,13 +167,162 @@ fun GameScreen(viewModel: GameViewModel, onOpenDrawer: () -> Unit, onOpenRightDr
             )
             OutlinedButton(
                 onClick = {
-                    viewModel.send(storyId.trim(), branchId.trim(), input)
+                    viewModel.sendCurrent(input)
                     input = ""
                 },
                 enabled = !uiState.sending && storyId.isNotBlank() && input.isNotBlank(),
             ) { Text(if (uiState.sending) stringResource(R.string.game_sending) else stringResource(R.string.common_send)) }
         }
     }
+
+    if (showPicker) {
+        StoryPickerDialog(
+            state = library,
+            onSelect = {
+                viewModel.selectStory(it)
+                showPicker = false
+            },
+            onRename = { renameTarget = it },
+            onDelete = { deleteTarget = it },
+            onRefresh = { viewModel.loadStories() },
+            onDismiss = {
+                showPicker = false
+                viewModel.dismissLibraryError()
+            },
+        )
+    }
+
+    renameTarget?.let { story ->
+        RenameStoryDialog(
+            story = story,
+            onConfirm = {
+                viewModel.renameStory(story.id, it)
+                renameTarget = null
+            },
+            onDismiss = { renameTarget = null },
+        )
+    }
+
+    deleteTarget?.let { story ->
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text(stringResource(R.string.game_story_delete_title)) },
+            text = { Text(stringResource(R.string.game_story_delete_confirm, story.title.ifBlank { story.id })) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.deleteStory(story.id)
+                    deleteTarget = null
+                }) { Text(stringResource(R.string.game_story_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteTarget = null }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
+    }
+}
+
+/** 副标题：轮次数 + 最近更新时间（时间戳解析失败时只显示轮次数）。 */
+@Composable
+private fun storySubtitle(story: StorySummary): String {
+    val updated = StoryLibrary.formatUpdatedAt(story.updatedAt)
+    return if (updated.isEmpty()) {
+        stringResource(R.string.game_story_turns, story.turnCount)
+    } else {
+        stringResource(R.string.game_story_summary, story.turnCount, updated)
+    }
+}
+
+/** 故事列表：选中打勾、逐项改名/删除，底部刷新。删除动作在页面层确认。 */
+@Composable
+private fun StoryPickerDialog(
+    state: StoryLibraryState,
+    onSelect: (String) -> Unit,
+    onRename: (StorySummary) -> Unit,
+    onDelete: (StorySummary) -> Unit,
+    onRefresh: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.game_story_picker_title)) },
+        text = {
+            Column {
+                when {
+                    state.stories.isEmpty() && state.loading -> Text(stringResource(R.string.game_story_loading))
+                    state.stories.isEmpty() -> Text(stringResource(R.string.game_story_empty))
+                    else -> LazyColumn(modifier = Modifier.heightIn(max = 380.dp)) {
+                        items(state.stories, key = { it.id }) { story ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable(enabled = !state.busy) { onSelect(story.id) }
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = story.title.ifBlank { story.id },
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = if (story.id == state.currentStoryId) FontWeight.SemiBold else FontWeight.Normal,
+                                    )
+                                    Text(storySubtitle(story), style = MaterialTheme.typography.bodySmall)
+                                }
+                                if (story.id == state.currentStoryId) {
+                                    Text("✓", modifier = Modifier.padding(horizontal = 4.dp))
+                                }
+                                TextButton(onClick = { onRename(story) }) {
+                                    Text(stringResource(R.string.game_story_rename))
+                                }
+                                TextButton(onClick = { onDelete(story) }) {
+                                    Text(stringResource(R.string.game_story_delete))
+                                }
+                            }
+                        }
+                    }
+                }
+                state.error?.let {
+                    Text(
+                        it.resolve(),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onRefresh, enabled = !state.loading) { Text(stringResource(R.string.common_refresh)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
+        },
+    )
+}
+
+@Composable
+private fun RenameStoryDialog(story: StorySummary, onConfirm: (String) -> Unit, onDismiss: () -> Unit) {
+    var title by remember(story.id) { mutableStateOf(story.title) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.game_story_rename_title)) },
+        text = {
+            OutlinedTextField(
+                value = title,
+                // Web 入口 maxLength=80，保持同一上限。
+                onValueChange = { if (it.length <= 80) title = it },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(title) }, enabled = title.isNotBlank()) {
+                Text(stringResource(R.string.common_confirm))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
+    )
 }
 
 /**
