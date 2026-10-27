@@ -71,6 +71,7 @@ import com.denova.novara.feature.shell.ChangesContent
 import com.denova.novara.feature.shell.VersionsContent
 import com.denova.novara.feature.shell.ProjectDirectoryContent
 import com.denova.novara.feature.shell.RightDrawer
+import com.denova.novara.feature.books.BooksScreen
 import com.denova.novara.feature.shell.appDestinations
 import com.denova.novara.feature.terminal.TerminalScreen
 import com.denova.novara.feature.terminal.TerminalViewModel
@@ -382,6 +383,22 @@ class MainActivity : AppCompatActivity() {
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
                                             initialProjectId = projectId,
                                             onBack = { navController.popBackStack() },
+                                        )
+                                    }
+                                    composable("books") {
+                                        BooksScreen(
+                                            client = connectionViewModel.client,
+                                            currentProjectId = currentProjectId,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onCurrentBookChanged = { book ->
+                                                // 书籍页里切换 / 新建 / 导入 / 移除后，同步外壳的项目上下文，
+                                                // 否则抽屉、编辑器与项目目录还停在上一个项目上。
+                                                if (book != null && book.projectId != currentProjectId) {
+                                                    currentProjectId = book.projectId
+                                                    editorViewModel.setProject(book.projectId)
+                                                    bookShelfViewModel.refresh()
+                                                }
+                                            },
                                         )
                                     }
                                     appDestinations.filter { !it.implemented }.forEach { destination ->
