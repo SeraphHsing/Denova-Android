@@ -34,5 +34,31 @@
 
 ## 未覆盖
 
-- 拖拽移动分类（Web 支持拖拽排序；手机端用管理对话框，移动语义未做）。
-- 条目「移动分类」没有独立入口：改条目类型即等价迁移，未单独验证。
+- ~~拖拽移动分类~~ / ~~条目移动入口~~：见下节第二轮，已补齐并真机通过。
+
+## 第二轮真机（分类移动 / 角色锁定 / 自定义分类 / 条目移动）
+
+- 日期：2026-10-28 晚
+- 项目：`project-9a1ce5282872a3784807476ba907fedb`（`p4c-lore-apply`；取证完成后已用 `/api/books/remove` 移除书籍记录）
+- 构建：JVM 73 套件 / 511 用例 / 0 失败 + `lintDebug` + `assembleDebug` 通过
+
+| 步骤 | 实测结果 |
+|---|---|
+| 新建分类 | 菜单「新建分类」→ `p4c-cat` → `Lore: category create id= total=6`；服务端分配 uuid `f6663533-…` |
+| 分类上移 | 管理分类 → 该行 `↑` → `Lore: category move id=f6663533-… total=6`；`GET categories` 顺序由 `… item, world, p4c-cat` 变为 `… item, p4c-cat, world` |
+| 角色分类锁定 | 管理分类里角色行显示「角色分类不可重命名或删除」；点「重命名」「删除」均不弹对话框、不发请求（服务端同样拒绝） |
+| 自定义分类建条目 | 选中 `p4c-cat` → 新建条目（分类显示 `p4c-cat`）→ 名称 `p4c-item-a`、重要度 `minor` → 保存 `Lore: saved item=p4c-item-a` |
+| 读回类型/重要度 | `GET items` → `type=f6663533-d663-4452-84c5-a6143739d919`（= 分类 id）、`importance=minor` |
+| 条目移动（显式入口） | 列表长按条目 →「移动到分类」→ 地点 → `Lore: moved item=p4c-item-a to=location`，服务端 `type=location`、`type_source=manual` |
+| 改分类下拉 | 表单「分类」改回 `p4c-cat` → 保存 → 服务端 `type` 回到分类 uuid |
+| 删除分类并选迁移目标 | 管理分类 → 删除 `p4c-cat` → 目标选择「世界设定」→ 确认文案随选择变化 → `Lore: category delete id=… total=5`；服务端读回条目 `type=world`，`character` 分类保留 |
+
+### 本轮修掉的三处契约/枚举缺陷
+
+1. **自定义分类的条目类型**：`LoreDraft.typeForCategory` 原把非内置分类映射成 `other`，而服务端要求条目 `type` ∈ 分类表（`validateCollection`），在自定义分类里新建条目必然保存失败。改为直接用分类 id。
+2. **重要度取值**：客户端原用 `high/medium/low`，服务端 `normalizeLoreImportance` 会把它们统一改成 `important`；改为基线的 `major/important/minor`，真机读回 `minor` 不再被改写。
+3. **角色分类不可改名/删除**：删除目标选择器与重命名入口都按服务端规则禁止 `character`（此前自动取「第一个非 character 分类」，只是碰巧避开）。
+
+### 仍不在本行范围
+
+- 分类拖拽排序：基线 `LoreCategoryManager` 本身就是 `↑ / ↓` 按钮（不是拖拽），已按基线实现。

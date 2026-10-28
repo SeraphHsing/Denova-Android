@@ -1,7 +1,7 @@
 # 项目状态
 
-**更新日期：** 2026-10-27  
-**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六关卡已按 [05 §3.1 证据台账](android-web-parity/05-roadmap.md#31-p1-证据台账2026-10-24-核对) 逐条核对并**于 2026-10-24 退出**：G5 / G4 / G2 判据齐备，G3 核心判据（并发合并读回、草稿事务提交前后终止进程）通过，G1 通过（降级：HTTPS/WSS 环境受限、迟到 401 留待 P3），G6 通过（范围受限 SD-01）；未满足项 9 条（环境受限 2、留待 P3 7）已全部定性，无悬空缺口（P3 回补：G3-b/c/d 已于 2026-10-25 全部补测通过，G3 关卡无留项，留待 P3 降为 2 条：G1-d 迟到 401 与 G6-b 权限分层）。复刻矩阵 118 条中已回写 **49 条 `已完成`**、其余 **69 条 `未开始`**（口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；逐条状态以 [parity-matrix.csv](android-web-parity/parity-matrix.csv) 为准；2026-10-27 按严格口径回退游戏 10 条，见下「P4-A 矩阵严格口径校正」）；**P2 工程基础已落地，P3（写作链路）已收官，P4-A（游戏）功能切片实现完成但矩阵 0/17 通过（缺 Web 端双端对照，待 P5），P4-B（工作台）进行中**。  
+**更新日期：** 2026-10-28  
+**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六关卡已按 [05 §3.1 证据台账](android-web-parity/05-roadmap.md#31-p1-证据台账2026-10-24-核对) 逐条核对并**于 2026-10-24 退出**：G5 / G4 / G2 判据齐备，G3 核心判据（并发合并读回、草稿事务提交前后终止进程）通过，G1 通过（降级：HTTPS/WSS 环境受限、迟到 401 留待 P3），G6 通过（范围受限 SD-01）；未满足项 9 条（环境受限 2、留待 P3 7）已全部定性，无悬空缺口（P3 回补：G3-b/c/d 已于 2026-10-25 全部补测通过，G3 关卡无留项，留待 P3 降为 2 条：G1-d 迟到 401 与 G6-b 权限分层）。复刻矩阵 118 条中已回写 **53 条 `已完成`**、其余 **65 条 `未开始`**（口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；逐条状态以 [parity-matrix.csv](android-web-parity/parity-matrix.csv) 为准；2026-10-27 按严格口径回退游戏 10 条，见下「P4-A 矩阵严格口径校正」）；**P2 工程基础已落地，P3（写作链路）已收官，P4-A（游戏）功能切片实现完成但矩阵 0/17 通过（缺 Web 端双端对照，待 P5），P4-B（工作台）已收口，P4-C（共通资源）进行中：书籍管理（BOK-001…003）与资料库（LOR-001…004）已收口**。  
 **产品实现状态：** P1 原型链路可用（连接认证 / 编辑器 / 游戏流 / 写作流 / 终端）；目标形态的公共界面（单 Activity 导航、左右抽屉、DesignTokens、主题与中英文）和业务页面尚未实现。
 
 ## 当前基线
@@ -174,7 +174,15 @@
 
 - 2026-10-28 **连接层：401 会话失效处理（配套「20 分钟有效期」误判的纠正）**。查基线源码确认会话 Cookie 有效期是 **30 天**（`browserSessionLifetime`），401 的真实来源是 `browserSession.valid()` 还要求 `AllowLANAccess`、用户名与**密码哈希**一致（任何一次写设置提交新密码会让全部旧会话失效），或会话文件读失败、或本机点了「退出」。据此补上客户端行为：`DenovaClient.toException` 在 401 时回调（同一次失效只报一次）→ `ConnectionViewModel` 切回未认证态并提示「登录已失效，请重新输入密码」；登录请求用 `suppressingUnauthorized` 包裹，登录接口的 401 只当密码错误、不改状态。真机验证：正常连接不被误判、错误密码显示「用户名或密码错误。」、正确密码恢复 `login ok`；新增 `AuthUnauthorizedTest`（内置 HttpServer，3 例：401 只通知一次 / 登录 401 不通知 / 2xx 不通知）。JVM 509 用例 / 0 失败。
 
-- 2026-10-28 **P4-C 第二切片进行中：资料库（LOR-001…004 已实现，真机验收未完成）**。新增 `core/network/LoreCatalog.kt` 与 `DenovaClient` 16 个 lore 方法（分类增删改移、条目 CRUD、材料上传/关联/移除/封面、图片与语音生成、索引读取/保存/预览、类型分类预览与应用），`feature/lore` 落地资料库页面（分类标签 + 搜索 + 条目表单 + 材料区 + 索引面板 + 分类建议对话框），`core/lore/LoreDraft.kt` 抽表单↔条目往返与标签解析（3 用例）。**真机已确认**：列表读取（`items=103 categories=6`）、新建条目（`saved item=p4c-lore-test`，103→104）、搜索过滤、材料上传（`material uploaded … name=cover-test.png`）与移除（材料 2→1）、以及**草稿跨页恢复**（返回编辑器再回来表单与内容仍在）。**同轮修掉三个缺陷**：①材料/生成接口返回 `Item` 本体而非 `{item}` 包装导致「材料操作失败」且无可读原因；②页面缺 `imePadding`，键盘弹出后「保存/上传材料」既看不见也滚不到；③`LoreViewModel` 绑在导航作用域导致草稿随页面销毁（改为 Activity 作用域 + `SavedStateHandle`）。**尚未验收**：分类增删改移、条目编辑/启用/删除、配图与语音生成（需可用 Agent）、索引预览与保存、分类预览与应用——因此 **LOR-001…004 仍为 `未开始`**，证据见 [p4c-resources/result-lore-wip.md](evidence/p4c-resources/xiaomi-14-pro/result-lore-wip.md)。
+- 2026-10-28 **P4-C 第二切片收口：资料库 LOR-001…004 全部真机回写 `已完成`**。
+  - **LOR-001**：分类 `op=move` 上移/下移（服务端顺序读回）、角色分类禁止改名/删除、删除分类可选迁移目标；自定义分类建条目 `type=分类 id`、重要度 `major/important/minor`、列表长按「移动到分类」与表单分类下拉两条迁移路径。同轮修「自定义分类 type 退化成 other 导致保存被拒」与「重要度枚举被服务端静默归一化」。
+  - **LOR-002**：材料上传、从项目素材关联（`op=link`）、远程图片（`op=remote`，`source.kind=web` 读回）、语音生成（82,560B mp3）、图像 Agent 配图（2.6MB png）、设为封面、语音试听、材料改名（`op=update`）；上传/生成显示进度并可取消（提示「已在本机取消，服务端可能仍会完成」），失败原因原样呈现。同轮修「`op=add` 不存在」「图像 Agent 缺 `command_id`」「慢接口 30s 超时」「媒体回包覆盖正在编辑的正文」。
+  - **LOR-003**：索引预览（tokens / over_budget，不写盘）、保存前言、过期 revision 保存 409 → 提示冲突并只刷新 revision、保留用户前言；类型分类预览后**只应用勾选范围**（未勾选条目类型不变）、应用 409 → 提示重新预览并丢弃过期建议。同轮修「编辑中打不开索引面板」与两类 409 无提示。
+  - **LOR-004**：草稿按 `server origin + 项目` 落 DataStore，切页返回、`force-stop`、`install -r` 覆盖安装均可恢复（真机 3 次 `draft restored`）；草稿打开期间外部（模拟 Agent 侧）改写条目后返回不覆盖本机草稿；一次保存只产生一条写请求；切作品不继承上一本草稿。
+  - 验证：JVM 73 套件 / 511 用例 / 0 失败 + `lintDebug` + `assembleDebug` 全绿。证据 [result-lore-001](evidence/p4c-resources/xiaomi-14-pro/result-lore-001.md)、[result-lore-002](evidence/p4c-resources/xiaomi-14-pro/result-lore-002.md)、[result-lore-003](evidence/p4c-resources/xiaomi-14-pro/result-lore-003.md)、[result-lore-004](evidence/p4c-resources/xiaomi-14-pro/result-lore-004.md)；测试书 `p4c-lore-apply` / `p4c-audio-test` / `p4c-media-test` 均已用 `/api/books/remove` 清理。
+  - 行外欠账（登记 P5 视觉/功能对照，不阻塞本行）：索引分组增删与组内条目排序编辑、材料多选批量上传、远程图片 `localize` 单独入口、图片材料全屏查看。
+
+- 2026-10-28 **P4-C 第二切片首轮：资料库（LOR-001…004 实现，验收未完成；已由上方条目收口）**。新增 `core/network/LoreCatalog.kt` 与 `DenovaClient` 16 个 lore 方法（分类增删改移、条目 CRUD、材料上传/关联/移除/封面、图片与语音生成、索引读取/保存/预览、类型分类预览与应用），`feature/lore` 落地资料库页面（分类标签 + 搜索 + 条目表单 + 材料区 + 索引面板 + 分类建议对话框），`core/lore/LoreDraft.kt` 抽表单↔条目往返与标签解析（3 用例）。**真机已确认**：列表读取（`items=103 categories=6`）、新建条目（`saved item=p4c-lore-test`，103→104）、搜索过滤、材料上传（`material uploaded … name=cover-test.png`）与移除（材料 2→1）、以及**草稿跨页恢复**（返回编辑器再回来表单与内容仍在）。**同轮修掉三个缺陷**：①材料/生成接口返回 `Item` 本体而非 `{item}` 包装导致「材料操作失败」且无可读原因；②页面缺 `imePadding`，键盘弹出后「保存/上传材料」既看不见也滚不到；③`LoreViewModel` 绑在导航作用域导致草稿随页面销毁（改为 Activity 作用域 + `SavedStateHandle`）。**尚未验收**：分类增删改移、条目编辑/启用/删除、配图与语音生成（需可用 Agent）、索引预览与保存、分类预览与应用——因此 **LOR-001…004 仍为 `未开始`**，证据见 [p4c-resources/result-lore-wip.md](evidence/p4c-resources/xiaomi-14-pro/result-lore-wip.md)。
 
 - 2026-10-28 **进入 P4-C（共通资源）第一切片：书籍管理（BOK-001 / 002 / 003）**。新增 `core/network/BookCatalog.kt` 与 16 个客户端方法（info / remove / reorder / sort-mode / cover upload+generate / 小说预览与导入 / 角色卡预览与导入 / 导出 / 当前工作区），`feature/books` 实现书籍管理页（当前书籍 + 书架 + 新建 / 导入小说 / 导入角色卡 + 排序菜单），文案逐条对齐基线 `zh-CN/home.ts`；手动排序抽成 `core/books/BookOrder.kt`（手机端上移/下移，提交完整路径表，3 个 JVM 用例）；下载落盘抽成 `core/export/DownloadsSaver.kt`（与 WB-006 会话导出共用）。**真机通过**：新建 `p4c-books-test`（列表 5→6、切为当前）→ 编辑信息（GET info 预填 → PUT → 重读一致）→ 上传封面（`covers=4`，缩略图渲染）→ 切换书籍 → 小说导入（预览「5 章 · 63 字」不写入 → 确认后 `chapters=5 chars=63`）→ 导出 `novel-test.txt`（`scope=downloads`，adb 可见 97 字节）→ 上移排序（reorder 后刷新保持，随后复原）→ 从书架移除两本测试书（`removed name=… newWorkspace=…`）。**同轮修复**：Coil 不认 okhttp `HttpUrl` 导致封面全不显示（改传字符串）。矩阵 **BOK-001/002/003 回写 `已完成`**（49 条已完成 / 69 条未开始）；证据 [p4c-resources/result-books.md](evidence/p4c-resources/xiaomi-14-pro/result-books.md)；JVM 503 用例 / 0 失败 + `lintDebug` + `assembleDebug` 全绿。未覆盖：角色卡导入真机步骤（缺可用 PNG 卡资产）、封面「生成」入口未真机调用、拖拽排序改为菜单上下移。
 
@@ -237,8 +245,10 @@
 剩余 7 条与原因：GAM-001（开场配置文本未逐字回读、lore 无候选）、GAM-002（按故事保留输入草稿未做）、GAM-006（世界侧实体数据为空）、GAM-011（提示词诱导未触发 ask，需审批型工具场景）、GAM-013（`suspend` 不产生 pending interruption）、GAM-014（双重流时序未构造）、GAM-016（图片附件与上下文未实现）。后续按 05-roadmap 进入 **P4-B**。
 
   **P4-B（工作台）已开工（2026-10-27）**：B1 完成工作台宿主、项目/会话管理与主副会话（WB-001 / 002 / 003 / 010 回写），并把写作 / 工作台两套 Agent 作用域收敛到 `AgentGateway`；B2 完成终端页签与旋转重连（WB-008），B3 完成文件页签与内嵌编辑（WB-004 宿主形态），B4/B5 完成变更审阅页签与历史搜索导出（WB-005 / WB-006）。**P4-B 五个切片已全部收口**（WB-001/002/003/004/005/006/008/010 已回写），下一步按 05-roadmap 进入 **P4-C**。NAV-001 仍需页面补齐后逐项验收（当前 4/13 可进入）。横屏左抽屉导航区不渲染已于 2026-10-27 修复（见上）。
+
+  **P4-C（共通资源）进行中（2026-10-28）**：书籍管理（BOK-001 / 002 / 003）与资料库（LOR-001…004）已真机回写；下一批为创作方案、Skills、Agents 等共通资源页面。NAV-001 待页面补齐后逐项验收。
 4. **P3 需回补的 P1 台账条目：** 只剩 G1-d 迟到 401 端到端（阻塞点：当前 UI 在 Checking 期间地址与连接按钮不可用，构造不出「登录在途时 status 返回」，需先补可并发的入口，工具 `tools/g3d_slow_proxy.py --status-delay-ms` 已就绪）；G6-b 权限分层随 P4-D。G2-c 全节点与 G4-d 跨包升级安装已于 2026-10-26 补测通过，G3 关卡（G3-b/c/d）已于 2026-10-25 全部补齐。补齐并验收后再更新对应矩阵行。
-5. **遗留（不阻塞阶段推进）：** 其余 103 条首批场景仍需在 P2/P3 期间按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
+5. **遗留（不阻塞阶段推进）：** 其余未回写的首批场景（见矩阵 `未开始` 行）仍需按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
 
 ## 状态记录规则
 
