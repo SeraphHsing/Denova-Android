@@ -65,6 +65,7 @@ import com.denova.novara.feature.chapters.ChaptersViewModel
 import com.denova.novara.feature.versions.VersionsViewModel
 import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.SettingsViewModel
+import com.denova.novara.feature.settings.SettingsScreen
 import com.denova.novara.feature.shell.AppDrawer
 import com.denova.novara.feature.shell.GameConsoleContent
 import com.denova.novara.feature.shell.PlaceholderScreen
@@ -440,6 +441,12 @@ class MainActivity : AppCompatActivity() {
                                         SkillsScreen(
                                             client = connectionViewModel.client,
                                             projectId = currentProjectId,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                        )
+                                    }
+                                    composable("settings") {
+                                        SettingsScreen(
+                                            client = connectionViewModel.client,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
                                         )
                                     }

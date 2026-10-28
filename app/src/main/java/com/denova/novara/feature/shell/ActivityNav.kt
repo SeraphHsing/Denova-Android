@@ -59,7 +59,7 @@ object ActivityNav {
         ActivitySpec("agents", R.string.dest_agents, ActivityGroup.TOOLS, Icons.Filled.Person, implemented = true),
         ActivitySpec("automations", R.string.dest_automations, ActivityGroup.TOOLS, Icons.Filled.DateRange, implemented = false),
         ActivitySpec("market", R.string.dest_market, ActivityGroup.TOOLS, Icons.Filled.ShoppingCart, implemented = false),
-        ActivitySpec("settings", R.string.dest_settings, ActivityGroup.SETTINGS, Icons.Filled.Settings, implemented = false),
+        ActivitySpec("settings", R.string.dest_settings, ActivityGroup.SETTINGS, Icons.Filled.Settings, implemented = true),
     )
 
     /**
