@@ -54,6 +54,7 @@
     <string name="conn_err_login_failed">Sign-in failed</string>
     <string name="conn_err_pairing_invalid">Pairing link is invalid or expired</string>
     <string name="conn_err_pair_failed">Pairing failed</string>
+    <string name="conn_session_expired">Session expired. Please sign in again.</string>
     <string name="conn_err_network">Network error, try again</string>
     <string name="conn_err_unreachable">Cannot reach the server (HTTP %1$d)</string>
     <string name="conn_err_cannot_connect">Cannot reach the server</string>

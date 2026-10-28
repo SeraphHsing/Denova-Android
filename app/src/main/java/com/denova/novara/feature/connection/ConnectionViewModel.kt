@@ -70,9 +70,23 @@ class ConnectionViewModel(
             return
         }
         DenovaLog.i("Connection", "connecting to ${key.origin}")
-        client = createClient(key)
+        val created = createClient(key)
+        // 任何请求收到 401 都视为会话失效：回到连接页并说明原因，
+        // 而不是把服务端那句「请先输入远程访问用户名和密码」直接抛给用户。
+        created.onUnauthorized = { handleSessionExpired(created, key) }
+        client = created
         viewModelScope.launch { store.saveServer(input) }
         checkStatus(key)
+    }
+
+    /** 会话失效（401）：只处理当前客户端，切回未认证态并给出可读提示。 */
+    private fun handleSessionExpired(c: DenovaClient, key: ServerKey) {
+        if (c !== client) return
+        DenovaLog.w("Connection", "session expired, returning to login")
+        viewModelScope.launch {
+            _state.value = ConnectionUiState.Unauthenticated(key, local = false)
+            _actionError.value = UiText.of(R.string.conn_session_expired)
+        }
     }
 
     fun login(username: String, password: String) {
@@ -83,7 +97,8 @@ class ConnectionViewModel(
             try {
                 // D03 恢复耗时埋点：认证往返起点
                 DenovaLog.i("Perf", "login-start")
-                val result = c.login(username.trim(), password)
+                // 登录接口的 401 表示密码错误，不能当作「会话过期」。
+                val result = c.suppressingUnauthorized { c.login(username.trim(), password) }
                 if (!c.generation.isCurrent(gen)) {
                     DenovaLog.i("Connection", "stale login result ignored gen=$gen")
                     return@launch
@@ -91,6 +106,7 @@ class ConnectionViewModel(
                 // 新登录成为当前世代：登录前发出的 status / 旧 401 一律作废，避免把新会话顶掉。
                 c.generation.retire()
                 DenovaLog.i("Connection", "login ok local=${result.local}")
+                c.resetUnauthorizedFlag()
                 _actionError.value = null
                 _state.value = ConnectionUiState.Authenticated(current, result.local)
             } catch (e: DenovaApiException) {

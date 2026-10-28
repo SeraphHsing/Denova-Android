@@ -244,6 +244,14 @@ class DenovaClient(
     /** 连接身份（隔离 key）：HistoryStore / 草稿等按此分目录。 */
     val serverOrigin: String get() = server.origin
 
+    /** 任一会话请求收到 401 时回调（由连接层设置），用于回到登录页。 */
+    var onUnauthorized: (() -> Unit)? = null
+
+    private val unauthorizedNotified = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    /** 登录请求期间为 true：401 在那里只代表密码错误，不触发「会话过期」。 */
+    private val suppressUnauthorized = java.util.concurrent.atomic.AtomicBoolean(false)
+
     private val json = Json {
         ignoreUnknownKeys = true
         // 服务端可选字段可能显式返回 null（如 running 态的 recovery_actions:null），
@@ -2542,7 +2550,37 @@ class DenovaClient(
 
     private fun toException(status: Int, body: String): DenovaApiException {
         val parsed = runCatching { json.decodeFromString(ApiErrorBody.serializer(), body) }.getOrNull()
+        // 401 统一在这里上报：会话被吊销（服务端密码哈希/局域网开关变化、会话文件读失败）或被本机退出后，
+        // 界面不该只弹一句「请先输入远程访问用户名和密码」，而要回到连接页提示重新登录。
+        if (status == 401) notifyUnauthorized()
         return DenovaApiException(status, parsed?.code, parsed?.error ?: body.ifBlank { null })
+    }
+
+    /** 会话失效（401）的一次性通知：同一次失效只回调一次，避免并发请求刷屏。 */
+    private fun notifyUnauthorized() {
+        if (suppressUnauthorized.get()) return
+        if (unauthorizedNotified.compareAndSet(false, true)) {
+            DenovaLog.w("Auth", "session unauthorized (401) origin=${server.origin}")
+            onUnauthorized?.invoke()
+        }
+    }
+
+    /** 重新登录成功后由连接层复位，允许下一次失效再次通知。 */
+    fun resetUnauthorizedFlag() {
+        unauthorizedNotified.set(false)
+    }
+
+    /**
+     * 登录请求本身用 401 表示「用户名或密码错误」，不能按「会话失效」处理（否则会把刚打开的连接页
+     * 又切一次状态、提示语也变成过期）。登录期间临时屏蔽 401 回调。
+     */
+    suspend fun <T> suppressingUnauthorized(block: suspend () -> T): T {
+        suppressUnauthorized.set(true)
+        try {
+            return block()
+        } finally {
+            suppressUnauthorized.set(false)
+        }
     }
 }
 

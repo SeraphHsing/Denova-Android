@@ -54,6 +54,7 @@
     <string name="conn_err_login_failed">登录失败</string>
     <string name="conn_err_pairing_invalid">配对链接无效或已过期</string>
     <string name="conn_err_pair_failed">配对失败</string>
+    <string name="conn_session_expired">登录已失效，请重新输入密码</string>
     <string name="conn_err_network">网络错误，请重试</string>
     <string name="conn_err_unreachable">无法连接服务器（HTTP %1$d）</string>
     <string name="conn_err_cannot_connect">无法连接服务器</string>
