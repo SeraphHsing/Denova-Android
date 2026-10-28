@@ -74,6 +74,7 @@ import com.denova.novara.feature.shell.ProjectDirectoryContent
 import com.denova.novara.feature.shell.RightDrawer
 import com.denova.novara.feature.books.BooksScreen
 import com.denova.novara.feature.lore.LoreScreen
+import com.denova.novara.feature.presets.PresetsScreen
 import com.denova.novara.feature.skills.SkillsScreen
 import com.denova.novara.feature.shell.appDestinations
 import com.denova.novara.feature.terminal.TerminalScreen
@@ -413,6 +414,12 @@ class MainActivity : AppCompatActivity() {
                                             projectId = currentProjectId,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
                                             viewModel = loreViewModel,
+                                        )
+                                    }
+                                    composable("teller") {
+                                        PresetsScreen(
+                                            client = connectionViewModel.client,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
                                         )
                                     }
                                     composable("skills") {
