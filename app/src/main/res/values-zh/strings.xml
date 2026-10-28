@@ -747,12 +747,12 @@
     <string name="lore_save_failed">保存条目失败</string>
     <string name="lore_deleted">已删除条目</string>
     <string name="lore_delete_failed">删除条目失败</string>
-    <string name="lore_delete_item_confirm">删除“%1$s”？正文与媒体会一并移除。</string>
+    <string name="lore_delete_item_confirm">删除"%1$s"？正文与媒体会一并移除。</string>
     <string name="lore_category_saved">已更新分类</string>
     <string name="lore_category_failed">分类操作失败</string>
     <string name="lore_category_name">分类名称</string>
     <string name="lore_category_manage">管理分类</string>
-    <string name="lore_category_delete_confirm">删除分类“%1$s”？该分类下的条目会移动到“%2$s”。</string>
+    <string name="lore_category_delete_confirm">删除分类"%1$s"？该分类下的条目会移动到"%2$s"。</string>
     <string name="lore_field_name">名称（必填）</string>
     <string name="lore_field_type">分类</string>
     <string name="lore_field_importance">重要度</string>
@@ -791,4 +791,30 @@
     <string name="lore_classify_none">没有选中任何条目</string>
     <string name="lore_classify_applied">已应用分类建议</string>
     <string name="lore_classify_confidence">置信度 %1$s</string>
+
+    <string name="lore_category_destination">条目移动到</string>
+    <string name="lore_category_character_locked">角色分类不可重命名或删除</string>
+    <string name="lore_item_move">移动到分类</string>
+    <string name="lore_item_moved">已移动条目</string>
+    <string name="lore_item_move_failed">移动条目失败</string>
+
+    <string name="lore_generate_mode">生成方式</string>
+    <string name="lore_generate_mode_agent">图像 Agent</string>
+    <string name="lore_generate_mode_custom">直接提示词</string>
+    <string name="lore_generate_instruction">附加要求（可选）</string>
+    <string name="lore_generate_prompt">画面提示词</string>
+    <string name="lore_generate_running_image">正在生成配图…</string>
+    <string name="lore_generate_running_speech">正在生成语音…</string>
+    <string name="lore_generate_cancel">取消</string>
+    <string name="lore_generate_cancelled">已在本机取消，服务端可能仍会完成。</string>
+    <string name="lore_upload_running">正在上传材料…</string>
+
+    <string name="lore_materials_library">从项目素材</string>
+    <string name="lore_material_added">已关联材料</string>
+    <string name="lore_material_empty">没有可用的项目素材</string>
+    <string name="lore_image_label">封面配图</string>
+
+    <string name="lore_index_conflict">索引已在其他位置更新，已重新加载最新版本；请重新预览后再保存。</string>
+    <string name="lore_index_reload">重新加载索引</string>
+    <string name="lore_classify_conflict">条目已在其他位置更新，请重新预览分类建议。</string>
 </resources>

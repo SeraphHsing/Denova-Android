@@ -22,7 +22,11 @@ import com.denova.novara.core.network.LoreItemSummary
 import com.denova.novara.core.network.LoreMaterialMutation
 import com.denova.novara.core.network.LoreSpeechRequest
 import com.denova.novara.core.network.LoreTypeChange
+import com.denova.novara.core.network.LoreImageGenerateRequest
+import com.denova.novara.core.network.LoreOptions
 import com.denova.novara.core.network.UploadFile
+import com.denova.novara.core.persistence.LoreDraftStore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,9 +43,11 @@ data class LoreUiState(
     val selectedCategory: String = "",
     val query: String = "",
     val selectedItemId: String? = null,
-    /** 编辑中的草稿：换页再回来仍在（LOR-004）。 */
+    /** 编辑中的草稿：换页再回来仍在（LOR-004），并落盘以便进程被杀后恢复。 */
     val draft: LoreDraft? = null,
     val busy: Boolean = false,
+    /** 材料上传单独一个标志，界面要显示「上传中」而不是笼统的忙碌。 */
+    val uploading: Boolean = false,
     val notice: UiText? = null,
     val error: UiText? = null,
     val index: LoreIndexSnapshot? = null,
@@ -51,10 +57,9 @@ data class LoreUiState(
     /** 预览里勾选要应用的条目（只提交确认范围）。 */
     val classificationPicked: Set<String> = emptySet(),
     val assets: List<com.denova.novara.core.network.LoreMaterial> = emptyList(),
+    /** 进行中的生成任务：`image` / `speech`；非空时界面显示进度与取消。 */
     val generating: String? = null,
 ) {
-    fun categoriesWithAll(): List<LoreCategory> = categories
-
     fun visibleItems(): List<LoreItemSummary> {
         val q = query.trim()
         return items.filter { item ->
@@ -67,6 +72,15 @@ data class LoreUiState(
 
     fun categoryLabel(id: String): String = categories.firstOrNull { it.id == id }?.name?.takeIf { it.isNotBlank() }
         ?: id
+
+    fun categoryCount(categoryId: String): Int = items.count { it.type == categoryId }
+
+    /** 删除分类时可选的迁移目标：排除自身与 `character`（后端明确拒绝迁往 character）。 */
+    fun deleteDestinations(categoryId: String): List<LoreCategory> =
+        categories.filter { it.id != categoryId && it.id != com.denova.novara.core.network.LoreOptions.CHARACTER }
+
+    /** 条目可移动到的分类：排除自身当前分类。 */
+    fun moveTargets(item: LoreItemSummary): List<LoreCategory> = categories.filter { it.id != item.type }
 }
 
 /**
@@ -82,7 +96,11 @@ class LoreViewModel(
     private val _state = MutableStateFlow(LoreUiState())
     val state: StateFlow<LoreUiState> = _state.asStateFlow()
 
+    private val draftStore = LoreDraftStore(application)
     private var loadJob: Job? = null
+    private var draftJob: Job? = null
+    private var generateJob: Job? = null
+    private var serverScope: String = ""
     private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     init {
@@ -90,25 +108,49 @@ class LoreViewModel(
         // 否则「正在编辑的条目」在离开页面后就没了（LOR-004）。
         savedState.get<String>(KEY_DRAFT)?.let { raw ->
             runCatching { json.decodeFromString(LoreDraft.serializer(), raw) }
-                .onSuccess { draft ->
-                    _state.value = _state.value.copy(
-                        draft = draft,
-                        selectedItemId = draft.id.ifBlank { null },
-                    )
-                }
+                .onSuccess { draft -> restoreDraft(draft) }
         }
+    }
+
+    private fun restoreDraft(draft: LoreDraft) {
+        _state.value = _state.value.copy(draft = draft, selectedItemId = draft.id.ifBlank { null })
     }
 
     private fun persistDraft(draft: LoreDraft?) {
         if (draft == null) {
-            savedState.remove(KEY_DRAFT)
+            savedState.remove<String>(KEY_DRAFT)
         } else {
             savedState[KEY_DRAFT] = json.encodeToString(LoreDraft.serializer(), draft)
         }
+        // 落盘用于进程被杀 / 升级安装后恢复；连续输入按 400ms 合并，避免每次按键都写盘。
+        val scope = draftScope()
+        draftJob?.cancel()
+        if (scope.isBlank()) return
+        if (draft == null) {
+            viewModelScope.launch { draftStore.clear(scope) }
+            return
+        }
+        draftJob = viewModelScope.launch {
+            delay(400)
+            draftStore.save(scope, draft)
+        }
+    }
+
+    private fun draftScope(): String {
+        val projectId = _state.value.projectId
+        if (serverScope.isBlank() || projectId.isBlank()) return ""
+        return "$serverScope|$projectId"
     }
 
     fun bindClient(client: DenovaClient) {
+        val origin = client.serverOrigin
+        if (serverScope.isNotEmpty() && serverScope != origin) {
+            // 换服务器：不继承上一个服务器的草稿与选中项（AGENTS §4）。
+            _state.value = _state.value.copy(draft = null, selectedItemId = null)
+            persistDraft(null)
+        }
         this.client = client
+        this.serverScope = origin
     }
 
     fun load(projectId: String, force: Boolean = false) {
@@ -132,6 +174,13 @@ class LoreViewModel(
             return
         }
         if (!force && _state.value.projectId == projectId && _state.value.items.isNotEmpty()) return
+        val previousProject = _state.value.projectId
+        if (previousProject.isNotBlank() && previousProject != projectId) {
+            // 切作品：草稿按项目隔离，不把上一本的正文带进新书；旧草稿留在盘上，
+            // 回到原作品时仍可恢复（LOR-004）。
+            savedState.remove<String>(KEY_DRAFT)
+            _state.value = _state.value.copy(draft = null, selectedItemId = null)
+        }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null, projectId = projectId)
@@ -148,9 +197,22 @@ class LoreViewModel(
                         ?: categories.firstOrNull()?.id.orEmpty(),
                 )
                 DenovaLog.i("Lore", "loaded project=$projectId items=${items.size} categories=${categories.size}")
+                // 进程重建后恢复未保存的草稿（LOR-004）。SavedStateHandle 有值时以它为准。
+                if (_state.value.draft == null) restorePersistedDraft()
             } catch (e: Exception) {
                 _state.value = _state.value.copy(loading = false, error = failureText(e, R.string.lore_load_failed))
             }
+        }
+    }
+
+    private fun restorePersistedDraft() {
+        val scope = draftScope()
+        if (scope.isBlank()) return
+        viewModelScope.launch {
+            val draft = draftStore.load(scope) ?: return@launch
+            if (_state.value.draft != null) return@launch
+            restoreDraft(draft)
+            DenovaLog.i("Lore", "draft restored id=${draft.id.ifBlank { "new" }} isNew=${draft.isNew}")
         }
     }
 
@@ -165,6 +227,8 @@ class LoreViewModel(
     // ---- 条目（LOR-001 / LOR-004）----
 
     fun selectItem(item: LoreItemSummary) {
+        // 同一个条目的未保存草稿不能被列表点击覆盖（LOR-004）。
+        if (_state.value.selectedItemId == item.id && _state.value.draft?.id == item.id) return
         val category = _state.value.categories.firstOrNull { it.id == item.type }?.id
             ?: _state.value.selectedCategory
         _state.value = _state.value.copy(
@@ -202,8 +266,10 @@ class LoreViewModel(
         val c = client ?: return
         val s = _state.value
         val draft = s.draft ?: return
+        // 提交中/上传中都不允许再次提交：一次点击只发一个写请求（LOR-004）。
         if (!draft.canSave() || s.busy) return
         val projectId = s.projectId
+        val scope = draftScope()
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = true, error = null, notice = null)
             try {
@@ -214,11 +280,41 @@ class LoreViewModel(
                     c.updateLoreItem(projectId, draft.id, draft.toInput(baseRevision = base))
                 }
                 DenovaLog.i("Lore", "saved item=${item.id} name=${item.name}")
+                // 已保存：服务端成为事实源，本地草稿不再需要恢复。
+                _state.value = _state.value.copy(draft = null)
+                savedState.remove<String>(KEY_DRAFT)
+                draftJob?.cancel()
+                if (scope.isNotBlank()) draftStore.clear(scope)
                 reloadKeepingSelection(item.id, UiText.of(R.string.lore_saved))
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(
                     busy = false,
                     error = failureText(e, R.string.lore_save_failed),
+                )
+            }
+        }
+    }
+
+    /** 条目移动到另一个分类：等价于把 `type` 改成目标分类 id（后端以分类表校验）。 */
+    fun moveItem(item: LoreItemSummary, categoryId: String) {
+        val c = client ?: return
+        val projectId = _state.value.projectId
+        if (categoryId.isBlank() || categoryId == item.type) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, error = null, notice = null)
+            try {
+                val input = LoreDraft.from(item, categoryId)
+                    .toInput(baseRevision = item.updatedAt)
+                    .copy(type = LoreDraft.typeForCategory(categoryId))
+                val updated = c.updateLoreItem(projectId, item.id, input)
+                DenovaLog.i("Lore", "moved item=${item.id} to=${updated.type}")
+                reloadKeepingSelection(updated.id, UiText.of(R.string.lore_item_moved))
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _state.value = _state.value.copy(
+                    busy = false,
+                    error = failureText(e, R.string.lore_item_move_failed),
                 )
             }
         }
@@ -260,6 +356,19 @@ class LoreViewModel(
 
     // ---- 分类（LOR-001）----
 
+    /**
+     * 分类上移 / 下移：`op=move` + 目标下标（服务端 `slices.Move` 语义）。
+     * 与 Web `LoreCategoryManager` 的 ArrowUp / ArrowDown 一致。
+     */
+    fun moveCategory(id: String, delta: Int) {
+        val categories = _state.value.categories
+        val from = categories.indexOfFirst { it.id == id }
+        if (from < 0) return
+        val to = from + delta
+        if (to < 0 || to >= categories.size) return
+        mutateCategory(LoreCategoryMutation(op = "move", id = id, index = to))
+    }
+
     fun mutateCategory(mutation: LoreCategoryMutation) {
         val c = client ?: return
         val projectId = _state.value.projectId
@@ -296,18 +405,41 @@ class LoreViewModel(
         }
     }
 
+    /** 从项目素材里关联既有材料（`op=add`），不需要重新上传。 */
+    fun addMaterialFromLibrary(item: LoreItemSummary, assetId: String) {
+        val c = client ?: return
+        val projectId = _state.value.projectId
+        viewModelScope.launch {
+            _state.value = _state.value.copy(error = null, notice = null)
+            try {
+                val updated = c.mutateLoreMaterial(
+                    projectId,
+                    item.id,
+                    LoreMaterialMutation(op = "add", assetId = assetId),
+                )
+                DenovaLog.i("Lore", "material linked item=${item.id} asset=$assetId")
+                applyUpdatedItem(updated, UiText.of(R.string.lore_material_added))
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _state.value = _state.value.copy(error = failureText(e, R.string.lore_material_failed))
+            }
+        }
+    }
+
     fun uploadMaterial(item: LoreItemSummary, file: UploadFile) {
         val c = client ?: return
         val projectId = _state.value.projectId
         viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, error = null, notice = null)
+            _state.value = _state.value.copy(busy = true, uploading = true, error = null, notice = null)
             try {
                 val updated = c.uploadLoreMaterial(projectId, item.id, file)
                 DenovaLog.i("Lore", "material uploaded item=${item.id} name=${file.fileName}")
                 applyUpdatedItem(updated, UiText.of(R.string.lore_material_uploaded))
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(
                     busy = false,
+                    uploading = false,
                     error = failureText(e, R.string.lore_material_failed),
                 )
             }
@@ -326,6 +458,7 @@ class LoreViewModel(
                 )
                 applyUpdatedItem(updated, UiText.of(R.string.lore_material_removed))
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(error = failureText(e, R.string.lore_material_failed))
             }
         }
@@ -343,29 +476,51 @@ class LoreViewModel(
                 )
                 applyUpdatedItem(updated, UiText.of(R.string.lore_cover_set))
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(error = failureText(e, R.string.lore_material_failed))
             }
         }
     }
 
-    /** 生成配图 / 语音：服务端把失败原因写在 `api.lore.image*` / `speech.*` 里，原样呈现。 */
-    fun generate(item: LoreItemSummary, speech: LoreSpeechRequest? = null) {
+    /** 生成配图：`mode=agent` 走图像 Agent（可带附加要求），否则按提示词直接生成。 */
+    fun generateImage(item: LoreItemSummary, request: LoreImageGenerateRequest) {
         val c = client ?: return
         val projectId = _state.value.projectId
-        viewModelScope.launch {
-            _state.value = _state.value.copy(busy = true, generating = if (speech == null) "image" else "speech", error = null)
+        startGeneration("image") {
+            c.generateLoreImage(projectId, item.id, request)
+        }
+    }
+
+    /** 生成语音：服务端把朗读文本存成 MP3 材料，失败原因原样呈现（`api.lore.speech*`）。 */
+    fun generateSpeech(item: LoreItemSummary, request: LoreSpeechRequest) {
+        val c = client ?: return
+        val projectId = _state.value.projectId
+        startGeneration("speech") {
+            c.generateLoreSpeech(projectId, item.id, request)
+        }
+    }
+
+    /**
+     * 生成任务的公共编排：进度、错误与取消。
+     *
+     * 取消只放弃本机等待（HTTP 请求被取消），服务端可能仍会完成并写入材料；
+     * 因此取消后不自动刷新条目，界面按「已在本机取消」如实提示。
+     */
+    private fun startGeneration(kind: String, call: suspend () -> LoreItemSummary) {
+        generateJob?.cancel()
+        generateJob = viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, generating = kind, error = null, notice = null)
             try {
-                val updated = if (speech == null) {
-                    c.generateLoreImage(projectId, item.id)
-                } else {
-                    c.generateLoreSpeech(projectId, item.id, speech)
-                }
-                DenovaLog.i("Lore", "generated ${if (speech == null) "image" else "speech"} item=${item.id}")
+                val updated = call()
+                DenovaLog.i("Lore", "generated $kind item=${updated.id}")
                 applyUpdatedItem(
                     updated,
-                    UiText.of(if (speech == null) R.string.lore_image_ready else R.string.lore_speech_ready),
+                    UiText.of(if (kind == "image") R.string.lore_image_ready else R.string.lore_speech_ready),
                 )
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                DenovaLog.w("Lore", "generate $kind failed", e)
                 _state.value = _state.value.copy(
                     busy = false,
                     generating = null,
@@ -375,9 +530,22 @@ class LoreViewModel(
         }
     }
 
+    fun cancelGeneration() {
+        if (_state.value.generating == null) return
+        generateJob?.cancel()
+        generateJob = null
+        DenovaLog.i("Lore", "generation cancelled by user")
+        _state.value = _state.value.copy(
+            busy = false,
+            generating = null,
+            notice = UiText.of(R.string.lore_generate_cancelled),
+        )
+    }
+
     // ---- 索引与分类预览（LOR-003）----
 
-    fun loadIndex() {
+    /** 读取服务端索引快照；[keepIntro] 用于冲突后刷新 revision 而不丢用户正在改的前言。 */
+    fun loadIndex(keepIntro: Boolean = false) {
         val c = client ?: return
         val projectId = _state.value.projectId
         if (projectId.isBlank()) return
@@ -386,11 +554,12 @@ class LoreViewModel(
                 val snapshot = c.loreIndex(projectId)
                 _state.value = _state.value.copy(
                     index = snapshot,
-                    indexIntro = snapshot.guide.introMarkdown,
+                    indexIntro = if (keepIntro) _state.value.indexIntro else snapshot.guide.introMarkdown,
                     indexPreview = null,
                 )
-                DenovaLog.i("Lore", "index loaded groups=${snapshot.guide.groups.size}")
+                DenovaLog.i("Lore", "index loaded groups=${snapshot.guide.groups.size} revision=${snapshot.revision.take(12)}")
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(error = failureText(e, R.string.lore_index_failed))
             }
         }
@@ -440,7 +609,19 @@ class LoreViewModel(
                 )
                 DenovaLog.i("Lore", "index saved revision=${saved.revision.take(12)}")
             } catch (e: Exception) {
-                _state.value = _state.value.copy(busy = false, error = failureText(e, R.string.lore_index_failed))
+                if (e is CancellationException) throw e
+                if (isRevisionConflict(e)) {
+                    // 409：别的端已经改过索引。刷新 revision 但不覆盖用户正在编辑的前言。
+                    DenovaLog.w("Lore", "index save conflicted; reloading revision")
+                    _state.value = _state.value.copy(
+                        busy = false,
+                        error = UiText.of(R.string.lore_index_conflict),
+                        indexPreview = null,
+                    )
+                    loadIndex(keepIntro = true)
+                } else {
+                    _state.value = _state.value.copy(busy = false, error = failureText(e, R.string.lore_index_failed))
+                }
             }
         }
     }
@@ -464,6 +645,9 @@ class LoreViewModel(
                 )
                 DenovaLog.i("Lore", "classification preview mode=$mode items=${preview.items.size}")
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                // 分类预览要经过模型，失败原因必须能看见（服务端给出的 key/文案），不能只显示「分类失败」。
+                DenovaLog.w("Lore", "classification preview failed: ${e.javaClass.simpleName}", e)
                 _state.value = _state.value.copy(
                     busy = false,
                     error = failureText(e, R.string.lore_classify_failed),
@@ -500,10 +684,22 @@ class LoreViewModel(
                 _state.value = _state.value.copy(classification = null, classificationPicked = emptySet())
                 reloadKeepingSelection(s.selectedItemId, UiText.of(R.string.lore_classify_applied))
             } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    busy = false,
-                    error = failureText(e, R.string.lore_classify_failed),
-                )
+                if (e is CancellationException) throw e
+                if (isRevisionConflict(e)) {
+                    // 预览之后条目被改过：丢弃旧建议，要求重新预览，避免拿过期 revision 覆盖。
+                    DenovaLog.w("Lore", "classification apply conflicted; dropping preview")
+                    _state.value = _state.value.copy(
+                        busy = false,
+                        classification = null,
+                        classificationPicked = emptySet(),
+                        error = UiText.of(R.string.lore_classify_conflict),
+                    )
+                } else {
+                    _state.value = _state.value.copy(
+                        busy = false,
+                        error = failureText(e, R.string.lore_classify_failed),
+                    )
+                }
             }
         }
     }
@@ -518,19 +714,27 @@ class LoreViewModel(
 
     // ---- 内部 ----
 
+    /**
+     * 材料 / 媒体类回包只更新列表里的条目（图片与材料挂在那里）。
+     *
+     * **不动编辑中的草稿**：上传或生成请求在途时用户可能还在改正文，
+     * 用服务端回包重建表单会把这些编辑抹掉（基线 `LoreDetailTabs.applyMedia` 同口径）。
+     */
     private fun applyUpdatedItem(item: LoreItemSummary, notice: UiText?) {
         val items = _state.value.items.map { if (it.id == item.id) item else it }
-        val draft = _state.value.draft
         _state.value = _state.value.copy(
             busy = false,
+            uploading = false,
             generating = null,
             items = items,
             selectedItemId = item.id,
-            // 只在没改过表单时同步，避免覆盖正在编辑的内容。
-            draft = if (draft != null && draft.id == item.id) LoreDraft.from(item, draft.categoryId) else draft,
             notice = notice,
         )
     }
+
+    /** 409 → 服务端 `api.resource.revisionConflict`（索引与分类应用共用）。 */
+    private fun isRevisionConflict(error: Exception): Boolean =
+        error is DenovaApiException && (error.status == 409 || error.code == "api.resource.revisionConflict")
 
     private fun reloadKeepingSelection(selectedId: String?, notice: UiText?) {
         val c = client ?: return
@@ -539,15 +743,24 @@ class LoreViewModel(
             try {
                 val items = c.projectLoreItems(projectId).items
                 val item = items.firstOrNull { it.id == selectedId }
+                val current = _state.value.draft
+                // 有未保存编辑时保留表单（用户内容优先），只刷新列表与选中项。
+                val keepDraft = current != null && item != null && current.id == item.id && !current.matches(item)
                 _state.value = _state.value.copy(
                     busy = false,
                     items = items,
                     selectedItemId = item?.id,
-                    draft = item?.let { LoreDraft.from(it, it.type) },
+                    draft = when {
+                        keepDraft -> current
+                        else -> item?.let { LoreDraft.from(it, it.type) }
+                    },
                     notice = notice,
                     error = null,
                 )
+                // 选中项与草稿一起持久化：删除 / 移动后不能把旧草稿留在盘上。
+                persistDraft(_state.value.draft)
             } catch (e: Exception) {
+                if (e is CancellationException) throw e
                 _state.value = _state.value.copy(busy = false, error = failureText(e, R.string.lore_load_failed))
             }
         }

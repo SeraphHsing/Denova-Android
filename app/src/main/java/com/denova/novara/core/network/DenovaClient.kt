@@ -309,6 +309,17 @@ class DenovaClient(
         okHttpClient.newBuilder().readTimeout(0, TimeUnit.SECONDS).build()
     }
 
+    /**
+     * 慢接口（跑模型/生图/生语音）专用：分类预览要把 100+ 条条目交给模型，
+     * 30s 读超时会在正常等待中被判超时（真机表现为 SocketTimeoutException → 界面只显示「分类失败」）。
+     */
+    private val slowHttpClient: OkHttpClient by lazy {
+        okHttpClient.newBuilder()
+            .readTimeout(180, TimeUnit.SECONDS)
+            .callTimeout(240, TimeUnit.SECONDS)
+            .build()
+    }
+
     suspend fun status(): AuthStatusResponse {
         val request = Request.Builder().url(server.baseUrl + "/api/auth/status").get().build()
         return withContext(Dispatchers.IO) {
@@ -1496,16 +1507,23 @@ class DenovaClient(
         }
 
     /** 生成条目配图：`POST .../items/:id/image/generate`（失败时服务端给 `api.lore.image*` 原因）。 */
-    suspend fun generateLoreImage(projectId: String, itemId: String): LoreItemSummary =
-        writeJson(url = loreUrl(projectId, "items/$itemId/image/generate"), payload = "{}") {
-            json.decodeFromString(LoreItemSummary.serializer(), it)
-        }
+    suspend fun generateLoreImage(
+        projectId: String,
+        itemId: String,
+        request: LoreImageGenerateRequest = LoreImageGenerateRequest(),
+    ): LoreItemSummary =
+        writeJson(
+            url = loreUrl(projectId, "items/$itemId/image/generate"),
+            payload = json.encodeToString(LoreImageGenerateRequest.serializer(), request),
+            slow = true,
+        ) { json.decodeFromString(LoreItemSummary.serializer(), it) }
 
     /** 生成条目语音：`POST .../items/:id/speech/generate`，返回更新后的条目（含新 MP3 材料）。 */
     suspend fun generateLoreSpeech(projectId: String, itemId: String, request: LoreSpeechRequest): LoreItemSummary =
         writeJson(
             url = loreUrl(projectId, "items/$itemId/speech/generate"),
             payload = json.encodeToString(LoreSpeechRequest.serializer(), request),
+            slow = true,
         ) { json.decodeFromString(LoreItemSummary.serializer(), it) }
 
     suspend fun loreIndex(projectId: String): LoreIndexSnapshot =
@@ -1522,6 +1540,7 @@ class DenovaClient(
         writeJson(
             url = loreUrl(projectId, "index/preview"),
             payload = json.encodeToString(LoreIndexGuide.serializer(), guide),
+            slow = true,
         ) { json.decodeFromString(LoreIndexPreview.serializer(), it) }
 
     suspend fun previewLoreClassification(
@@ -1531,6 +1550,7 @@ class DenovaClient(
         writeJson(
             url = loreUrl(projectId, "classification/preview"),
             payload = json.encodeToString(LoreClassificationRequest.serializer(), request),
+            slow = true,
         ) { json.decodeFromString(LoreClassificationPreview.serializer(), it) }
 
     suspend fun applyLoreClassification(
@@ -1540,6 +1560,7 @@ class DenovaClient(
         writeJson(
             url = loreUrl(projectId, "classification/apply"),
             payload = json.encodeToString(LoreClassificationApplyRequest.serializer(), request),
+            slow = true,
         ) { json.decodeFromString(LoreClassificationApplyResult.serializer(), it) }
 
     /**
@@ -2450,6 +2471,7 @@ class DenovaClient(
         url: HttpUrl,
         payload: String? = null,
         method: String = "POST",
+        slow: Boolean = false,
         decode: (String) -> T,
     ): T = withContext(Dispatchers.IO) {
         val body = payload?.toRequestBody(jsonMediaType)
@@ -2460,7 +2482,7 @@ class DenovaClient(
             "DELETE" -> builder.delete()
             else -> builder.post(body ?: "".toRequestBody(jsonMediaType))
         }
-        okHttpClient.newCall(builder.build()).execute().use { resp ->
+        (if (slow) slowHttpClient else okHttpClient).newCall(builder.build()).execute().use { resp ->
             val text = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) throw toException(resp.code, text)
             decode(text)

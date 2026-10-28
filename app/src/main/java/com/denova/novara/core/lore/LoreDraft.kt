@@ -17,7 +17,7 @@ data class LoreDraft(
     val enabled: Boolean = true,
     val type: String = "world",
     val name: String = "",
-    val importance: String = "medium",
+    val importance: String = com.denova.novara.core.network.LoreOptions.DEFAULT_IMPORTANCE,
     val tagsText: String = "",
     val keywordsText: String = "",
     val briefDescription: String = "",
@@ -41,6 +41,24 @@ data class LoreDraft(
 
     fun canSave(): Boolean = name.isNotBlank()
 
+    /**
+     * 表单是否与这条服务端条目一致（没有未保存编辑）。
+     *
+     * 列表开关、分类应用、材料回包都会重新读取条目；只有确实没改动时才用服务端版本重建表单，
+     * 否则会把用户正在输入的正文覆盖掉（LOR-001 / LOR-004）。
+     */
+    fun matches(item: LoreItemSummary): Boolean =
+        id == item.id &&
+            enabled == item.enabled &&
+            type == item.type &&
+            name == item.name &&
+            importance == item.importance.ifBlank { com.denova.novara.core.network.LoreOptions.DEFAULT_IMPORTANCE } &&
+            tagsText == item.tags.joinToString("、") &&
+            keywordsText == item.keywords.joinToString("、") &&
+            briefDescription == item.briefDescription &&
+            loadMode == item.loadMode.ifBlank { com.denova.novara.core.network.LoreOptions.DEFAULT_LOAD_MODE } &&
+            content == item.content
+
     companion object {
         /** 新建条目的默认草稿（放在当前分类下）。 */
         fun create(categoryId: String): LoreDraft = LoreDraft(
@@ -51,23 +69,37 @@ data class LoreDraft(
 
         fun from(item: LoreItemSummary, categoryId: String): LoreDraft = LoreDraft(
             id = item.id,
-            categoryId = categoryId,
+            categoryId = categoryId.ifBlank { item.type },
             enabled = item.enabled,
             type = item.type,
             name = item.name,
-            importance = item.importance.ifBlank { "medium" },
+            importance = item.importance.ifBlank { com.denova.novara.core.network.LoreOptions.DEFAULT_IMPORTANCE },
             tagsText = item.tags.joinToString("、"),
             keywordsText = item.keywords.joinToString("、"),
             briefDescription = item.briefDescription,
-            loadMode = item.loadMode.ifBlank { "auto" },
+            loadMode = item.loadMode.ifBlank { com.denova.novara.core.network.LoreOptions.DEFAULT_LOAD_MODE },
             content = item.content,
             isNew = false,
         )
 
-        /** 分类 id 与条目类型同名；自定义分类退回 `other`，避免把角色行为挂到未知分类上。 */
-        fun typeForCategory(categoryId: String): String = when (categoryId) {
-            "character", "location", "faction", "item", "world" -> categoryId
-            else -> "other"
+        /**
+         * 条目 `type` 就是分类 id（后端 `validateCollection` 要求 type ∈ 分类表）。
+         * 自定义分类同样直接使用其 id；不会再退化成 `other`（那会让保存被拒）。
+         */
+        fun typeForCategory(categoryId: String): String = categoryId.trim()
+
+        /** 把分类从 [from] 移到 [to]（服务端 `op=move` 的 `index` 语义）；越界返回原表。 */
+        fun moveCategory(
+            categories: List<com.denova.novara.core.network.LoreCategory>,
+            id: String,
+            to: Int,
+        ): List<com.denova.novara.core.network.LoreCategory> {
+            val from = categories.indexOfFirst { it.id == id }
+            if (from < 0 || to < 0 || to >= categories.size || from == to) return categories
+            val next = categories.toMutableList()
+            val moved = next.removeAt(from)
+            next.add(to, moved)
+            return next
         }
 
         /** 标签 / 关键词输入：中英文逗号、顿号、换行都算分隔符，去空去重保序。 */

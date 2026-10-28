@@ -625,7 +625,7 @@
     <string name="workbench_project_move_up">Move up</string>
     <string name="workbench_project_move_down">Move down</string>
     <string name="workbench_project_archive">Remove from workbench</string>
-    <string name="workbench_project_archive_confirm">Remove “%1$s” from the workbench? The folder and its conversations stay on the server.</string>
+    <string name="workbench_project_archive_confirm">Remove "%1$s" from the workbench? The folder and its conversations stay on the server.</string>
     <string name="workbench_project_missing">Folder missing on host</string>
     <string name="workbench_project_current">Currently open</string>
     <string name="workbench_project_add_failed">Failed to add project</string>
@@ -640,11 +640,11 @@
     <string name="workbench_files_pick">Choose file</string>
     <string name="workbench_files_unselected">No file selected</string>
     <string name="workbench_files_empty">This project has no files yet</string>
-    <string name="workbench_files_hint">Use “Choose file” above to open a project file</string>
+    <string name="workbench_files_hint">Use "Choose file" above to open a project file</string>
     <string name="workbench_session_untitled">Untitled conversation</string>
     <string name="workbench_session_rename">Rename conversation</string>
     <string name="workbench_session_delete">Delete conversation</string>
-    <string name="workbench_session_delete_confirm">Delete “%1$s”? The saved transcript is removed.</string>
+    <string name="workbench_session_delete_confirm">Delete "%1$s"? The saved transcript is removed.</string>
     <string name="workbench_session_running">Running</string>
     <string name="workbench_session_create_failed">Failed to create conversation</string>
     <string name="workbench_session_rename_failed">Failed to rename conversation</string>
@@ -677,7 +677,7 @@
     <string name="workbench_history_export_failed">Export failed: %1$s</string>
     <string name="workbench_history_export_failed_short">Export failed</string>
     <string name="workbench_history_delete_title">Delete conversation</string>
-    <string name="workbench_history_delete_body">Delete “%1$s”? The saved transcript is removed.</string>
+    <string name="workbench_history_delete_body">Delete "%1$s"? The saved transcript is removed.</string>
     <string name="workbench_history_delete">Delete</string>
     <string name="workbench_history_renamed">Renamed</string>
     <string name="workbench_history_rename_failed">Failed to rename conversation</string>
@@ -705,7 +705,7 @@
     <string name="home_descriptionPlaceholder">Description (optional)</string>
     <string name="home_editInfo">Edit info</string>
     <string name="home_deleteBook">Delete book</string>
-    <string name="home_deleteBookDescription">“%1$s” will be removed from the bookshelf; its directory and files stay on disk.</string>
+    <string name="home_deleteBookDescription">"%1$s" will be removed from the bookshelf; its directory and files stay on disk.</string>
     <string name="home_softDeleteBook">Remove from shelf</string>
     <string name="home_exportTxt">Export TXT</string>
     <string name="home_exporting">Exporting</string>
@@ -719,11 +719,11 @@
     <string name="home_sortLink_recent">Recently opened</string>
     <string name="home_unnamedBook">Untitled book</string>
     <string name="books_switch">Switch</string>
-    <string name="books_switched">Switched to “%1$s”</string>
+    <string name="books_switched">Switched to "%1$s"</string>
     <string name="books_current_badge">Current</string>
     <string name="books_info_saved">Book info saved</string>
     <string name="books_save_failed">Save failed</string>
-    <string name="books_removed">Removed “%1$s” from the bookshelf</string>
+    <string name="books_removed">Removed "%1$s" from the bookshelf</string>
     <string name="books_remove_failed">Remove failed</string>
     <string name="books_sort_failed">Failed to save book order</string>
     <string name="books_cover_updated">Cover updated</string>
@@ -735,7 +735,7 @@
     <string name="card_import_previewing">Parsing character card…</string>
     <string name="card_importing">Importing…</string>
     <string name="card_import_failed">Character card import failed</string>
-    <string name="card_imported">Created “%1$s” from the character card</string>
+    <string name="card_imported">Created "%1$s" from the character card</string>
     <string name="card_import_summary">Character card: %1$d lorebook entries</string>
     <string name="lore_title">Lore library</string>
     <string name="lore_subtitle">%1$d entries</string>
@@ -748,12 +748,12 @@
     <string name="lore_save_failed">Failed to save entry</string>
     <string name="lore_deleted">Entry deleted</string>
     <string name="lore_delete_failed">Failed to delete entry</string>
-    <string name="lore_delete_item_confirm">Delete “%1$s”? Its body and media will be removed.</string>
+    <string name="lore_delete_item_confirm">Delete "%1$s"? Its body and media will be removed.</string>
     <string name="lore_category_saved">Category updated</string>
     <string name="lore_category_failed">Category operation failed</string>
     <string name="lore_category_name">Category name</string>
     <string name="lore_category_manage">Manage categories</string>
-    <string name="lore_category_delete_confirm">Delete category “%1$s”? Its entries move to “%2$s”.</string>
+    <string name="lore_category_delete_confirm">Delete category "%1$s"? Its entries move to "%2$s".</string>
     <string name="lore_field_name">Name (required)</string>
     <string name="lore_field_type">Category</string>
     <string name="lore_field_importance">Importance</string>
@@ -792,4 +792,30 @@
     <string name="lore_classify_none">No entry selected</string>
     <string name="lore_classify_applied">Suggestions applied</string>
     <string name="lore_classify_confidence">Confidence %1$s</string>
+
+    <string name="lore_category_destination">Move entries to</string>
+    <string name="lore_category_character_locked">The character category cannot be renamed or removed</string>
+    <string name="lore_item_move">Move to category</string>
+    <string name="lore_item_moved">Entry moved</string>
+    <string name="lore_item_move_failed">Failed to move entry</string>
+
+    <string name="lore_generate_mode">Generation mode</string>
+    <string name="lore_generate_mode_agent">Image Agent</string>
+    <string name="lore_generate_mode_custom">Direct prompt</string>
+    <string name="lore_generate_instruction">Extra instruction (optional)</string>
+    <string name="lore_generate_prompt">Image prompt</string>
+    <string name="lore_generate_running_image">Generating image…</string>
+    <string name="lore_generate_running_speech">Generating speech…</string>
+    <string name="lore_generate_cancel">Cancel</string>
+    <string name="lore_generate_cancelled">Cancelled on this device; the server may still finish.</string>
+    <string name="lore_upload_running">Uploading material…</string>
+
+    <string name="lore_materials_library">From project assets</string>
+    <string name="lore_material_added">Material linked</string>
+    <string name="lore_material_empty">No project assets available</string>
+    <string name="lore_image_label">Cover image</string>
+
+    <string name="lore_index_conflict">The index changed elsewhere; reloaded the latest revision. Preview again before saving.</string>
+    <string name="lore_index_reload">Reload index</string>
+    <string name="lore_classify_conflict">Entries changed elsewhere; preview the suggestions again.</string>
 </resources>

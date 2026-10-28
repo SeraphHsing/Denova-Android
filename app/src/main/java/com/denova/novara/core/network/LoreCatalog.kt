@@ -222,10 +222,33 @@ data class LoreSpeechRequest(
     val text: String,
 )
 
-/** 资料库条目的固定类型与加载模式（与 Web 侧同一组取值）。 */
+/**
+ * 配图生成请求：`POST .../items/:id/image/generate`（`loreapp.ItemImageGenerateRequest`）。
+ *
+ * `mode=agent` 交给图像 Agent（可带 `instruction`）；其余走直接生成（`prompt` 覆盖预设）。
+ * 与 Web `LoreMaterialGenerateDialog` 同一组字段。
+ */
+@Serializable
+data class LoreImageGenerateRequest(
+    /** 空字符串表示直接生成（服务端只有 `mode=agent` 才走图像 Agent）。 */
+    val mode: String = "",
+    val prompt: String = "",
+    val instruction: String = "",
+    @SerialName("image_preset_id") val imagePresetId: String = "",
+)
+
+/**
+ * 资料库条目的固定取值（与 Web `types.ts` / 后端 `normalize.go` 同一组）。
+ *
+ * 重要度只有 `major | important | minor`：服务端把其它写法统一改成 `important`，
+ * 因此客户端不能再用 high/medium/low（否则每次保存都被静默改写）。
+ * 条目的 `type` 是**分类 id**，自定义分类也直接用它，不能退化成 `other`。
+ */
 object LoreOptions {
-    val TYPES = listOf("character", "location", "faction", "item", "world", "concept", "event", "other")
-    val IMPORTANCE = listOf("high", "medium", "low")
+    val IMPORTANCE = listOf("major", "important", "minor")
     val LOAD_MODES = listOf("resident", "auto", "manual")
-    val CATEGORY_IDS = listOf("character", "location", "faction", "item", "world")
+    const val DEFAULT_IMPORTANCE = "important"
+    const val DEFAULT_LOAD_MODE = "auto"
+    /** 有行为语义的固定分类：不可重命名、不可删除、不可作为迁移目标。 */
+    const val CHARACTER = "character"
 }
