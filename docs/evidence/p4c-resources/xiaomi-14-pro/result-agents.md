@@ -38,7 +38,13 @@
 （固定基线契约如此）。因此「会话绑定自定义 Agent」以「创建请求带 `custom_agent_id` + 服务端 200 返回会话 ID +
 会话可挂接」为证据，不以读回字段为证据。绑定失效（ID 不存在）时服务端会拒绝创建，属同一路径的负向保护。
 
-## 3. 未覆盖 / 边界
+## 3. 测试数据清理
+
+- 自定义 Agent：探针 `custom-agent-1793204636383-0` 已在页面删除，服务端 `user.custom_agents` 恢复为操作前的 1 条（`人物设计`），revision 回到 `218dc6b0`。
+- 写作会话：`s-20261028162419-a35daf128358` 为本次验证创建，**服务端没有删除写作会话的端点**（api-inventory 中
+  `DELETE` 只覆盖项目作用域 agent-chat 会话），因此该空会话保留在会话列表中（标题 `androidprobe9`），不含任何消息。
+
+## 4. 未覆盖 / 边界
 
 - 定义的 `runtime`（引擎选择）、`tools`、`skill_policy`、`delegation`、`context_bindings`、`image_api_profile_id`
   在 Android 侧**只展示与保留、不提供编辑表单**；这些配置属设置页 14 个 section 的范围（P4-D）。
