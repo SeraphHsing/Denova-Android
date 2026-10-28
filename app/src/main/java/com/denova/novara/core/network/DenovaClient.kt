@@ -253,6 +253,17 @@ class DenovaClient(
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     /**
+     * 资料库写请求专用：服务端 `bindCompleteLoreItemInput` 要求 9 个字段**全部出现**在 JSON 里
+     * （缺失即 400 `loreFieldsRequired`），所以这里必须 `encodeDefaults = true`；
+     * 同时用 `explicitNulls = false` 让「未传 index_memberships」保持为「不改成员关系」。
+     */
+    private val loreJson = Json {
+        encodeDefaults = true
+        explicitNulls = false
+        ignoreUnknownKeys = true
+    }
+
+    /**
      * 创建类请求专用：`encodeDefaults=true` 让表单默认值也显式上送（与 Web 行为一致，
      * 不依赖服务端归一化），`explicitNulls=false` 让未选择的可选对象整段省略。
      */
@@ -1429,13 +1440,13 @@ class DenovaClient(
     suspend fun createLoreItem(projectId: String, input: LoreItemInput): LoreItemSummary =
         writeJson(
             url = loreUrl(projectId, "items"),
-            payload = json.encodeToString(LoreItemInput.serializer(), input),
+            payload = loreJson.encodeToString(LoreItemInput.serializer(), input),
         ) { json.decodeFromString(LoreItemResponse.serializer(), it).item }
 
     suspend fun updateLoreItem(projectId: String, id: String, input: LoreItemInput): LoreItemSummary =
         writeJson(
             url = loreUrl(projectId, "items/$id"),
-            payload = json.encodeToString(LoreItemInput.serializer(), input),
+            payload = loreJson.encodeToString(LoreItemInput.serializer(), input),
             method = "PUT",
         ) { json.decodeFromString(LoreItemResponse.serializer(), it).item }
 

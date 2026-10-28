@@ -97,6 +97,7 @@ private fun LoreContent(
     var renameCategory by remember { mutableStateOf<String?>(null) }
     var deleteCategory by remember { mutableStateOf<String?>(null) }
     var newCategory by remember { mutableStateOf(false) }
+    var manageCategories by remember { mutableStateOf(false) }
     var confirmDeleteItem by remember { mutableStateOf<LoreItemSummary?>(null) }
     var speechFor by remember { mutableStateOf<LoreItemSummary?>(null) }
 
@@ -133,6 +134,13 @@ private fun LoreContent(
                         onClick = {
                             categoryMenu = false
                             viewModel.previewClassification()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.lore_category_manage)) },
+                        onClick = {
+                            categoryMenu = false
+                            manageCategories = true
                         },
                     )
                     DropdownMenuItem(
@@ -194,8 +202,23 @@ private fun LoreContent(
             onConfirm = { name ->
                 newCategory = false
                 viewModel.mutateCategory(
-                    LoreCategoryMutation(op = "create", id = "custom-" + name.hashCode().toString(16), name = name),
+                    // 服务端 create 会自己分配 uuid，客户端不需要造 id。
+                    LoreCategoryMutation(op = "create", name = name),
                 )
+            },
+        )
+    }
+    if (manageCategories) {
+        CategoryManagerDialog(
+            state = state,
+            onDismiss = { manageCategories = false },
+            onRename = { id ->
+                manageCategories = false
+                renameCategory = id
+            },
+            onDelete = { id ->
+                manageCategories = false
+                deleteCategory = id
             },
         )
     }
@@ -213,7 +236,10 @@ private fun LoreContent(
         )
     }
     deleteCategory?.let { id ->
-        val destination = state.categories.firstOrNull { it.id != id }?.id.orEmpty()
+        // 服务端禁止迁移到 character（「choose an existing destination category」），
+        // 所以优先选一个非 character 的现有分类。
+        val destination = state.categories.firstOrNull { it.id != id && it.id != "character" }?.id
+            ?: state.categories.firstOrNull { it.id != id }?.id.orEmpty()
         AlertDialog(
             onDismissRequest = { deleteCategory = null },
             title = { Text(stringResource(R.string.lore_field_type)) },
@@ -599,6 +625,42 @@ private fun LoreIndexPanel(state: LoreUiState, viewModel: LoreViewModel, onClose
             Text(preview.markdown, style = MaterialTheme.typography.bodySmall)
         }
     }
+}
+
+/** 分类管理：列出全部分类，重命名 / 删除（删除时条目迁往第一个其余分类）。 */
+@Composable
+private fun CategoryManagerDialog(
+    state: LoreUiState,
+    onDismiss: () -> Unit,
+    onRename: (String) -> Unit,
+    onDelete: (String) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.lore_category_manage)) },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                items(state.categories, key = { it.id }) { category ->
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            state.categoryLabel(category.id),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { onRename(category.id) }) {
+                            Text(stringResource(R.string.common_rename))
+                        }
+                        TextButton(
+                            enabled = state.categories.size > 1,
+                            onClick = { onDelete(category.id) },
+                        ) { Text(stringResource(R.string.common_delete)) }
+                    }
+                    HorizontalDivider()
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) } },
+    )
 }
 
 @Composable

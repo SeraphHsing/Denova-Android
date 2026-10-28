@@ -751,6 +751,7 @@
     <string name="lore_category_saved">Category updated</string>
     <string name="lore_category_failed">Category operation failed</string>
     <string name="lore_category_name">Category name</string>
+    <string name="lore_category_manage">Manage categories</string>
     <string name="lore_category_delete_confirm">Delete category “%1$s”? Its entries move to “%2$s”.</string>
     <string name="lore_field_name">Name (required)</string>
     <string name="lore_field_type">Category</string>

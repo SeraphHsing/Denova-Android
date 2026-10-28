@@ -750,6 +750,7 @@
     <string name="lore_category_saved">已更新分类</string>
     <string name="lore_category_failed">分类操作失败</string>
     <string name="lore_category_name">分类名称</string>
+    <string name="lore_category_manage">管理分类</string>
     <string name="lore_category_delete_confirm">删除分类“%1$s”？该分类下的条目会移动到“%2$s”。</string>
     <string name="lore_field_name">名称（必填）</string>
     <string name="lore_field_type">分类</string>
