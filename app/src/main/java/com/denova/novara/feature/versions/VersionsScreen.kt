@@ -12,12 +12,16 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -65,6 +69,25 @@ fun VersionsScreen(
             ) { Text(stringResource(R.string.refresh)) }
         }
         HorizontalDivider()
+        // 宿主还没确定当前项目时（例如上次打开的书已归档）允许手动指定项目，否则页面只能显示空态。
+        var manualProject by remember { mutableStateOf("") }
+        if (projectId.isBlank()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = manualProject,
+                    onValueChange = { manualProject = it },
+                    label = { Text(stringResource(R.string.market_project_id)) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                )
+                TextButton(
+                    onClick = { if (manualProject.isNotBlank()) viewModel.load(manualProject.trim()) },
+                ) { Text(stringResource(R.string.market_load)) }
+            }
+        }
         VersionsContent(
             state = state,
             onRefresh = { if (projectId.isNotBlank()) viewModel.load(projectId, force = true) },
