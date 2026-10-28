@@ -1766,6 +1766,82 @@ class DenovaClient(
     suspend fun activitySummary(): ActivitySummary =
         getJson(apiUrl("activity/summary")) { json.decodeFromString(ActivitySummary.serializer(), it) }
 
+    // ---- 资源市场与扩展（P4-D / MKT-001…005）----
+
+    /** 资源市场目录：`GET /api/resource-market/catalog`（远程可读）。 */
+    suspend fun marketCatalog(): MarketCatalog =
+        getJson(apiUrl("resource-market/catalog")) {
+            json.decodeFromString(MarketCatalog.serializer(), it)
+        }
+
+    /** 刷新目录：`POST /api/resource-market/catalog/refresh`（**本机限定**）。 */
+    suspend fun refreshMarketCatalog(): MarketCatalog =
+        writeJson(url = apiUrl("resource-market/catalog/refresh"), payload = "{}") { text ->
+            json.decodeFromString(MarketCatalog.serializer(), text)
+        }
+
+    /** 已安装资源：`GET /api/resource-exchange/installations`（远程可读）。 */
+    suspend fun marketInstallations(): List<Installation> =
+        getJson(apiUrl("resource-exchange/installations")) {
+            json.decodeFromString(ListSerializer(Installation.serializer()), it)
+        }
+
+    /** 资源备份：`GET /api/resource-exchange/installations/:id/backups`（远程可读）。 */
+    suspend fun installationBackups(id: String): List<InstallationBackup> =
+        getJson(apiUrl("resource-exchange/installations/$id/backups")) {
+            json.decodeFromString(ListSerializer(InstallationBackup.serializer()), it)
+        }
+
+    /** 检查资源更新：`POST /api/resource-exchange/installations/:id/check`（**本机限定**）。 */
+    suspend fun checkInstallation(id: String) {
+        writeJson<Unit>(url = apiUrl("resource-exchange/installations/$id/check"), payload = "{}") { }
+    }
+
+    /** 更新策略：`POST /api/resource-exchange/installations/:id/policy`（**本机限定**）。 */
+    suspend fun setInstallationPolicy(id: String, mode: String) {
+        writeJson<Unit>(
+            url = apiUrl("resource-exchange/installations/$id/policy"),
+            payload = createJson.encodeToString(
+                InstallationPolicyRequest.serializer(),
+                InstallationPolicyRequest(updateMode = mode),
+            ),
+        ) { }
+    }
+
+    /** 插件页目录：`GET /api/platform/manage/plugin-pages`（远程可读）。 */
+    suspend fun pluginPages(): List<PluginPage> =
+        getJson(apiUrl("platform/manage/plugin-pages")) {
+            json.decodeFromString(ListSerializer(PluginPage.serializer()), it)
+        }
+
+    /** 运行时快照：`GET /api/platform/manage/runtimes`（只读状态，页面本体需本机 loopback）。 */
+    suspend fun platformRuntimes(): List<JsonObject> =
+        getJson(apiUrl("platform/manage/runtimes")) {
+            json.decodeFromString(ListSerializer(JsonObject.serializer()), it)
+        }
+
+    /** 程序更新状态：`GET /api/update/status`。 */
+    suspend fun updateStatus(): UpdateStatus =
+        getJson(apiUrl("update/status")) { json.decodeFromString(UpdateStatus.serializer(), it) }
+
+    /** 程序更新检查：`GET /api/update/check`（只读，不触发安装）。 */
+    suspend fun updateCheck(): UpdateCheck =
+        getJson(apiUrl("update/check")) { json.decodeFromString(UpdateCheck.serializer(), it) }
+
+    /** 项目级扩展配置：`GET /api/platform/manage/projects/:id/extensions`（远程可读）。 */
+    suspend fun projectExtensions(projectId: String): ProjectExtensionConfig =
+        getJson(apiUrl("platform/manage/projects/$projectId/extensions")) {
+            json.decodeFromString(ProjectExtensionConfig.serializer(), it)
+        }
+
+    /** 保存项目级扩展配置：`PUT .../extensions`（基线里少数**远程可写**的扩展配置）。 */
+    suspend fun saveProjectExtensions(projectId: String, input: ProjectExtensionInput): ProjectExtensionConfig =
+        writeJson(
+            url = apiUrl("platform/manage/projects/$projectId/extensions"),
+            payload = createJson.encodeToString(ProjectExtensionInput.serializer(), input),
+            method = "PUT",
+        ) { text -> json.decodeFromString(ProjectExtensionConfig.serializer(), text) }
+
     // ---- 资料库（P4-C / LOR-001…004）----
 
     suspend fun loreCategories(projectId: String): List<LoreCategory> =

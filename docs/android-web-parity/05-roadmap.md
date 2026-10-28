@@ -80,14 +80,14 @@
 | G5-c | 关闭释放 | 通过 | `closeAndRelease` 后服务端 `sessions:[]`；被对端释放时 7–25s 如实提示且不静默重建（缓解措施见 G6-a） |
 | G5-d | D03 终端性能预算 | 通过 | 62.5 KiB/s × 300s 真机 6 轮，输出 / 输入延迟、丢帧、resize、PSS 全部达标，2026-10-24 评审通过 |
 | G6-a | 双端操作不误删对方 PTY / 不丢失会话内容 | 环境受限 | 真实 Chrome 实测：Web 挂载工作台回收所有 `attached=0` 且不在其持久化标签中的会话，不区分 owner / 项目；属固定基线行为，按 [SD-01](07-evidence-and-decisions.md#范围决定scope-decision) 不作对抗，以「不静默重建 + 7–25s 如实提示 + 只删自身 + 64KB 只读历史 + 免登录秒级重挂」降低损失 |
-| G6-b | 权限表现一致 | 留待 P3 | 终端相关契约（token 即权限、owner 冲突、DELETE 无 owner 校验）已对齐；14 个设置 section 的权限分层随 P4-D 验证 |
+| G6-b | 权限表现一致 | 通过（2026-10-29，P4-D 回补） | 终端相关契约（token 即权限、owner 冲突、DELETE 无 owner 校验）已对齐；P4-D 实测两层权限：①**设置分层**——设置页只写 `user` 层、`base_revision` 冲突 409 保留草稿，写 `remote_access_password` 后旧会话立即失效并回落到登录页（[证据](../evidence/p4d-settings/xiaomi-14-pro/result.md)）；②**远程/本机分层**——远程客户端对「刷新市场目录」「切换更新策略」「检查更新」均得到服务端 403，界面如实显示「该操作需要在运行 Denova 的本机上执行」，安装/预览入口禁用，服务端状态未被改动（[证据](../evidence/p4d-market/xiaomi-14-pro/result.md)） |
 | G6-c | owner 归属与冲突 | 通过 | 同 owner 跨项目 409 `ownerConflict` 中文提示且立即停手，释放后恢复正常 |
 
 **证据形态缺口（登记，不改变逐条结论）**：本条 §3 退出条件要求各关卡提供原生录屏，六关卡实际取证形态为截图 + `logcat` / 请求日志 + 可复现脚本；含私人正文的截图按 `AGENTS.md` §5 只留本地不入库。若评审要求录屏，按 `docs/evidence/` 目录补录后回填本节。
 
 **P1 退出结论（2026-10-24，项目负责人 Hsing 决定）：P1 退出。** 六关卡均有代码与真机 / 真实服务器往返证据；未满足项 9 条已全部定性（环境受限 2 条：G1-b、G6-a；留待 P3 7 条：G1-d、G2-c、G3-b/c/d、G4-d、G6-b），无未定性缺口，因此不再作为 P1 阻塞。这些条目在补齐前不得在复刻矩阵中标记完成；复核位置：G1-d / G2-c / G3-b·c·d / G4-d 在 P3，G6-b 随 P4-D，G4-d 最终在 P6 发布候选复核。
 
-**P3 回补记录：** 2026-10-25 G3-d 已在 P3 修复并真机补测通过（见上表与 [证据](../evidence/g3-d/xiaomi-14-pro/result.md)）；同日 G3-b、G3-c 随 WRI-011 补测通过（[证据](../evidence/wri-011/xiaomi-14-pro/result.md)），G3 关卡已无留项。2026-10-26 G4-d 以两个不同构建覆盖安装补测通过（[证据](../evidence/g4-d/xiaomi-14-pro/result.md)），G2-c 的图片 / 表格 / IME 组合态与行列操作真机通过（[证据](../evidence/g2c-nodes/xiaomi-14-pro/result.md)、[证据](../evidence/g2c-table-images/xiaomi-14-pro/result.md)）。留待 P3 条目剩 2 条（G1-d、G6-b）。
+**P3 回补记录：** 2026-10-25 G3-d 已在 P3 修复并真机补测通过（见上表与 [证据](../evidence/g3-d/xiaomi-14-pro/result.md)）；同日 G3-b、G3-c 随 WRI-011 补测通过（[证据](../evidence/wri-011/xiaomi-14-pro/result.md)），G3 关卡已无留项。2026-10-26 G4-d 以两个不同构建覆盖安装补测通过（[证据](../evidence/g4-d/xiaomi-14-pro/result.md)），G2-c 的图片 / 表格 / IME 组合态与行列操作真机通过（[证据](../evidence/g2c-nodes/xiaomi-14-pro/result.md)、[证据](../evidence/g2c-table-images/xiaomi-14-pro/result.md)）。留待 P3 条目剩 2 条（G1-d、G6-b）。**2026-10-29 P4-D 回补：G6-b 权限表现已真机通过**（设置分层 + 远程/本机分层，见上表），P1 台账留待条目只剩 **G1-d 迟到 401**。
 
 ## 4. P2：工程基础与公共界面
 

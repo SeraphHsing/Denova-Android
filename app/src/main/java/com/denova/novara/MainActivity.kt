@@ -68,6 +68,8 @@ import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.settings.SettingsScreen
 import com.denova.novara.feature.automations.AutomationsScreen
 import com.denova.novara.feature.messages.MessageCenterScreen
+import com.denova.novara.feature.market.MarketScreen
+import com.denova.novara.feature.versions.VersionsScreen
 import com.denova.novara.feature.shell.AppDrawer
 import com.denova.novara.feature.shell.GameConsoleContent
 import com.denova.novara.feature.shell.PlaceholderScreen
@@ -99,6 +101,9 @@ class MainActivity : AppCompatActivity() {
 
     /** 消息中心：抽屉角标与页面共用，放在 Activity 作用域（MSG-001…003）。 */
     private val messageCenterViewModel: com.denova.novara.feature.messages.MessageCenterViewModel by viewModels()
+
+    /** 资源市场：需要跟随语言切换重算本地化文本，放 Activity 作用域（MKT-001…005）。 */
+    private val marketViewModel: com.denova.novara.feature.market.MarketViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!logcatInstalled) {
@@ -475,6 +480,23 @@ class MainActivity : AppCompatActivity() {
                                             projectId = currentProjectId,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
                                             viewModel = automationsViewModel,
+                                        )
+                                    }
+                                    composable("versions") {
+                                        VersionsScreen(
+                                            client = connectionViewModel.client,
+                                            projectId = currentProjectId,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            viewModel = versionsViewModel,
+                                        )
+                                    }
+                                    composable("market") {
+                                        MarketScreen(
+                                            client = connectionViewModel.client,
+                                            language = language,
+                                            projectId = currentProjectId,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            viewModel = marketViewModel,
                                         )
                                     }
                                     composable("messages") {
