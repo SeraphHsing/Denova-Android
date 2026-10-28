@@ -47,6 +47,7 @@ import com.denova.novara.core.persistence.PreferencesStore
 import com.denova.novara.feature.shell.ActivityNav
 import com.denova.novara.core.onboarding.OnboardingStep
 import com.denova.novara.feature.agent.AgentScreen
+import com.denova.novara.feature.agents.AgentsScreen
 import com.denova.novara.feature.onboarding.CreateBookDialog
 import com.denova.novara.feature.agent.AgentViewModel
 import com.denova.novara.feature.connection.ConnectionScreen
@@ -353,11 +354,12 @@ class MainActivity : AppCompatActivity() {
                                         )
                                     }
                                     composable(
-                                        route = "agent?projectId={projectId}&filePath={filePath}&prompt={prompt}",
+                                        route = "agent?projectId={projectId}&filePath={filePath}&prompt={prompt}&sessionId={sessionId}",
                                         arguments = listOf(
                                             navArgument("projectId") { type = NavType.StringType; defaultValue = "" },
                                             navArgument("filePath") { type = NavType.StringType; defaultValue = "" },
                                             navArgument("prompt") { type = NavType.StringType; defaultValue = "" },
+                                            navArgument("sessionId") { type = NavType.StringType; defaultValue = "" },
                                         ),
                                     ) { entry ->
                                         AgentScreen(
@@ -367,6 +369,18 @@ class MainActivity : AppCompatActivity() {
                                             projectId = entry.arguments?.getString("projectId").orEmpty(),
                                             initialFile = entry.arguments?.getString("filePath").orEmpty(),
                                             initialPrompt = entry.arguments?.getString("prompt").orEmpty(),
+                                            initialSessionId = entry.arguments?.getString("sessionId").orEmpty(),
+                                        )
+                                    }
+                                    composable("agents") {
+                                        AgentsScreen(
+                                            client = connectionViewModel.client,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenSession = { sessionId ->
+                                                navController.navigate(
+                                                    "agent?projectId=$currentProjectId&filePath=&sessionId=$sessionId",
+                                                )
+                                            },
                                         )
                                     }
                                     composable("workbench") {

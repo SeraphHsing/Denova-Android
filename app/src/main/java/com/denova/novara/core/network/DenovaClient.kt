@@ -1599,6 +1599,67 @@ class DenovaClient(
     private fun presetUrl(kind: PresetKind, id: String? = null): HttpUrl =
         apiUrl(if (id.isNullOrBlank()) kind.apiPath else "${kind.apiPath}/$id")
 
+    // ---- Agents 定义与引擎状态（P4-C / DEF-001…002）----
+
+    /** 分层设置快照：`GET /api/settings`（或项目作用域 `/api/projects/:id/settings`）。 */
+    suspend fun settingsSnapshot(projectId: String? = null): SettingsSnapshot =
+        getJson(settingsUrl(projectId)) { text ->
+            SettingsSnapshot(json.parseToJsonElement(text).jsonObject)
+        }
+
+    /**
+     * 只改一层设置：`PATCH /api/settings` body `{layer, base_revision, changes}`。
+     *
+     * `changes` 里只放本次要改的字段（自定义 Agent 传整份 `custom_agents` 数组），
+     * `base_revision` 是该层 revision，冲突返回 409 `api.settings.revisionConflict`。
+     */
+    suspend fun patchSettings(
+        layer: String,
+        baseRevision: String,
+        changes: JsonObject,
+        projectId: String? = null,
+    ): SettingsSnapshot =
+        writeJson(
+            url = settingsUrl(projectId),
+            payload = createJson.encodeToString(
+                SettingsPatchRequest.serializer(),
+                SettingsPatchRequest(layer = layer, baseRevision = baseRevision, changes = changes),
+            ),
+            method = "PATCH",
+        ) { text ->
+            SettingsSnapshot(json.parseToJsonElement(text).jsonObject)
+        }
+
+    /** Agent 引擎目录与状态：`GET /api/agent-runtimes`。 */
+    suspend fun agentRuntimes(): AgentRuntimesResponse =
+        getJson(apiUrl("agent-runtimes")) { json.decodeFromString(AgentRuntimesResponse.serializer(), it) }
+
+    /** 重新检查某个引擎：`POST /api/agent-runtimes/:id/check`（返回最新状态描述）。 */
+    suspend fun agentEngineCheck(engineId: String): AgentEngineDescriptor =
+        writeJson(url = apiUrl("agent-runtimes/$engineId/check"), payload = "{}") { text ->
+            json.decodeFromString(AgentEngineDescriptor.serializer(), text)
+        }
+
+    /** 引擎可用模型：`GET /api/agent-runtimes/:id/models`。 */
+    suspend fun agentEngineModels(engineId: String): AgentEngineModels =
+        getJson(apiUrl("agent-runtimes/$engineId/models")) {
+            json.decodeFromString(AgentEngineModels.serializer(), it)
+        }
+
+    /** 创建写作会话并绑定自定义 Agent：`POST /api/sessions {title, custom_agent_id}`。 */
+    suspend fun createSessionWithAgent(title: String, customAgentId: String): SessionSummary {
+        val payload = createJson.encodeToString(
+            CreateSessionWithAgentRequest.serializer(),
+            CreateSessionWithAgentRequest(title = title, customAgentId = customAgentId),
+        )
+        return writeJson(url = apiUrl("sessions"), payload = payload) { text ->
+            json.decodeFromString(SessionSummary.serializer(), text)
+        }
+    }
+
+    private fun settingsUrl(projectId: String?): HttpUrl =
+        apiUrl(if (projectId.isNullOrBlank()) "settings" else "projects/$projectId/settings")
+
     // ---- 资料库（P4-C / LOR-001…004）----
 
     suspend fun loreCategories(projectId: String): List<LoreCategory> =

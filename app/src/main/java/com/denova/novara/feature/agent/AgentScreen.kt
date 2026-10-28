@@ -538,6 +538,8 @@ fun AgentScreen(
     inline: Boolean = false,
     /** 内嵌时的固定会话身份：调用方（工作台页签）已经决定了会话，不能回落到「上次写作会话」。 */
     fixedSessionId: String = "",
+    /** 由外部页面指定要进入的写作会话（Agents 页「进入会话」新建并绑定了自定义 Agent）。 */
+    initialSessionId: String = "",
     /** 是否由本组件自动 `start()`；工作台由宿主先绑定项目通道再挂接，故传 false。 */
     autoStart: Boolean = true,
 ) {
@@ -550,11 +552,14 @@ fun AgentScreen(
     // 进入页面自动回到会话（AGT-013）：优先上次挂接的会话，其次服务端 active / 最近会话。
     // 进程被杀后重启也能直接落回同一会话，pending ask 与任务入口由服务端投影恢复。
     // 内嵌（工作台）时会话由宿主指定，且工作台会话不写写作会话锚点。
-    LaunchedEffect(projectId, initialFile, fixedSessionId) {
-        if (fixedSessionId.isNotBlank()) {
-            if (sessionId != fixedSessionId) sessionId = fixedSessionId
-            if (autoStart && state.sessionId != fixedSessionId) {
-                viewModel.start(fixedSessionId, projectId, remember = false)
+    LaunchedEffect(projectId, initialFile, fixedSessionId, initialSessionId) {
+        val presetSession = fixedSessionId.ifBlank { initialSessionId }
+        if (presetSession.isNotBlank()) {
+            if (sessionId != presetSession) sessionId = presetSession
+            if (autoStart && state.sessionId != presetSession) {
+                // 工作台会话由宿主持有（不写锚点）；Agents 页指定的会话是写作会话，写锚点便于重启回到它。
+                viewModel.start(presetSession, projectId, remember = fixedSessionId.isBlank())
+                if (initialPrompt.isNotBlank()) viewModel.setComposerDraft(initialPrompt)
             }
             return@LaunchedEffect
         }
