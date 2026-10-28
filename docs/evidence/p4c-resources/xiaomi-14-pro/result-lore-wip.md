@@ -38,6 +38,27 @@
 3. **草稿随页面销毁**：`LoreViewModel` 原先绑定导航目的地作用域，离开页面即清空；改为 Activity 作用域
    并把草稿序列化进 `SavedStateHandle`，Activity 重建后也能恢复。
 
+## 2.1 第二批真机确认（2026-10-28 晚）
+
+| 步骤 | 结果 |
+|---|---|
+| 新建分类 | `Lore: category create id=… total=7` |
+| 重命名分类 | `Lore: category rename id=6733f47b-… total=7`（服务端把 create 的 id 归一成 uuid） |
+| 删除分类 | `Lore: category delete id=… total=6`，确认框写明「条目会移动到 location」 |
+| 条目启用开关 | 表单内开关可关（写入 `updateLoreItem`），关后为重开页面仍为关 |
+| 条目更新（正文） | **失败**：首次报 `资料条目更新缺少完整字段: tags, keywords` → 客户端改用 `encodeDefaults = true` 的专用 Json 后该错误消失；但随后几次点击误落在其它控件上，未取得「保存成功」日志 |
+
+### 本轮再修两个契约缺陷
+
+1. **条目更新必须带全部 9 个字段**：服务端 `bindCompleteLoreItemInput` 只要有一个字段没出现在 JSON 里就返回
+   400 `api.projectBook.loreFieldsRequired`；kotlinx 默认省略与默认值相同的字段（空数组 / 空串），于是
+   「改一句话」永远失败。改用 `encodeDefaults = true` + `explicitNulls = false` 的 `loreJson`。
+2. **删除分类不能迁往 character**：服务端 `MutateCategory` 明确拒绝 `destination_id == "character"`，
+   我们原来取「第一个其它分类」正好是 character，所以永远 400；改为优先选非 character 分类。
+
+同时把「分类标签行放不下就点不到 ⋮」改成菜单里的**管理分类**对话框（列出全部分类，逐行改名/删除），
+并让 create 不再由客户端造 id（服务端会分配 uuid）。
+
 ## 3. 尚未验收（因此矩阵未回写）
 
 - LOR-001：分类的新建 / 重命名 / 删除（条目会迁往目标分类）、条目编辑、启用开关、删除条目。
