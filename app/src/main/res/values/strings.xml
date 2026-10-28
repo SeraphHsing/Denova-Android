@@ -794,6 +794,11 @@
     <string name="lore_classify_confidence">Confidence %1$s</string>
 
     <string name="lore_category_destination">Move entries to</string>
+    <string name="lore_type_character">Character</string>
+    <string name="lore_type_location">Location</string>
+    <string name="lore_type_faction">Organization</string>
+    <string name="lore_type_item">Item</string>
+    <string name="lore_type_world">World</string>
     <string name="lore_category_character_locked">The character category cannot be renamed or removed</string>
     <string name="lore_item_move">Move to category</string>
     <string name="lore_item_moved">Entry moved</string>
@@ -811,8 +816,20 @@
     <string name="lore_upload_running">Uploading material…</string>
 
     <string name="lore_materials_library">From project assets</string>
+    <string name="lore_materials_short">Material</string>
     <string name="lore_material_added">Material linked</string>
     <string name="lore_material_empty">No project assets available</string>
+    <string name="lore_material_play">Play</string>
+    <string name="lore_material_stop">Stop</string>
+    <string name="lore_material_play_failed">Playback failed</string>
+    <string name="lore_material_edit">Rename</string>
+    <string name="lore_material_updated">Material updated</string>
+    <string name="lore_material_remote">Remote image</string>
+    <string name="lore_material_url">Image URL (HTTPS)</string>
+    <string name="lore_material_save_locally">Save a local copy</string>
+    <string name="lore_material_remote_hint">The server downloads the image and keeps it in the project assets.</string>
+    <string name="lore_material_description">Description</string>
+    <string name="lore_cover">Cover</string>
     <string name="lore_image_label">Cover image</string>
 
     <string name="lore_index_conflict">The index changed elsewhere; reloaded the latest revision. Preview again before saving.</string>

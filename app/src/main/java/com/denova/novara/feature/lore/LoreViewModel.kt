@@ -8,6 +8,7 @@ import com.denova.novara.R
 import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.lore.LoreDraft
+import com.denova.novara.core.media.LoreAudioPlayer
 import com.denova.novara.core.network.DenovaApiException
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.LoreClassificationApplyRequest
@@ -19,6 +20,7 @@ import com.denova.novara.core.network.LoreIndexPreview
 import com.denova.novara.core.network.LoreIndexSnapshot
 import com.denova.novara.core.network.LoreIndexUpdate
 import com.denova.novara.core.network.LoreItemSummary
+import com.denova.novara.core.network.LoreMaterial
 import com.denova.novara.core.network.LoreMaterialMutation
 import com.denova.novara.core.network.LoreSpeechRequest
 import com.denova.novara.core.network.LoreTypeChange
@@ -59,6 +61,8 @@ data class LoreUiState(
     val assets: List<com.denova.novara.core.network.LoreMaterial> = emptyList(),
     /** 进行中的生成任务：`image` / `speech`；非空时界面显示进度与取消。 */
     val generating: String? = null,
+    /** 正在试听的语音材料（asset id）；空表示没有播放。 */
+    val playingMaterialId: String? = null,
 ) {
     fun visibleItems(): List<LoreItemSummary> {
         val q = query.trim()
@@ -69,9 +73,6 @@ data class LoreUiState(
     }
 
     fun selectedItem(): LoreItemSummary? = items.firstOrNull { it.id == selectedItemId }
-
-    fun categoryLabel(id: String): String = categories.firstOrNull { it.id == id }?.name?.takeIf { it.isNotBlank() }
-        ?: id
 
     fun categoryCount(categoryId: String): Int = items.count { it.type == categoryId }
 
@@ -97,6 +98,12 @@ class LoreViewModel(
     val state: StateFlow<LoreUiState> = _state.asStateFlow()
 
     private val draftStore = LoreDraftStore(application)
+    /** 语音试听：播放结束或被停止时清掉标记（回调在主线程）。 */
+    private val audio = LoreAudioPlayer(application) { finishedId ->
+        if (_state.value.playingMaterialId == finishedId) {
+            _state.value = _state.value.copy(playingMaterialId = null)
+        }
+    }
     private var loadJob: Job? = null
     private var draftJob: Job? = null
     private var generateJob: Job? = null
@@ -252,7 +259,8 @@ class LoreViewModel(
     }
 
     fun closeEditor() {
-        _state.value = _state.value.copy(draft = null, selectedItemId = null)
+        audio.stop()
+        _state.value = _state.value.copy(draft = null, selectedItemId = null, playingMaterialId = null)
         persistDraft(null)
     }
 
@@ -405,7 +413,7 @@ class LoreViewModel(
         }
     }
 
-    /** 从项目素材里关联既有材料（`op=add`），不需要重新上传。 */
+    /** 从项目素材里关联既有材料（`op=link`，服务端只接受 link/update/remove/cover），不重复上传。 */
     fun addMaterialFromLibrary(item: LoreItemSummary, assetId: String) {
         val c = client ?: return
         val projectId = _state.value.projectId
@@ -415,7 +423,7 @@ class LoreViewModel(
                 val updated = c.mutateLoreMaterial(
                     projectId,
                     item.id,
-                    LoreMaterialMutation(op = "add", assetId = assetId),
+                    LoreMaterialMutation(op = "link", assetId = assetId),
                 )
                 DenovaLog.i("Lore", "material linked item=${item.id} asset=$assetId")
                 applyUpdatedItem(updated, UiText.of(R.string.lore_material_added))
@@ -440,6 +448,96 @@ class LoreViewModel(
                 _state.value = _state.value.copy(
                     busy = false,
                     uploading = false,
+                    error = failureText(e, R.string.lore_material_failed),
+                )
+            }
+        }
+    }
+
+    /**
+     * 语音材料试听（LOR-002「预览」）：受保护 MP3 先带会话取字节，再交给本机播放器。
+     * 再点同一个材料即停止；切换材料时自动停旧的。
+     */
+    fun toggleAudio(material: LoreMaterial) {
+        val c = client ?: return
+        if (audio.playingId == material.id) {
+            audio.stop()
+            _state.value = _state.value.copy(playingMaterialId = null)
+            return
+        }
+        val projectId = _state.value.projectId
+        viewModelScope.launch {
+            try {
+                val bytes = c.assetBytes(projectId, material.path)
+                if (audio.play(material.id, bytes, material.mimeType)) {
+                    _state.value = _state.value.copy(playingMaterialId = material.id, error = null)
+                } else {
+                    _state.value = _state.value.copy(
+                        playingMaterialId = null,
+                        error = UiText.of(R.string.lore_material_play_failed),
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(error = failureText(e, R.string.lore_material_play_failed))
+            }
+        }
+    }
+
+    /** 材料改名 / 改描述：`op=update`（只改这两个字段，不动文件与关联）。 */
+    fun renameMaterial(item: LoreItemSummary, material: LoreMaterial, name: String, description: String) {
+        val c = client ?: return
+        val projectId = _state.value.projectId
+        viewModelScope.launch {
+            _state.value = _state.value.copy(error = null, notice = null)
+            try {
+                val updated = c.mutateLoreMaterial(
+                    projectId,
+                    item.id,
+                    LoreMaterialMutation(
+                        op = "update",
+                        assetId = material.id,
+                        name = name,
+                        description = description,
+                    ),
+                )
+                applyUpdatedItem(updated, UiText.of(R.string.lore_material_updated))
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _state.value = _state.value.copy(error = failureText(e, R.string.lore_material_failed))
+            }
+        }
+    }
+
+    /**
+     * 远程图片材料：`op=remote`（服务端下载并登记），可选同时保留本地副本。
+     * 下载在服务端进行，可能超过默认读超时，因此走慢客户端。
+     */
+    fun addRemoteMaterial(item: LoreItemSummary, url: String, name: String, description: String, saveLocally: Boolean) {
+        val c = client ?: return
+        val projectId = _state.value.projectId
+        viewModelScope.launch {
+            _state.value = _state.value.copy(busy = true, error = null, notice = null)
+            try {
+                val updated = c.mutateLoreMaterial(
+                    projectId,
+                    item.id,
+                    LoreMaterialMutation(
+                        op = "remote",
+                        url = url,
+                        name = name,
+                        description = description,
+                        saveLocally = saveLocally,
+                    ),
+                    slow = true,
+                )
+                DenovaLog.i("Lore", "remote material item=${item.id} url=${url.take(40)}")
+                applyUpdatedItem(updated, UiText.of(R.string.lore_material_added))
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                _state.value = _state.value.copy(
+                    busy = false,
                     error = failureText(e, R.string.lore_material_failed),
                 )
             }
@@ -482,12 +580,22 @@ class LoreViewModel(
         }
     }
 
-    /** 生成配图：`mode=agent` 走图像 Agent（可带附加要求），否则按提示词直接生成。 */
+    /**
+     * 生成配图：`mode=agent` 走图像 Agent（可带附加要求），否则按提示词直接生成。
+     *
+     * 图像 Agent 强制要求 `command_id`（服务端 `agent command_id is required`），
+     * 与 Web `createAgentCommandID()` 一样每次提交生成一个 uuid，作为这一次逻辑命令的幂等键。
+     */
     fun generateImage(item: LoreItemSummary, request: LoreImageGenerateRequest) {
         val c = client ?: return
         val projectId = _state.value.projectId
+        val effective = if (request.mode == "agent" && request.commandId.isBlank()) {
+            request.copy(commandId = java.util.UUID.randomUUID().toString())
+        } else {
+            request
+        }
         startGeneration("image") {
-            c.generateLoreImage(projectId, item.id, request)
+            c.generateLoreImage(projectId, item.id, effective)
         }
     }
 
@@ -764,6 +872,11 @@ class LoreViewModel(
                 _state.value = _state.value.copy(busy = false, error = failureText(e, R.string.lore_load_failed))
             }
         }
+    }
+
+    override fun onCleared() {
+        audio.release()
+        super.onCleared()
     }
 
     private companion object {

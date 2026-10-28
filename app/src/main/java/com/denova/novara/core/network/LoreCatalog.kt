@@ -87,7 +87,12 @@ data class LoreMaterial(
     val source: LoreAssetSource = LoreAssetSource(),
 )
 
-/** `POST .../items/:id/materials` 的 `MaterialMutation`：op=add|update|remove|cover。 */
+/**
+ * `POST .../items/:id/materials` 的 `MaterialMutation`。
+ *
+ * op 取值为 `link`（关联已有素材）/ `update`（改名与描述）/ `remove` / `cover` / `cover_if_missing`，
+ * 与后端 `Store.MutateMaterial` 的 switch 一致；`add` 之类的写法会被判 400 `unknown material operation`。
+ */
 @Serializable
 data class LoreMaterialMutation(
     val op: String,
@@ -232,6 +237,8 @@ data class LoreSpeechRequest(
 data class LoreImageGenerateRequest(
     /** 空字符串表示直接生成（服务端只有 `mode=agent` 才走图像 Agent）。 */
     val mode: String = "",
+    /** 图像 Agent 的幂等键：`mode=agent` 时服务端强制要求（缺失即 400）。 */
+    @SerialName("command_id") val commandId: String = "",
     val prompt: String = "",
     val instruction: String = "",
     @SerialName("image_preset_id") val imagePresetId: String = "",

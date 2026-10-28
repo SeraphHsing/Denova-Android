@@ -197,6 +197,9 @@ private fun LoreContent(
         }
 
         when {
+            // 索引面板优先于编辑表单：编辑到一半点「索引」也要能进去，草稿留在 ViewModel 里，
+            // 关掉索引后自动回到同一份表单（LOR-003 / LOR-004）。
+            showIndex -> LoreIndexPanel(state = state, viewModel = viewModel, onClose = { showIndex = false })
             state.draft != null -> LoreEditor(
                 state = state,
                 draft = state.draft,
@@ -211,7 +214,6 @@ private fun LoreContent(
                     viewModel.refreshAssets()
                 },
             )
-            showIndex -> LoreIndexPanel(state = state, viewModel = viewModel, onClose = { showIndex = false })
             else -> LoreList(
                 state = state,
                 viewModel = viewModel,
@@ -318,7 +320,7 @@ private fun LoreContent(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                state.categoryLabel(category.id),
+                                categoryLabel(state, category.id),
                                 style = MaterialTheme.typography.bodyMedium,
                                 modifier = Modifier.weight(1f),
                             )
@@ -385,9 +387,11 @@ private fun LoreContent(
                             )
                             Column(Modifier.weight(1f)) {
                                 Text(item.name, style = MaterialTheme.typography.bodyMedium)
+                                val currentLabel = categoryLabel(state, item.currentType.ifBlank { "-" })
+                                val suggestedLabel = categoryLabel(state, item.suggestedType.ifBlank { "-" })
                                 Text(
-                                    "${item.currentType.ifBlank { "-" }} → ${item.suggestedType.ifBlank { "-" }}" +
-                                        " · " + stringResource(R.string.lore_classify_confidence, item.confidence),
+                                    "$currentLabel → $suggestedLabel · " +
+                                        stringResource(R.string.lore_classify_confidence, item.confidence),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.outline,
                                 )
@@ -446,7 +450,7 @@ private fun LoreList(
                             RoundedCornerShape(8.dp),
                         ),
                     ) {
-                        Text("${state.categoryLabel(category.id)} ${state.categoryCount(category.id)}")
+                        Text("${categoryLabel(state, category.id)} ${state.categoryCount(category.id)}")
                     }
                     // 分类管理入口：点分类名切换筛选，点「⋮」改名/删除（移动端替代右键菜单）。
                     Box {
@@ -523,7 +527,7 @@ private fun LoreRow(
         Column(Modifier.weight(1f)) {
             Text(item.name, style = MaterialTheme.typography.bodyLarge)
             Text(
-                "${state.categoryLabel(item.type)} · ${item.importance.ifBlank { "-" }}" +
+                "${categoryLabel(state, item.type)} · ${item.importance.ifBlank { "-" }}" +
                     (if (item.keywords.isNotEmpty()) " · " + item.keywords.joinToString("、") else ""),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
@@ -555,6 +559,9 @@ private fun LoreEditor(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var materialMenu by remember { mutableStateOf(false) }
+    var remoteDialog by remember { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<LoreMaterial?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         val item = state.selectedItem() ?: return@rememberLauncherForActivityResult
         if (uri == null) return@rememberLauncherForActivityResult
@@ -624,20 +631,19 @@ private fun LoreEditor(
         // 分类即条目的 type：选另一个分类就是把它移动到该分类（后端以分类表校验）。
         OptionRow(
             label = stringResource(R.string.lore_field_type),
-            options = state.categories.map { it.id },
+            options = state.categories.map { it.id to categoryLabel(state, it.id) },
             selected = draft.type,
             onSelect = { value -> viewModel.updateDraft { it.copy(type = value, categoryId = value) } },
-            render = { id -> state.categoryLabel(id) },
         )
         OptionRow(
             label = stringResource(R.string.lore_field_importance),
-            options = LoreOptions.IMPORTANCE,
+            options = LoreOptions.IMPORTANCE.map { it to it },
             selected = draft.importance,
             onSelect = { value -> viewModel.updateDraft { it.copy(importance = value) } },
         )
         OptionRow(
             label = stringResource(R.string.lore_field_load_mode),
-            options = LoreOptions.LOAD_MODES,
+            options = LoreOptions.LOAD_MODES.map { it to it },
             selected = draft.loadMode,
             onSelect = { value -> viewModel.updateDraft { it.copy(loadMode = value) } },
         )
@@ -682,14 +688,36 @@ private fun LoreEditor(
                     enabled = !state.busy && state.generating == null,
                     onClick = { onGenerateSpeech(item) },
                 ) { Text(stringResource(R.string.lore_generate_speech)) }
-                TextButton(
-                    enabled = !state.busy,
-                    onClick = { picker.launch(arrayOf("*/*")) },
-                ) { Text(stringResource(R.string.lore_material_upload)) }
-                TextButton(
-                    enabled = !state.busy,
-                    onClick = { onPickAsset(item) },
-                ) { Text(stringResource(R.string.lore_materials_library)) }
+                // 材料来源收进一个菜单：手机上并排 5 个按钮会挤掉可点区域。
+                Box {
+                    TextButton(
+                        enabled = !state.busy,
+                        onClick = { materialMenu = true },
+                    ) { Text("＋ " + stringResource(R.string.lore_materials_short)) }
+                    DropdownMenu(expanded = materialMenu, onDismissRequest = { materialMenu = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.lore_material_upload)) },
+                            onClick = {
+                                materialMenu = false
+                                picker.launch(arrayOf("*/*"))
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.lore_materials_library)) },
+                            onClick = {
+                                materialMenu = false
+                                onPickAsset(item)
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.lore_material_remote)) },
+                            onClick = {
+                                materialMenu = false
+                                remoteDialog = true
+                            },
+                        )
+                    }
+                }
             }
         }
         if (item != null) {
@@ -724,8 +752,21 @@ private fun LoreEditor(
                             color = MaterialTheme.colorScheme.outline,
                         )
                     }
+                    if (material.mimeType.startsWith("audio/")) {
+                        val playing = state.playingMaterialId == material.id
+                        TextButton(onClick = { viewModel.toggleAudio(material) }) {
+                            Text(
+                                stringResource(
+                                    if (playing) R.string.lore_material_stop else R.string.lore_material_play,
+                                ),
+                            )
+                        }
+                    }
                     TextButton(onClick = { viewModel.setCoverMaterial(item, material.id) }) {
-                        Text(stringResource(R.string.lore_set_cover))
+                        Text(stringResource(R.string.lore_cover))
+                    }
+                    TextButton(onClick = { renameTarget = material }) {
+                        Text(stringResource(R.string.lore_material_edit))
                     }
                     TextButton(onClick = { viewModel.removeMaterial(item, material.id) }) {
                         Text(stringResource(R.string.common_delete))
@@ -734,6 +775,26 @@ private fun LoreEditor(
                 HorizontalDivider()
             }
         }
+    }
+
+    renameTarget?.let { material ->
+        MaterialEditDialog(
+            material = material,
+            onDismiss = { renameTarget = null },
+            onConfirm = { name, description ->
+                renameTarget = null
+                state.selectedItem()?.let { viewModel.renameMaterial(it, material, name, description) }
+            },
+        )
+    }
+    if (remoteDialog) {
+        RemoteMaterialDialog(
+            onDismiss = { remoteDialog = false },
+            onConfirm = { url, name, saveLocally ->
+                remoteDialog = false
+                state.selectedItem()?.let { viewModel.addRemoteMaterial(it, url, name, "", saveLocally) }
+            },
+        )
     }
 }
 
@@ -817,7 +878,7 @@ private fun CategoryManagerDialog(
                     val locked = category.id == LoreOptions.CHARACTER
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            state.categoryLabel(category.id),
+                            categoryLabel(state, category.id),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
                         )
@@ -872,8 +933,8 @@ private fun CategoryDeleteDialog(
                 Text(
                     stringResource(
                         R.string.lore_category_delete_confirm,
-                        state.categoryLabel(categoryId),
-                        state.categoryLabel(destination),
+                        categoryLabel(state, categoryId),
+                        categoryLabel(state, destination),
                     ),
                 )
                 Text(
@@ -891,7 +952,7 @@ private fun CategoryDeleteDialog(
                             selected = destination == category.id,
                             onClick = { destination = category.id },
                         )
-                        Text(state.categoryLabel(category.id), style = MaterialTheme.typography.bodyMedium)
+                        Text(categoryLabel(state, category.id), style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -907,26 +968,27 @@ private fun CategoryDeleteDialog(
     )
 }
 
+/** 下拉选项：`id to 显示名`（显示名在组合作用域里算好，避免在非组合 lambda 里调用 stringResource）。 */
 @Composable
 private fun OptionRow(
     label: String,
-    options: List<String>,
+    options: List<Pair<String, String>>,
     selected: String,
     onSelect: (String) -> Unit,
-    render: (String) -> String = { it },
 ) {
     var open by remember { mutableStateOf(false) }
+    val selectedLabel = options.firstOrNull { it.first == selected }?.second ?: selected
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = 8.dp))
         Box {
-            TextButton(onClick = { open = true }) { Text(render(selected).ifBlank { "-" }) }
+            TextButton(onClick = { open = true }) { Text(selectedLabel.ifBlank { "-" }) }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                options.forEach { option ->
+                options.forEach { (id, name) ->
                     DropdownMenuItem(
-                        text = { Text(render(option)) },
+                        text = { Text(name) },
                         onClick = {
                             open = false
-                            onSelect(option)
+                            onSelect(id)
                         },
                     )
                 }
@@ -995,6 +1057,94 @@ private fun SpeechDialog(
             TextButton(
                 enabled = name.isNotBlank() && text.isNotBlank(),
                 onClick = { onConfirm(name.trim(), text.trim()) },
+            ) { Text(stringResource(R.string.common_confirm)) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
+    )
+}
+
+/** 材料改名 / 改描述（`op=update`）。 */
+@Composable
+private fun MaterialEditDialog(
+    material: LoreMaterial,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit,
+) {
+    var name by remember { mutableStateOf(material.name) }
+    var description by remember { mutableStateOf(material.description) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.lore_material_edit)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.lore_field_name)) },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text(stringResource(R.string.lore_material_description)) },
+                    minLines = 2,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(name.trim(), description.trim()) }) {
+                Text(stringResource(R.string.common_confirm))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
+    )
+}
+
+/** 远程图片材料（`op=remote`）：服务端下载并登记，可选保留本地副本。 */
+@Composable
+private fun RemoteMaterialDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String, String, Boolean) -> Unit,
+) {
+    var url by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var saveLocally by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.lore_material_remote)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.lore_material_remote_hint),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text(stringResource(R.string.lore_material_url)) },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text(stringResource(R.string.lore_field_name)) },
+                    singleLine = true,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = saveLocally, onCheckedChange = { saveLocally = it })
+                    Text(
+                        stringResource(R.string.lore_material_save_locally),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = url.trim().startsWith("http"),
+                onClick = { onConfirm(url.trim(), name.trim(), saveLocally) },
             ) { Text(stringResource(R.string.common_confirm)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
@@ -1102,6 +1252,25 @@ private fun AssetPickerDialog(
 
 /** 行点击修饰（对话框里的列表项）。 */
 private fun Modifier.clickableRow(onClick: () -> Unit): Modifier = this.clickable(onClick = onClick)
+
+/**
+ * 分类显示名：服务端给了自定义名就用它，否则用内置分类的本地化名称。
+ * 后端对默认分类只回 `{id}`（名字由前端本地化），直接显示 id 会中英混排。
+ */
+@Composable
+private fun categoryLabel(state: LoreUiState, id: String): String {
+    val named = state.categories.firstOrNull { it.id == id }?.name?.takeIf { it.isNotBlank() }
+    if (named != null) return named
+    val res = when (id) {
+        "character" -> R.string.lore_type_character
+        "location" -> R.string.lore_type_location
+        "faction" -> R.string.lore_type_faction
+        "item" -> R.string.lore_type_item
+        "world" -> R.string.lore_type_world
+        else -> null
+    }
+    return res?.let { stringResource(it) } ?: id
+}
 
 /** 配图地址：优先服务端给的 `image_url`，否则按项目资产接口取字节（需会话 Cookie）。 */
 private fun loreImageUrl(client: DenovaClient, projectId: String, item: LoreItemSummary?): String? {

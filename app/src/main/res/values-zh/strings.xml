@@ -793,6 +793,11 @@
     <string name="lore_classify_confidence">置信度 %1$s</string>
 
     <string name="lore_category_destination">条目移动到</string>
+    <string name="lore_type_character">角色</string>
+    <string name="lore_type_location">地点</string>
+    <string name="lore_type_faction">组织</string>
+    <string name="lore_type_item">物品</string>
+    <string name="lore_type_world">世界设定</string>
     <string name="lore_category_character_locked">角色分类不可重命名或删除</string>
     <string name="lore_item_move">移动到分类</string>
     <string name="lore_item_moved">已移动条目</string>
@@ -810,8 +815,20 @@
     <string name="lore_upload_running">正在上传材料…</string>
 
     <string name="lore_materials_library">从项目素材</string>
+    <string name="lore_materials_short">材料</string>
     <string name="lore_material_added">已关联材料</string>
     <string name="lore_material_empty">没有可用的项目素材</string>
+    <string name="lore_material_play">播放</string>
+    <string name="lore_material_stop">停止</string>
+    <string name="lore_material_play_failed">试听失败</string>
+    <string name="lore_material_edit">改名</string>
+    <string name="lore_material_updated">已更新材料</string>
+    <string name="lore_material_remote">远程图片</string>
+    <string name="lore_material_url">图片地址（HTTPS）</string>
+    <string name="lore_material_save_locally">同时保存本地副本</string>
+    <string name="lore_material_remote_hint">服务端会下载该图片并存入项目素材。</string>
+    <string name="lore_material_description">描述</string>
+    <string name="lore_cover">封面</string>
     <string name="lore_image_label">封面配图</string>
 
     <string name="lore_index_conflict">索引已在其他位置更新，已重新加载最新版本；请重新预览后再保存。</string>

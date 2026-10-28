@@ -1490,15 +1490,21 @@ class DenovaClient(
         }
     }
 
-    /** 材料关联 / 重命名 / 移除 / 设为封面：`POST .../items/:id/materials`。 */
+    /**
+     * 材料关联 / 改名 / 移除 / 设为封面 / 远程图片：`POST .../items/:id/materials`。
+     *
+     * `op=remote` 时服务端要下载远端图片，用慢客户端（默认 30s 读超时会误判超时）。
+     */
     suspend fun mutateLoreMaterial(
         projectId: String,
         itemId: String,
         mutation: LoreMaterialMutation,
+        slow: Boolean = false,
     ): LoreItemSummary =
         writeJson(
             url = loreUrl(projectId, "items/$itemId/materials"),
             payload = json.encodeToString(LoreMaterialMutation.serializer(), mutation),
+            slow = slow,
         ) { json.decodeFromString(LoreItemSummary.serializer(), it) }
 
     suspend fun loreAssets(projectId: String): List<LoreMaterial> =
@@ -2569,6 +2575,20 @@ class DenovaClient(
             .addPathSegments("api/projects/$projectId/files/asset")
             .addQueryParameter("path", path)
             .build()
+
+    /** 取受保护素材的原始字节（带会话 Cookie），用于本地播放等拿不到 URL 的场景。 */
+    suspend fun assetBytes(projectId: String, path: String): ByteArray = withContext(Dispatchers.IO) {
+        val url = if (path.startsWith("http://") || path.startsWith("https://")) {
+            path.toHttpUrl()
+        } else {
+            projectAssetUrl(projectId, path)
+        }
+        okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+            val body = resp.body
+            if (!resp.isSuccessful) throw toException(resp.code, body?.string().orEmpty())
+            body?.bytes() ?: ByteArray(0)
+        }
+    }
 
     private fun toException(status: Int, body: String): DenovaApiException {
         val parsed = runCatching { json.decodeFromString(ApiErrorBody.serializer(), body) }.getOrNull()
