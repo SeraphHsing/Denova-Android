@@ -42,7 +42,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import com.denova.novara.core.logging.DenovaLog
 import okhttp3.Call
@@ -1549,6 +1553,51 @@ class DenovaClient(
         val path = if (suffix.isBlank()) base else "$base/$suffix"
         return server.baseUrl.toHttpUrl().newBuilder().addPathSegments(path).build()
     }
+
+    // ---- 创作方案（P4-C / PLN-001…002）：六类预设资源共用一套 CRUD ----
+
+    /** 预设目录：`GET /api/{kind}`（顶层键见 [PresetKind.listKey]）。 */
+    suspend fun presetList(kind: PresetKind): List<PresetResource> =
+        getJson(presetUrl(kind)) { text ->
+            val root = json.parseToJsonElement(text).jsonObject
+            val items = (root[kind.listKey] as? JsonArray) ?: JsonArray(emptyList())
+            items.mapNotNull { element -> element as? JsonObject }.map(::PresetResource)
+        }
+
+    /** 单条预设：`GET /api/{kind}/:id`。 */
+    suspend fun presetGet(kind: PresetKind, id: String): PresetResource =
+        getJson(presetUrl(kind, id)) { text ->
+            PresetResource(json.parseToJsonElement(text).jsonObject)
+        }
+
+    /** 新建预设：`POST /api/{kind}`（body 是完整定义；ID 留空由服务端生成）。 */
+    suspend fun presetCreate(kind: PresetKind, body: JsonObject): PresetResource =
+        writeJson(url = presetUrl(kind), payload = body.toString()) { text ->
+            PresetResource(json.parseToJsonElement(text).jsonObject)
+        }
+
+    /** 更新预设：`PATCH /api/{kind}/:id`，body 追加 `base_revision`。 */
+    suspend fun presetUpdate(
+        kind: PresetKind,
+        id: String,
+        body: JsonObject,
+        baseRevision: String,
+    ): PresetResource =
+        writeJson(
+            url = presetUrl(kind, id),
+            payload = JsonObject(body + ("base_revision" to JsonPrimitive(baseRevision))).toString(),
+            method = "PATCH",
+        ) { text ->
+            PresetResource(json.parseToJsonElement(text).jsonObject)
+        }
+
+    /** 删除预设：`DELETE /api/{kind}/:id`。 */
+    suspend fun presetDelete(kind: PresetKind, id: String) {
+        writeJson(url = presetUrl(kind, id), method = "DELETE") { Unit }
+    }
+
+    private fun presetUrl(kind: PresetKind, id: String? = null): HttpUrl =
+        apiUrl(if (id.isNullOrBlank()) kind.apiPath else "${kind.apiPath}/$id")
 
     // ---- 资料库（P4-C / LOR-001…004）----
 
