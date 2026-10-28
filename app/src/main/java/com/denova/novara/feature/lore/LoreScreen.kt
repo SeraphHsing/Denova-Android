@@ -100,6 +100,8 @@ private fun LoreContent(
     var manageCategories by remember { mutableStateOf(false) }
     var confirmDeleteItem by remember { mutableStateOf<LoreItemSummary?>(null) }
     var speechFor by remember { mutableStateOf<LoreItemSummary?>(null) }
+    // 顶栏「索引」只切视图，必须同时把服务端索引读回来；否则预览 / 保存都因为没有快照而静默失效。
+    LaunchedEffect(showIndex) { if (showIndex) viewModel.loadIndex() }
 
     Column(
         // imePadding：表单底部（保存 / 材料）要能被键盘顶上来，否则手机上永远点不到。
@@ -119,6 +121,10 @@ private fun LoreContent(
                 )
             }
             TextButton(onClick = { showIndex = !showIndex }) { Text(stringResource(R.string.lore_index)) }
+            // 类型分类直接放顶栏：菜单里再点一次在手机上经常失败（弹层锚点在顶栏右侧）。
+            TextButton(onClick = { viewModel.previewClassification() }) {
+                Text(stringResource(R.string.lore_classify))
+            }
             Box {
                 TextButton(onClick = { categoryMenu = true }) { Text(stringResource(R.string.lore_field_type)) }
                 DropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
