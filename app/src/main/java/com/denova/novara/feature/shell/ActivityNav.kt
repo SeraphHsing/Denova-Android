@@ -55,7 +55,7 @@ object ActivityNav {
         ActivitySpec("teller", R.string.dest_teller, ActivityGroup.TOOLS, Icons.Filled.Notifications, implemented = false),
         ActivitySpec("versions", R.string.dest_versions, ActivityGroup.TOOLS, Icons.Filled.Refresh, implemented = false),
         ActivitySpec("books", R.string.dest_books, ActivityGroup.TOOLS, Icons.Filled.List, implemented = true),
-        ActivitySpec("skills", R.string.dest_skills, ActivityGroup.TOOLS, Icons.Filled.Build, implemented = false),
+        ActivitySpec("skills", R.string.dest_skills, ActivityGroup.TOOLS, Icons.Filled.Build, implemented = true),
         ActivitySpec("agents", R.string.dest_agents, ActivityGroup.TOOLS, Icons.Filled.Person, implemented = false),
         ActivitySpec("automations", R.string.dest_automations, ActivityGroup.TOOLS, Icons.Filled.DateRange, implemented = false),
         ActivitySpec("market", R.string.dest_market, ActivityGroup.TOOLS, Icons.Filled.ShoppingCart, implemented = false),

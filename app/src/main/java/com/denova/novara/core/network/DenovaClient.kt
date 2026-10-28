@@ -42,6 +42,8 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import com.denova.novara.core.logging.DenovaLog
 import okhttp3.Call
 import okhttp3.Cookie
@@ -1441,6 +1443,112 @@ class DenovaClient(
     /** 资料库条目（主角候选）：`GET /api/projects/:id/book/lore/items`。 */
     suspend fun projectLoreItems(projectId: String): LoreItemsResponse =
         getJson(projectLoreItemsUrl(projectId)) { json.decodeFromString(LoreItemsResponse.serializer(), it) }
+
+    // ---- Skills（P4-C / SKL-001…002）----
+
+    /** 技能库：`GET /api/skills` 或 `GET /api/projects/:id/skills`（项目层合并全局层）。 */
+    suspend fun skillCatalog(projectId: String?): SkillSnapshot =
+        getJson(skillsUrl(projectId)) { json.decodeFromString(SkillSnapshot.serializer(), it) }
+
+    /** 单个 Skill 的 SKILL.md：`GET .../skills/document?scope=&name=`。 */
+    suspend fun skillDocument(projectId: String?, scope: String, name: String): SkillDocument =
+        getJson(
+            skillsUrl(projectId, "document")
+                .newBuilder()
+                .addQueryParameter("scope", scope)
+                .addQueryParameter("name", name)
+                .build(),
+        ) { json.decodeFromString(SkillDocument.serializer(), it) }
+
+    /** Skill 目录内的附属文件：`GET .../skills/file?scope=&name=&path=`。 */
+    suspend fun skillFileDocument(
+        projectId: String?,
+        scope: String,
+        name: String,
+        path: String,
+    ): SkillFileDocument =
+        getJson(
+            skillsUrl(projectId, "file")
+                .newBuilder()
+                .addQueryParameter("scope", scope)
+                .addQueryParameter("name", name)
+                .addQueryParameter("path", path)
+                .build(),
+        ) { json.decodeFromString(SkillFileDocument.serializer(), it) }
+
+    /** 新建 Skill：`POST .../skills`（服务端生成 SKILL.md 骨架并返回文档）。 */
+    suspend fun createSkill(projectId: String?, request: SkillCreateRequest): SkillDocument =
+        writeJson(
+            url = skillsUrl(projectId),
+            payload = createJson.encodeToString(SkillCreateRequest.serializer(), request),
+        ) { json.decodeFromString(SkillDocument.serializer(), it) }
+
+    /**
+     * 保存 SKILL.md：`PUT .../skills/document`。
+     *
+     * `target_scope` / `target_name` 与来源不同即「另存为 / 覆盖」（基线的重命名与覆盖内置），
+     * 服务端按 `base_revision` 做乐观锁，冲突返回 409 `api.resource.revisionConflict`。
+     */
+    suspend fun saveSkillDocument(
+        projectId: String?,
+        request: SkillDocumentSaveRequest,
+    ): SkillDocument =
+        writeJson(
+            url = skillsUrl(projectId, "document"),
+            payload = createJson.encodeToString(SkillDocumentSaveRequest.serializer(), request),
+            method = "PUT",
+        ) { json.decodeFromString(SkillDocument.serializer(), it) }
+
+    /** 保存附属文件：`PUT .../skills/file`（同样按 `base_revision` 校验）。 */
+    suspend fun saveSkillFile(projectId: String?, request: SkillFileSaveRequest): SkillFileDocument =
+        writeJson(
+            url = skillsUrl(projectId, "file"),
+            payload = createJson.encodeToString(SkillFileSaveRequest.serializer(), request),
+            method = "PUT",
+        ) { json.decodeFromString(SkillFileDocument.serializer(), it) }
+
+    /** 删除 Skill 目录（含附属文件）：`DELETE .../skills/document?scope=&name=`。 */
+    suspend fun deleteSkill(projectId: String?, scope: String, name: String) {
+        writeJson(
+            url = skillsUrl(projectId, "document")
+                .newBuilder()
+                .addQueryParameter("scope", scope)
+                .addQueryParameter("name", name)
+                .build(),
+            method = "DELETE",
+        ) { Unit }
+    }
+
+    /**
+     * 技能偏好：`PATCH .../skills/preferences`。
+     *
+     * 服务端要求 `enabled` 与 `shared_enabled` **恰好出现一个**，所以这里手工构造 JSON，
+     * 不依赖序列化器的 null 语义（否则会同时发出两个字段被判 400）。
+     */
+    suspend fun setSkillPreference(projectId: String?, preference: SkillPreference): SkillSnapshot {
+        val payload = buildJsonObject {
+            when (preference) {
+                is SkillPreference.Skill -> {
+                    put("scope", preference.scope)
+                    put("name", preference.name)
+                    put("enabled", preference.enabled)
+                }
+                is SkillPreference.Shared -> put("shared_enabled", preference.enabled)
+            }
+        }
+        return writeJson(
+            url = skillsUrl(projectId, "preferences"),
+            payload = payload.toString(),
+            method = "PATCH",
+        ) { json.decodeFromString(SkillSnapshot.serializer(), it) }
+    }
+
+    /** `api/skills` 或 `api/projects/:id/skills`（后缀如 `document` / `file` / `preferences`）。 */
+    private fun skillsUrl(projectId: String?, suffix: String = ""): HttpUrl {
+        val base = if (projectId.isNullOrBlank()) "api/skills" else "api/projects/$projectId/skills"
+        val path = if (suffix.isBlank()) base else "$base/$suffix"
+        return server.baseUrl.toHttpUrl().newBuilder().addPathSegments(path).build()
+    }
 
     // ---- 资料库（P4-C / LOR-001…004）----
 
