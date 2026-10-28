@@ -1660,6 +1660,88 @@ class DenovaClient(
     private fun settingsUrl(projectId: String?): HttpUrl =
         apiUrl(if (projectId.isNullOrBlank()) "settings" else "projects/$projectId/settings")
 
+    // ---- 自动化（P4-D / AUT-001…004）----
+
+    /** 全项目目录：`GET /api/automations/catalog` → `{projects:[{project_id,tasks,inbox,error?}]}`。 */
+    suspend fun automationCatalog(): AutomationCatalog =
+        getJson(apiUrl("automations/catalog")) {
+            json.decodeFromString(AutomationCatalog.serializer(), it)
+        }
+
+    /** 单项目任务：`GET /api/automations?project_id=`（该端点要求 project_id 或 workspace）。 */
+    suspend fun automationTasks(projectId: String): List<AutomationTask> =
+        getJson(
+            apiUrl("automations").newBuilder().addQueryParameter("project_id", projectId).build(),
+        ) { text -> json.decodeFromString(AutomationTasksResponse.serializer(), text).tasks }
+
+    /** 模板目录：`GET /api/automations/templates?locale=`。 */
+    suspend fun automationTemplates(locale: String): List<AutomationTemplate> =
+        getJson(
+            apiUrl("automations/templates").newBuilder().addQueryParameter("locale", locale).build(),
+        ) { text -> json.decodeFromString(AutomationTemplatesResponse.serializer(), text).templates }
+
+    suspend fun automationCreate(request: AutomationCreateRequest): AutomationTask =
+        writeJson(
+            url = apiUrl("automations"),
+            payload = createJson.encodeToString(AutomationCreateRequest.serializer(), request),
+        ) { text -> json.decodeFromString(AutomationTask.serializer(), text) }
+
+    /** 更新：服务端要求 `base_revision`，冲突返回 409 `revision_conflict`。 */
+    suspend fun automationUpdate(id: String, request: AutomationUpdateRequest): AutomationTask =
+        writeJson(
+            url = automationUrl(id),
+            payload = createJson.encodeToString(AutomationUpdateRequest.serializer(), request),
+            method = "PATCH",
+        ) { text -> json.decodeFromString(AutomationTask.serializer(), text) }
+
+    /** 删除：服务端按归档 tombstone 处理（有活跃运行时返回 400）。 */
+    suspend fun automationDelete(id: String) {
+        writeJson<Unit>(url = automationUrl(id), method = "DELETE") { }
+    }
+
+    /** 检查触发器：`POST /api/automations/:id/check` → 命中的收件箱条目。 */
+    suspend fun automationCheck(id: String): List<AutomationInboxItem> =
+        writeJson(url = automationUrl(id, "check"), payload = "{}") { text ->
+            json.decodeFromString(AutomationCheckResponse.serializer(), text).items
+        }
+
+    /** 立即运行：`POST /api/automations/:id/run`（`command_id` 为幂等键，202 + run）。 */
+    suspend fun automationRun(id: String, commandId: String): AutomationRunRecord =
+        writeJson(
+            url = automationUrl(id, "run"),
+            payload = createJson.encodeToString(
+                AutomationRunRequest.serializer(),
+                AutomationRunRequest(commandId = commandId),
+            ),
+        ) { text -> json.decodeFromString(AutomationRunResponse.serializer(), text).run }
+
+    suspend fun automationInbox(projectId: String): List<AutomationInboxItem> =
+        getJson(
+            apiUrl("automations/inbox").newBuilder().addQueryParameter("project_id", projectId).build(),
+        ) { text -> json.decodeFromString(AutomationInboxResponse.serializer(), text).items }
+
+    suspend fun automationInboxRead(itemId: String): AutomationInboxItem =
+        writeJson(url = automationInboxUrl(itemId, "read"), payload = "{}") { text ->
+            json.decodeFromString(AutomationInboxItem.serializer(), text)
+        }
+
+    suspend fun automationInboxDismiss(itemId: String): AutomationInboxItem =
+        writeJson(url = automationInboxUrl(itemId, "dismiss"), payload = "{}") { text ->
+            json.decodeFromString(AutomationInboxItem.serializer(), text)
+        }
+
+    /** 确认收件箱条目：可能同时返回一次运行（`{item, run?}`）。 */
+    suspend fun automationInboxConfirm(itemId: String): AutomationConfirmResponse =
+        writeJson(url = automationInboxUrl(itemId, "confirm"), payload = "{}") { text ->
+            json.decodeFromString(AutomationConfirmResponse.serializer(), text)
+        }
+
+    private fun automationUrl(id: String, suffix: String? = null): HttpUrl =
+        apiUrl(if (suffix.isNullOrBlank()) "automations/$id" else "automations/$id/$suffix")
+
+    private fun automationInboxUrl(itemId: String, action: String): HttpUrl =
+        apiUrl("automations/inbox/$itemId/$action")
+
     // ---- 资料库（P4-C / LOR-001…004）----
 
     suspend fun loreCategories(projectId: String): List<LoreCategory> =

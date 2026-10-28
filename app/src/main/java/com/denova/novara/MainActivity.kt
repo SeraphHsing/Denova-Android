@@ -66,6 +66,7 @@ import com.denova.novara.feature.versions.VersionsViewModel
 import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.settings.SettingsScreen
+import com.denova.novara.feature.automations.AutomationsScreen
 import com.denova.novara.feature.shell.AppDrawer
 import com.denova.novara.feature.shell.GameConsoleContent
 import com.denova.novara.feature.shell.PlaceholderScreen
@@ -91,6 +92,9 @@ class MainActivity : AppCompatActivity() {
 
     /** 资料库草稿要跨页面存活（LOR-004），所以放在 Activity 作用域。 */
     private val loreViewModel: com.denova.novara.feature.lore.LoreViewModel by viewModels()
+
+    /** 自动化草稿要跨页面存活（AUT-004），同样放在 Activity 作用域。 */
+    private val automationsViewModel: com.denova.novara.feature.automations.AutomationsViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!logcatInstalled) {
@@ -448,6 +452,14 @@ class MainActivity : AppCompatActivity() {
                                         SettingsScreen(
                                             client = connectionViewModel.client,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
+                                        )
+                                    }
+                                    composable("automations") {
+                                        AutomationsScreen(
+                                            client = connectionViewModel.client,
+                                            projectId = currentProjectId,
+                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            viewModel = automationsViewModel,
                                         )
                                     }
                                     appDestinations.filter { !it.implemented }.forEach { destination ->

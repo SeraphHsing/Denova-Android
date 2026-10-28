@@ -17,12 +17,12 @@ class AppDestinationTest {
     @Test
     fun `implemented destinations match the shipped pages`() {
         // P4-B：工作台宿主页面；P4-C：书籍 / 资料库 / 创作方案 / Skills / Agents；
-        // P4-D：设置页（此后 automations / market 依次接入）。
+        // P4-D：设置页、自动化（此后 market 与独立 versions 页依次接入）。
         val implemented = appDestinations.filter { it.implemented }.map { it.route }
         assertEquals(
             listOf(
                 "editor", "game", "agent", "workbench", "lore", "teller",
-                "books", "skills", "agents", "settings",
+                "books", "skills", "agents", "automations", "settings",
             ),
             implemented,
         )
