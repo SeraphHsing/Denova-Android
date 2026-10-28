@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -53,6 +54,7 @@ import com.denova.novara.core.network.SkillSummary
 import com.denova.novara.core.skills.SkillLibrary
 import com.denova.novara.core.skills.SkillStatusFilter
 import com.denova.novara.core.skills.key
+import kotlinx.coroutines.delay
 
 /**
  * 技能库（P4-C / SKL-001·002），对齐基线 `features/skills/SkillsView.tsx`：
@@ -85,6 +87,15 @@ fun SkillsScreen(
     val groups = SkillLibrary.groupByScope(visible)
     val categories = SkillLibrary.categories(state.snapshot.skills)
     val writable = state.writableScopes
+    // 打开的 SKILL.md / 附属文件详情在列表末尾：选中后自动滚到底，否则点「打开」看起来没反应
+    // （2026-10-28 真机确认）。
+    val listState = rememberLazyListState()
+    LaunchedEffect(state.selected, state.filePath) {
+        if (state.selected == null) return@LaunchedEffect
+        delay(120)
+        val total = listState.layoutInfo.totalItemsCount
+        if (total > 0) listState.animateScrollToItem(total - 1)
+    }
 
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding(),
@@ -111,6 +122,7 @@ fun SkillsScreen(
 
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
+            state = listState,
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {

@@ -1008,4 +1008,6 @@
     <string name="agents_contract_invalid">请选择受支持的运行契约</string>
     <string name="agents_engines_failed">加载引擎状态失败</string>
     <string name="agents_locked">内置 Agent（只读）</string>
+    <string name="agents_open">查看</string>
+    <string name="agents_customizable">可定制</string>
 </resources>

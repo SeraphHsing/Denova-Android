@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -52,6 +53,7 @@ import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.network.AgentEngineDescriptor
 import com.denova.novara.core.network.CustomAgentDefinition
 import com.denova.novara.core.network.DenovaClient
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -79,6 +81,14 @@ fun AgentsScreen(
 
     var deleteTarget by remember { mutableStateOf<CustomAgentDefinition?>(null) }
     val grouped = state.grouped
+    // 详情 / 表单在列表末尾：选中或开始编辑后自动滚到底（2026-10-28 真机确认）。
+    val listState = rememberLazyListState()
+    LaunchedEffect(state.editing, state.selectedKey) {
+        if (!state.editing && state.selectedKey.isBlank()) return@LaunchedEffect
+        delay(120)
+        val total = listState.layoutInfo.totalItemsCount
+        if (total > 0) listState.animateScrollToItem(total - 1)
+    }
 
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding(),
@@ -108,6 +118,7 @@ fun AgentsScreen(
 
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
+            state = listState,
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -289,6 +300,12 @@ private fun EngineRow(engine: AgentEngineDescriptor, onCheck: () -> Unit) {
 
 @Composable
 private fun BuiltinRow(builtin: BuiltinAgent, selected: Boolean, onSelect: () -> Unit) {
+    // version_summary / tool_agent 是模型单点用途，没有可定制的运行契约，不能显示 project.general.v1。
+    val meta = if (builtin.customizable) {
+        AgentDefinitions.contractFor(builtin.key)
+    } else {
+        stringResource(R.string.agents_locked)
+    }
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(
@@ -297,14 +314,14 @@ private fun BuiltinRow(builtin: BuiltinAgent, selected: Boolean, onSelect: () ->
                 fontWeight = if (selected) FontWeight.SemiBold else null,
             )
             Text(
-                stringResource(builtin.subtitleRes) + " · " + AgentDefinitions.contractFor(builtin.key),
+                stringResource(builtin.subtitleRes) + " · " + meta,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.outline,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        TextButton(onClick = onSelect) { Text(stringResource(R.string.presets_open)) }
+        TextButton(onClick = onSelect) { Text(stringResource(R.string.agents_open)) }
     }
 }
 
@@ -332,7 +349,7 @@ private fun CustomRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        TextButton(onClick = onSelect) { Text(stringResource(R.string.presets_open)) }
+        TextButton(onClick = onSelect) { Text(stringResource(R.string.agents_open)) }
         Switch(checked = agent.enabled, onCheckedChange = onToggle)
     }
 }
@@ -352,7 +369,11 @@ private fun BuiltinDetailCard(
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
-            AgentDefinitions.contractFor(builtin.key) + " · " + stringResource(R.string.agents_locked),
+            if (builtin.customizable) {
+                AgentDefinitions.contractFor(builtin.key) + " · " + stringResource(R.string.agents_customizable)
+            } else {
+                stringResource(R.string.agents_locked)
+            },
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
         )

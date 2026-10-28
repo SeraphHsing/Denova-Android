@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -47,6 +48,7 @@ import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.PresetKind
 import com.denova.novara.core.network.PresetResource
+import kotlinx.coroutines.delay
 
 /**
  * 创作方案（P4-C / PLN-001·002），对齐基线 `SettingPanel mode="teller"`（六类预设资源）：
@@ -71,6 +73,15 @@ fun PresetsScreen(
 
     var deleteTarget by remember { mutableStateOf<PresetResource?>(null) }
     val entries = state.list()
+    // 详情 / 表单在列表末尾：选中或开始编辑后自动滚到底，否则用户点了「新建」看不到表单
+    // （2026-10-28 真机确认）。
+    val listState = rememberLazyListState()
+    LaunchedEffect(state.editing, state.selectedId) {
+        if (!state.editing && state.selectedId.isBlank()) return@LaunchedEffect
+        delay(120)
+        val total = listState.layoutInfo.totalItemsCount
+        if (total > 0) listState.animateScrollToItem(total - 1)
+    }
 
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding(),
@@ -97,6 +108,7 @@ fun PresetsScreen(
 
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
+            state = listState,
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {

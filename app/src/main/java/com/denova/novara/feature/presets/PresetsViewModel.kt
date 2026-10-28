@@ -65,7 +65,9 @@ class PresetsViewModel(application: Application) : AndroidViewModel(application)
         if (this.client === client) return
         this.client = client
         val kind = _state.value.kind
-        _state.value = PresetsUiState(kind = kind, loading = true)
+        // 不能先置 loading=true 再 load()：load 里的「已在加载即返回」守卫会把它挡住，
+        // 真机上表现为页面一直停在「正在加载…」（2026-10-28 修复）。
+        _state.value = PresetsUiState(kind = kind)
         load(kind, force = true)
     }
 

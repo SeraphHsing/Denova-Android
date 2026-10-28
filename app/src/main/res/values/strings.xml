@@ -1009,4 +1009,6 @@
     <string name="agents_contract_invalid">Choose a supported runtime contract</string>
     <string name="agents_engines_failed">Failed to load engine status</string>
     <string name="agents_locked">Built-in Agent (read-only)</string>
+    <string name="agents_open">Open</string>
+    <string name="agents_customizable">customizable</string>
 </resources>

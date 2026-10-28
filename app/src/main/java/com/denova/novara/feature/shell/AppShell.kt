@@ -4,12 +4,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -89,6 +93,15 @@ fun AppDrawer(
     // 之前是「固定底栏 + 中间 Column(weight + verticalScroll)」：横屏时可视高度只剩百来像素，
     // 中间的滚动列被压到几乎为零，导航分组整块不渲染（2026-10-27 真机 + 语义树确认）。
     // 换成单个 LazyColumn 后任意高度都能滚动到每一项，也不再出现「渲染出来却点不到」的裁剪问题。
+    // 底部也要避开系统导航/手势区：只加 statusBars 时，抽屉最后几条（Skills / Agents）
+    // 会落到手势条下方，语义树里能查到但点了没反应（2026-10-28 真机确认）。
+    // 手势导航下 navigationBars 常报 0，真正吃掉点击的是 systemGestures，取两者较大值；
+    // 另外给列表底部留出额外空间，滚到底时最后一项停在上方可点区域，而不是贴着屏幕底边。
+    val bottomInset = maxOf(
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+        WindowInsets.systemGestures.asPaddingValues().calculateBottomPadding(),
+    )
+    val listBottomPadding = if (bottomInset > 240.dp) bottomInset else 240.dp
     Column(
         Modifier
             .fillMaxSize()
@@ -100,7 +113,10 @@ fun AppDrawer(
             modifier = Modifier.padding(16.dp),
         )
         HorizontalDivider()
-        LazyColumn(Modifier.weight(1f)) {
+        LazyColumn(
+            Modifier.weight(1f),
+            contentPadding = PaddingValues(bottom = listBottomPadding),
+        ) {
             // 新手引导（WRI-001）：三步核心，完成或跳过就不再出现。
             if (onboardingStep != null) {
                 item {
