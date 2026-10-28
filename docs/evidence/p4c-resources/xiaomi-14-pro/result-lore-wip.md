@@ -1,4 +1,10 @@
-# P4-C · 资料库（LOR-001…004）验收进度（进行中）
+# P4-C · 资料库（LOR-001…004）验收进度（历史记录，已收口）
+
+> **已被取代**：本文件是 2026-10-28 首轮的进行中记录，最终结论与剩余缺口见
+> [result-lore-001.md](result-lore-001.md) / [result-lore-002.md](result-lore-002.md) /
+> [result-lore-003.md](result-lore-003.md) / [result-lore-004.md](result-lore-004.md)。
+
+（以下为当时记录，未回改。）
 
 - 日期：2026-10-28
 - 设备：Xiaomi 14 Pro（`135babde`，Android 16）
