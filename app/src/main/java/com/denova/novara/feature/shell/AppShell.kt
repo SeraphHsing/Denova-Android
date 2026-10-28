@@ -70,6 +70,9 @@ fun AppDrawer(
     onSelectBook: (BookRecord) -> Unit,
     /** debug 构建的日志入口；为 null 时不显示。放在抽屉里而不是悬浮按钮，避免遮挡底部操作。 */
     onOpenDebug: (() -> Unit)? = null,
+    /** 消息中心入口（MSG-001…003）与未读角标；为 null 时不显示。 */
+    onOpenMessages: (() -> Unit)? = null,
+    unreadMessages: Int = 0,
     onNavigate: (AppDestination) -> Unit,
     /** 新手引导当前步（WRI-001）；为 null 时不显示引导卡。 */
     onboardingStep: OnboardingStep? = null,
@@ -312,6 +315,18 @@ fun AppDrawer(
                     Text(stringResource(R.string.language), modifier = Modifier.weight(1f))
                     LanguageOption("中文", "zh", language, onSelectLanguage)
                     LanguageOption("English", "en", language, onSelectLanguage)
+                }
+                if (onOpenMessages != null) {
+                    HorizontalDivider()
+                    TextButton(onClick = onOpenMessages, modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            if (unreadMessages > 0) {
+                                stringResource(R.string.drawer_messages_unread, unreadMessages)
+                            } else {
+                                stringResource(R.string.drawer_messages)
+                            },
+                        )
+                    }
                 }
                 if (onOpenDebug != null) {
                     HorizontalDivider()

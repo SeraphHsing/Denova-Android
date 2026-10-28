@@ -1742,6 +1742,30 @@ class DenovaClient(
     private fun automationInboxUrl(itemId: String, action: String): HttpUrl =
         apiUrl("automations/inbox/$itemId/$action")
 
+    // ---- 消息中心（P4-D / MSG-001…003）----
+
+    /** 消息列表：`GET /api/messages` → `{items, unread_count}`（无分页 / 无过滤参数）。 */
+    suspend fun messages(): ProductMessageList =
+        getJson(apiUrl("messages")) { json.decodeFromString(ProductMessageList.serializer(), it) }
+
+    /** 单条已读：`POST /api/messages/:id/read`（幂等，返回该条消息）。 */
+    suspend fun markMessageRead(id: String): ProductMessage {
+        val url = apiUrl("messages").newBuilder().addPathSegment(id).addPathSegment("read").build()
+        return writeJson(url = url, payload = "{}") { text ->
+            json.decodeFromString(ProductMessage.serializer(), text)
+        }
+    }
+
+    /** 全部已读：`POST /api/messages/read-all` → `{items, unread_count:0}`。 */
+    suspend fun markAllMessagesRead(): ProductMessageList =
+        writeJson(url = apiUrl("messages/read-all"), payload = "{}") { text ->
+            json.decodeFromString(ProductMessageList.serializer(), text)
+        }
+
+    /** 活动摘要：`GET /api/activity/summary`（抽屉角标只需消息未读数）。 */
+    suspend fun activitySummary(): ActivitySummary =
+        getJson(apiUrl("activity/summary")) { json.decodeFromString(ActivitySummary.serializer(), it) }
+
     // ---- 资料库（P4-C / LOR-001…004）----
 
     suspend fun loreCategories(projectId: String): List<LoreCategory> =

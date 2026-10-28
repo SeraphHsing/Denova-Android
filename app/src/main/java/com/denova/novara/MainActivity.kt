@@ -67,6 +67,7 @@ import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.settings.SettingsScreen
 import com.denova.novara.feature.automations.AutomationsScreen
+import com.denova.novara.feature.messages.MessageCenterScreen
 import com.denova.novara.feature.shell.AppDrawer
 import com.denova.novara.feature.shell.GameConsoleContent
 import com.denova.novara.feature.shell.PlaceholderScreen
@@ -95,6 +96,9 @@ class MainActivity : AppCompatActivity() {
 
     /** 自动化草稿要跨页面存活（AUT-004），同样放在 Activity 作用域。 */
     private val automationsViewModel: com.denova.novara.feature.automations.AutomationsViewModel by viewModels()
+
+    /** 消息中心：抽屉角标与页面共用，放在 Activity 作用域（MSG-001…003）。 */
+    private val messageCenterViewModel: com.denova.novara.feature.messages.MessageCenterViewModel by viewModels()
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (!logcatInstalled) {
@@ -121,6 +125,8 @@ class MainActivity : AppCompatActivity() {
     val chaptersViewModel: ChaptersViewModel = viewModel(factory = container.viewModelFactory)
                 val workbenchViewModel: WorkbenchViewModel = viewModel(factory = container.viewModelFactory)
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
+                val messageState by messageCenterViewModel.state.collectAsState()
+                val messageUnread = messageState.unread
                 val state by connectionViewModel.state.collectAsState()
                 val projectState by projectDirectoryViewModel.state.collectAsState()
                 val bookState by bookShelfViewModel.state.collectAsState()
@@ -188,6 +194,8 @@ class MainActivity : AppCompatActivity() {
                                     workbenchViewModel.bindClient(client)
                                     // 工作台不切换前台书籍：只在进入页面/抽屉时读取项目树。
                                     workbenchViewModel.refresh()
+                                    // 消息中心：抽屉角标与页面共用一份状态（MSG-001…003）。
+                                    messageCenterViewModel.bindClient(client)
                                 }
                             }
                             ModalNavigationDrawer(
@@ -227,6 +235,13 @@ class MainActivity : AppCompatActivity() {
                                             } else {
                                                 null
                                             },
+                                            onOpenMessages = {
+                                                scope.launch { drawerState.close() }
+                                                navController.navigate("messages") {
+                                                    launchSingleTop = true
+                                                }
+                                            },
+                                            unreadMessages = messageUnread,
                                             // WRI-001：没有书先引导建书；刚建完进入「填第一章请求」步。
                                             onboardingStep = when {
                                                 bookState.books.isEmpty() -> OnboardingStep.BOOK
@@ -460,6 +475,22 @@ class MainActivity : AppCompatActivity() {
                                             projectId = currentProjectId,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
                                             viewModel = automationsViewModel,
+                                        )
+                                    }
+                                    composable("messages") {
+                                        MessageCenterScreen(
+                                            client = connectionViewModel.client,
+                                            onBack = { navController.popBackStack() },
+                                            viewModel = messageCenterViewModel,
+                                            onOpenAutomation = { projectId ->
+                                                // 消息 → 自动化：带项目作用域跳到自动化页（MSG-002 跳转目标）。
+                                                if (projectId.isNotBlank()) {
+                                                    automationsViewModel.setProject(projectId)
+                                                }
+                                                navController.navigate("automations") {
+                                                    launchSingleTop = true
+                                                }
+                                            },
                                         )
                                     }
                                     appDestinations.filter { !it.implemented }.forEach { destination ->

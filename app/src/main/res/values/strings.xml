@@ -1204,4 +1204,27 @@
     <string name="automation_saved">Automation saved</string>
     <string name="automation_created">Automation created</string>
     <string name="automation_deleted">Automation deleted</string>
+
+    <!-- P4-D 消息中心 -->
+    <string name="drawer_messages">Message center</string>
+    <string name="drawer_messages_unread">Message center (%1$d)</string>
+    <string name="messages_title">Messages</string>
+    <string name="messages_subtitle">%1$d items · %2$d unread</string>
+    <string name="messages_empty">No messages</string>
+    <string name="messages_empty_filter">No messages in this filter</string>
+    <string name="messages_open">Open</string>
+    <string name="messages_read_state">read</string>
+    <string name="messages_marked_all">All messages marked as read</string>
+    <string name="messages_mark_all_read">Mark all read</string>
+    <string name="messages_load_failed">Failed to load messages</string>
+    <string name="messages_read_failed">Failed to save read state</string>
+    <string name="messages_filter_all">All</string>
+    <string name="messages_filter_action">Action</string>
+    <string name="messages_filter_automation">Automation</string>
+    <string name="messages_filter_product">Product</string>
+    <string name="messages_type_update">Update</string>
+    <string name="messages_type_automation">Automation</string>
+    <string name="messages_type_action">Automation · Action required</string>
+    <string name="messages_open_automation">Open automation</string>
+    <string name="messages_open_automation_action">Review action</string>
 </resources>

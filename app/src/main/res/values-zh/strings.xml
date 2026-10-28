@@ -1203,4 +1203,27 @@
     <string name="automation_saved">自动化已保存</string>
     <string name="automation_created">自动化已创建</string>
     <string name="automation_deleted">自动化已删除</string>
+
+    <!-- P4-D 消息中心 -->
+    <string name="drawer_messages">消息中心</string>
+    <string name="drawer_messages_unread">消息中心（%1$d）</string>
+    <string name="messages_title">消息中心</string>
+    <string name="messages_subtitle">%1$d 条 · %2$d 条未读</string>
+    <string name="messages_empty">没有消息</string>
+    <string name="messages_empty_filter">该筛选下没有消息</string>
+    <string name="messages_open">查看</string>
+    <string name="messages_read_state">已读</string>
+    <string name="messages_marked_all">已全部标记为已读</string>
+    <string name="messages_mark_all_read">全部已读</string>
+    <string name="messages_load_failed">加载消息失败</string>
+    <string name="messages_read_failed">保存已读状态失败</string>
+    <string name="messages_filter_all">全部</string>
+    <string name="messages_filter_action">待办</string>
+    <string name="messages_filter_automation">自动化</string>
+    <string name="messages_filter_product">产品</string>
+    <string name="messages_type_update">更新</string>
+    <string name="messages_type_automation">自动化</string>
+    <string name="messages_type_action">自动化 · 待办</string>
+    <string name="messages_open_automation">打开自动化</string>
+    <string name="messages_open_automation_action">查看待办</string>
 </resources>
