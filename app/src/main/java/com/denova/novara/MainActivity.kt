@@ -369,6 +369,7 @@ class MainActivity : AppCompatActivity() {
                                         GameScreen(
                                             viewModel = gameViewModel,
                                             projectId = currentProjectId,
+                                            client = connectionViewModel.client,
                                             onOpenDrawer = { scope.launch { drawerState.open() } },
                                             onOpenRightDrawer = {
                                                 // 打开右抽屉先收起左抽屉，避免两个面板同屏（NAV-003）。
@@ -560,6 +561,7 @@ class MainActivity : AppCompatActivity() {
                             if (isGame) {
                                 val gameLedger by gameViewModel.ledger.collectAsState()
                                 val gameUi by gameViewModel.uiState.collectAsState()
+                                val gameMedia by gameViewModel.media.collectAsState()
                                 GameConsoleContent(
                                     ledger = gameLedger,
                                     turnAnchors = gameUi.turnAnchors,
@@ -582,6 +584,9 @@ class MainActivity : AppCompatActivity() {
                                     },
                                     onRegenerate = { gameViewModel.regenerateTurn(it) },
                                     onEditTurn = { gameViewModel.beginEditTurn(it) },
+                                    onGenerateImage = { gameViewModel.generateImage(it) },
+                                    imageTurnIds = gameMedia.images.keys,
+                                    imageBusyTurnId = gameMedia.generatingTurnId,
                                     editingTurnId = gameUi.editingTurnId,
                                     editingNarrative = gameUi.editingTurnId?.let { gameViewModel.turnNarrative(it) },
                                     editingBusy = gameUi.editingBusy,

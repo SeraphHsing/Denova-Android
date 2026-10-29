@@ -2,8 +2,11 @@ package com.denova.novara
 
 import com.denova.novara.core.network.GameCommandRequest
 import com.denova.novara.core.network.SendInteractiveChatRequest
+import com.denova.novara.core.stream.AgentApprovalLogic
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
+import com.denova.novara.core.stream.ApprovalOption
+import com.denova.novara.core.stream.ApprovalState
 import com.denova.novara.core.stream.GameActiveView
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -134,6 +137,55 @@ class GameRuntimeControlTest {
         assertFalse(text.contains("\"message\""))
         assertFalse(text.contains("regenerate_from_turn_id"))
         assertFalse(text.contains("resume_interruption_id"))
+    }
+
+    @Test
+    fun `tool approval ask answers with the fixed question id and resolves by choice`() {
+        val approvalAsk = json.decodeFromString(
+            AgentAskInteraction.serializer(),
+            """
+            {
+              "schema": "ask.pending.v1",
+              "id": "permission-1",
+              "kind": "tool_approval",
+              "tool_call_id": "call-1",
+              "status": "pending",
+              "questions": [],
+              "approval": {
+                "mode": "ask",
+                "tool_name": "web_fetch",
+                "command": "https://example.com",
+                "risk": "medium",
+                "can_remember": false
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertTrue(approvalAsk.isToolApproval)
+        // 审批 ask 的 questions 为空，所以普通提问的 canSubmit 永远为 false，必须走审批答案体。
+        assertFalse(AgentAskLogic.canSubmit(approvalAsk, emptyMap()))
+        val answer = AgentApprovalLogic.answer(ApprovalOption.ALLOW_ONCE)
+        assertEquals("tool-approval", answer.questionId)
+        assertEquals(listOf("allow-once"), answer.selectedOptionIds)
+
+        // 服务端不允许记忆时不下发「始终允许」。
+        assertEquals(
+            listOf(ApprovalOption.DENY, ApprovalOption.ALLOW_ONCE),
+            AgentApprovalLogic.options(approvalAsk.approval),
+        )
+        val rememberable = approvalAsk.approval?.copy(canRemember = true, ruleDisplayPattern = "web_fetch *")
+        assertEquals(
+            listOf(ApprovalOption.DENY, ApprovalOption.ALLOW_WORKSPACE, ApprovalOption.ALLOW_ONCE),
+            AgentApprovalLogic.options(rememberable),
+        )
+
+        // 已解决态以实际提交的选项为准：审批 resolution 不回 selected_options，
+        // 因此「允许本次」必须由本地选择补齐，否则会被显示成「已拒绝」。
+        assertEquals(ApprovalState.ALLOWED, AgentApprovalLogic.state("answered", "allow-once"))
+        assertEquals(ApprovalState.ALLOWED_WORKSPACE, AgentApprovalLogic.state("answered", "allow-workspace"))
+        assertEquals(ApprovalState.DENIED, AgentApprovalLogic.state("answered", "deny"))
+        assertEquals(ApprovalState.DENIED, AgentApprovalLogic.state("answered", null))
     }
 
     @Test

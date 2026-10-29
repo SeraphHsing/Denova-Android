@@ -1,5 +1,7 @@
 package com.denova.novara.feature.game
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
@@ -39,6 +42,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -60,6 +64,8 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -73,12 +79,25 @@ import com.denova.novara.R
 import com.denova.novara.core.game.StoryCreationForm
 import com.denova.novara.core.game.StoryLibrary
 import com.denova.novara.core.i18n.resolve
+import com.denova.novara.core.stream.AgentApprovalLogic
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
+import com.denova.novara.core.stream.ApprovalMode
+import com.denova.novara.core.stream.ApprovalOption
+import com.denova.novara.core.stream.ApprovalReason
+import com.denova.novara.core.stream.ApprovalRisk
+import com.denova.novara.core.stream.ApprovalState
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.StorySummary
 import com.denova.novara.core.stream.GameActivity
 import com.denova.novara.core.stream.GamePhase
+import coil3.ImageLoader
+import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import com.denova.novara.core.game.GameAttachmentLimits
+import com.denova.novara.core.image.imageLoaderFor
+import com.denova.novara.core.network.DenovaClient
+import java.util.Locale
 
 /**
  * 游戏舞台（P4-A）：故事库驱动入口（GAM-002）→ 挂接活动流 → 投影阶段与累积叙事。
@@ -88,6 +107,7 @@ import com.denova.novara.core.stream.GamePhase
 fun GameScreen(
     viewModel: GameViewModel,
     projectId: String,
+    client: DenovaClient?,
     onOpenDrawer: () -> Unit,
     onOpenRightDrawer: () -> Unit,
     onBack: () -> Unit,
@@ -95,6 +115,14 @@ fun GameScreen(
     val uiState by viewModel.uiState.collectAsState()
     val library by viewModel.library.collectAsState()
     val creation by viewModel.creation.collectAsState()
+    val media by viewModel.media.collectAsState()
+    // 配图走项目受保护资源（带会话 Cookie），复用 AUTH-002 的 Coil 加载器。
+    val context = LocalContext.current
+    val imageLoader = remember(client) { client?.let { imageLoaderFor(context, it) } }
+    // GAM-016：附件由系统选择器读取后随下一条输入一次性发送。
+    val attachLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenMultipleDocuments(),
+    ) { uris -> viewModel.addAttachments(uris) }
 
     // 后台被系统掐断连接后，回前台自动重挂（身份/结果仍对应）。
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -252,6 +280,29 @@ fun GameScreen(
                 }
             }
         }
+        // 附件 / 配图 / 上下文压缩（GAM-016）
+        GameMediaPanel(
+            media = media,
+            latestTurnId = uiState.turnAnchors.lastOrNull()?.turnId,
+            latestTurnNumber = uiState.turnAnchors.lastOrNull()?.number,
+            busy = uiState.stage.phase == GamePhase.RUNNING || uiState.sending,
+            imageUrl = client?.let { activeClient ->
+                // 优先用游戏状态里的服务端工作区项目（冷启动时外壳的 currentProjectId 可能为空）。
+                val assetProjectId = uiState.projectId.ifBlank { projectId }
+                media.images.values.lastOrNull()?.takeIf { assetProjectId.isNotBlank() }?.let { image ->
+                    activeClient.projectAssetUrl(assetProjectId, image.imagePath).toString()
+                }
+            },
+            imageLoader = imageLoader,
+            onPickAttachments = { attachLauncher.launch(arrayOf("*/*")) },
+            onRemoveAttachment = viewModel::removeAttachment,
+            onClearAttachments = viewModel::clearAttachments,
+            onDismissError = viewModel::dismissMediaError,
+            onGenerateImage = viewModel::generateImage,
+            onCompact = viewModel::compactContext,
+            onRemoveCompaction = viewModel::removeCompaction,
+        )
+
         uiState.runtimeError?.let {
             Text(
                 it.resolve(),
@@ -267,6 +318,7 @@ fun GameScreen(
                 ask = ask,
                 busy = uiState.runtimeBusy,
                 onSubmit = { selected -> viewModel.answerAsk(selected) },
+                onApprove = { option -> viewModel.approveAsk(option) },
                 onCancel = { viewModel.cancelAsk() },
             )
         }
@@ -318,6 +370,7 @@ fun GameScreen(
                     viewModel.sendCurrent(input)
                     input = ""
                 },
+                // 服务端要求正文非空：仅附件会以 `player input is empty` 失败（2026-10-29 实测）。
                 enabled = !uiState.sending && storyId.isNotBlank() && input.isNotBlank(),
             ) { Text(if (uiState.sending) stringResource(R.string.game_sending) else stringResource(R.string.common_send)) }
         }
@@ -694,6 +747,7 @@ private fun AskCard(
     ask: AgentAskInteraction,
     busy: Boolean,
     onSubmit: (Map<String, List<String>>) -> Unit,
+    onApprove: (ApprovalOption) -> Unit,
     onCancel: () -> Unit,
 ) {
     var selected by remember(ask.id) { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
@@ -704,13 +758,61 @@ private fun AskCard(
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
             Text(
-                if (ask.isPending) {
-                    stringResource(R.string.game_ask_title)
-                } else {
-                    AgentAskLogic.statusText(ask).resolve()
+                when {
+                    ask.isPending && ask.isToolApproval -> stringResource(R.string.approval_title)
+                    ask.isPending -> stringResource(R.string.game_ask_title)
+                    ask.isToolApproval -> approvalStateLabel(ask)
+                    else -> AgentAskLogic.statusText(ask).resolve()
                 },
                 style = MaterialTheme.typography.titleSmall,
             )
+            // 工具审批（GAM-011）：questions 为空，决策在 approval 里；选项与 AGT-003 一致。
+            if (ask.isToolApproval) {
+                val approval = ask.approval
+                Text(
+                    "${stringResource(R.string.approval_label_tool)}: ${approval?.toolName.orEmpty()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                Text(
+                    "${stringResource(R.string.approval_label_mode)}: ${approvalModeLabel(approval?.mode)}" +
+                        " · ${approvalRiskLabel(approval?.risk)}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                AgentApprovalLogic.body(approval)?.let { body ->
+                    Text(
+                        body,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                AgentApprovalLogic.reason(approval?.ruleId).takeIf { it != ApprovalReason.GENERIC }?.let { reason ->
+                    Text(
+                        "${stringResource(R.string.approval_reason_label)}: ${approvalReasonLabel(reason)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                    )
+                }
+                if (ask.isPending) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        TextButton(onClick = onCancel, enabled = !busy) {
+                            Text(stringResource(R.string.common_cancel))
+                        }
+                        AgentApprovalLogic.options(approval).forEach { option ->
+                            TextButton(onClick = { onApprove(option) }, enabled = !busy) {
+                                Text(approvalOptionLabel(option))
+                            }
+                        }
+                    }
+                }
+                return@Column
+            }
             ask.questions.forEach { question ->
                 Text(
                     question.question,
@@ -1048,4 +1150,256 @@ private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifie
             )
         }
     }
+}
+
+/**
+ * 附件 / 配图 / 上下文压缩（GAM-016）。
+ *
+ * 三者都是「用户可见进度 + 结果 + 错误」的显式状态：附件读取与预算校验在前，
+ * 配图与压缩的命令 id 由 ViewModel 缓存（失败重试复用，成功后换新），
+ * 因此重复点击不会生成两个实体，也不会把 `skipped_reason` 当成成功。
+ */
+@Composable
+private fun GameMediaPanel(
+    media: GameMediaState,
+    latestTurnId: String?,
+    latestTurnNumber: Int?,
+    busy: Boolean,
+    imageUrl: String?,
+    imageLoader: ImageLoader?,
+    onPickAttachments: () -> Unit,
+    onRemoveAttachment: (Int) -> Unit,
+    onClearAttachments: () -> Unit,
+    onDismissError: () -> Unit,
+    onGenerateImage: (String) -> Unit,
+    onCompact: () -> Unit,
+    onRemoveCompaction: () -> Unit,
+) {
+    val idle = !busy && !media.compacting && !media.removingCompaction &&
+        media.generatingTurnId == null && !media.reading
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onPickAttachments, enabled = !media.reading && !busy) {
+                Text(stringResource(R.string.game_media_attach))
+            }
+            if (media.attachments.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.game_media_count, media.attachments.size, GameAttachmentLimits.MAX_FILES),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+                TextButton(onClick = onClearAttachments, enabled = idle) {
+                    Text(stringResource(R.string.game_media_clear))
+                }
+            }
+            TextButton(
+                onClick = { latestTurnId?.let(onGenerateImage) },
+                enabled = idle && latestTurnId != null,
+            ) {
+                Text(
+                    if (media.generatingTurnId != null) {
+                        stringResource(R.string.game_media_image_generating)
+                    } else {
+                        val suffix = latestTurnNumber?.let { " #$it" }.orEmpty()
+                        stringResource(R.string.game_media_image_generate) + suffix
+                    },
+                )
+            }
+            TextButton(onClick = onCompact, enabled = idle) {
+                Text(
+                    if (media.compacting) {
+                        stringResource(R.string.game_media_compacting)
+                    } else {
+                        stringResource(R.string.game_media_compact)
+                    },
+                )
+            }
+            TextButton(onClick = onRemoveCompaction, enabled = idle) {
+                Text(
+                    if (media.removingCompaction) {
+                        stringResource(R.string.game_media_compact_removing)
+                    } else {
+                        stringResource(R.string.game_media_compact_remove)
+                    },
+                )
+            }
+        }
+
+        if (media.attachments.isNotEmpty()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                itemsIndexed(
+                    items = media.attachments,
+                    key = { index, item -> "att-$index-${item.name}-${item.sizeBytes}" },
+                ) { index, item ->
+                    AssistChip(
+                        onClick = { onRemoveAttachment(index) },
+                        label = {
+                            Text(
+                                text = "${item.name} · ${formatAttachmentSize(item.sizeBytes)} ×",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.widthIn(max = 220.dp),
+                            )
+                        },
+                    )
+                }
+            }
+        }
+
+        if (media.reading) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                Text(
+                    stringResource(R.string.game_media_reading),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+            }
+        }
+        media.attachmentError?.let { error ->
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    error.resolve(),
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.weight(1f),
+                )
+                TextButton(onClick = onDismissError) { Text("×") }
+            }
+        }
+        if (media.generatingTurnId != null) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        media.imageNotices.values.lastOrNull()?.let { notice ->
+            Text(
+                notice.resolve(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        val imageAlt = stringResource(R.string.game_media_image_alt)
+        if (imageUrl != null && imageLoader != null) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current).data(imageUrl).build(),
+                imageLoader = imageLoader,
+                contentDescription = stringResource(R.string.game_media_image_alt),
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxWidth().height(180.dp).padding(vertical = 4.dp),
+            )
+            media.images.values.lastOrNull()?.let { image ->
+                Text(
+                    text = buildString {
+                        append(imageAlt)
+                        val model = image.model.ifBlank { image.provider }
+                        if (model.isNotBlank()) append(" · ").append(model)
+                        if (image.sizeBytes > 0) {
+                            append(" · ").append(formatAttachmentSize(image.sizeBytes))
+                        }
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                )
+            }
+        }
+        media.compactionNotice?.let { notice ->
+            Text(
+                notice.resolve(),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        media.compactionError?.let { error ->
+            Text(
+                error.resolve(),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+        media.compactionSummary?.takeIf { it.isNotBlank() }?.let { summary ->
+            Text(
+                stringResource(R.string.game_media_compact_summary, summary),
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** 审批选项文案（顺序由 [AgentApprovalLogic.options] 决定：拒绝 → 始终允许 → 允许本次）。 */
+@Composable
+private fun approvalOptionLabel(option: ApprovalOption): String = stringResource(
+    when (option) {
+        ApprovalOption.DENY -> R.string.approval_deny
+        ApprovalOption.ALLOW_WORKSPACE -> R.string.approval_allow_workspace
+        ApprovalOption.ALLOW_ONCE -> R.string.approval_allow_once
+    },
+)
+
+@Composable
+private fun approvalModeLabel(value: String?): String = stringResource(
+    when (AgentApprovalLogic.mode(value)) {
+        ApprovalMode.ASK -> R.string.approval_mode_ask
+        ApprovalMode.WRITE -> R.string.approval_mode_write
+        ApprovalMode.FULL_ACCESS -> R.string.approval_mode_full
+        ApprovalMode.UNKNOWN -> R.string.approval_mode_unknown
+    },
+)
+
+@Composable
+private fun approvalRiskLabel(value: String?): String = stringResource(
+    when (AgentApprovalLogic.risk(value)) {
+        ApprovalRisk.LOW -> R.string.approval_risk_low
+        ApprovalRisk.MEDIUM -> R.string.approval_risk_medium
+        ApprovalRisk.HIGH -> R.string.approval_risk_high
+        ApprovalRisk.CRITICAL -> R.string.approval_risk_critical
+        ApprovalRisk.UNKNOWN -> R.string.approval_risk_unknown
+    },
+)
+
+@Composable
+private fun approvalReasonLabel(reason: ApprovalReason): String = stringResource(
+    when (reason) {
+        ApprovalReason.WORKSPACE_UNAVAILABLE -> R.string.approval_reason_workspace_unavailable
+        ApprovalReason.INVALID_WORKSPACE_BOUNDARY -> R.string.approval_reason_invalid_boundary
+        ApprovalReason.BASH_PARSE_FAILED -> R.string.approval_reason_bash_parse_failed
+        ApprovalReason.BASH_DYNAMIC_SYNTAX -> R.string.approval_reason_bash_dynamic
+        ApprovalReason.BASH_UNLISTED_COMMAND -> R.string.approval_reason_bash_unlisted
+        ApprovalReason.BASH_UNCLASSIFIED -> R.string.approval_reason_bash_unclassified
+        ApprovalReason.PWSH_DYNAMIC_SYNTAX -> R.string.approval_reason_pwsh_dynamic
+        ApprovalReason.PWSH_PARSE_FAILED -> R.string.approval_reason_pwsh_parse_failed
+        ApprovalReason.PWSH_UNLISTED_COMMAND -> R.string.approval_reason_pwsh_unlisted
+        ApprovalReason.BROWSER_ARGUMENTS_UNKNOWN -> R.string.approval_reason_browser_args
+        ApprovalReason.BROWSER_REMOTE_MUTATION -> R.string.approval_reason_browser_mutation
+        ApprovalReason.BROWSER_COMMAND_UNKNOWN -> R.string.approval_reason_browser_command
+        ApprovalReason.BROWSER_ACTION_UNKNOWN -> R.string.approval_reason_browser_action
+        ApprovalReason.BROWSER_NETWORK_ACCESS -> R.string.approval_reason_browser_network
+        ApprovalReason.EXTERNAL_FILESYSTEM_READ -> R.string.approval_reason_external_fs
+        ApprovalReason.GENERIC -> R.string.approval_reason_generic
+    },
+)
+
+/** 已解决态：以用户实际选中的选项为先（服务端把「拒绝」记成 cancelled 但保留 answers）。 */
+@Composable
+private fun approvalStateLabel(ask: AgentAskInteraction): String {
+    val selected = ask.answers.flatMap { it.selectedOptions }.firstOrNull()?.id
+    return stringResource(
+        when (AgentApprovalLogic.state(ask.status, selected)) {
+            ApprovalState.WAITING -> R.string.approval_state_waiting
+            ApprovalState.ALLOWED -> R.string.approval_state_allowed
+            ApprovalState.ALLOWED_WORKSPACE -> R.string.approval_state_allowed_workspace
+            ApprovalState.DENIED -> R.string.approval_state_denied
+            ApprovalState.CANCELLED -> R.string.approval_state_cancelled
+        },
+    )
+}
+
+/** 附件 / 图片体积展示（1 KiB = 1024 B，与服务端上限口径一致）。 */
+private fun formatAttachmentSize(bytes: Long): String = when {
+    bytes >= 1024 * 1024 -> String.format(Locale.US, "%.1f MiB", bytes / 1024.0 / 1024.0)
+    bytes >= 1024 -> String.format(Locale.US, "%.0f KiB", bytes / 1024.0)
+    else -> "$bytes B"
 }

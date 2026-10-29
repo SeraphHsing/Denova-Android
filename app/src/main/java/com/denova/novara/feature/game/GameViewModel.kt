@@ -4,12 +4,17 @@ import com.denova.novara.R
 import com.denova.novara.core.i18n.UiText
 
 import android.app.Application
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.denova.novara.core.command.CommandRecord
 import com.denova.novara.core.command.CommandStatus
 import com.denova.novara.NovaraApplication
 import com.denova.novara.core.command.CommandStore
+import com.denova.novara.core.game.GameAttachmentLimits
+import com.denova.novara.core.game.GameAttachmentRead
+import com.denova.novara.core.game.GameAttachmentReader
+import com.denova.novara.core.game.PendingAttachment
 import com.denova.novara.core.game.StoryCreation
 import com.denova.novara.core.game.StoryCreationForm
 import com.denova.novara.core.game.StoryCreationIssue
@@ -19,11 +24,14 @@ import com.denova.novara.core.game.StoryLedger
 import com.denova.novara.core.game.StoryLibrary
 import com.denova.novara.core.game.StoryStateLedgerBuilder
 import com.denova.novara.core.logging.DenovaLog
+import com.denova.novara.core.network.ContextCompactionRequest
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.BranchPlan
 import com.denova.novara.core.network.BranchSummary
 import com.denova.novara.core.network.DenovaApiException
 import com.denova.novara.core.network.GameCommandRequest
+import com.denova.novara.core.network.GenerateInteractiveImageRequest
+import com.denova.novara.core.network.InteractiveImage
 import com.denova.novara.core.network.SendInteractiveChatRequest
 import com.denova.novara.core.network.StorySummary
 import com.denova.novara.core.stream.StoryPaging
@@ -39,8 +47,13 @@ import com.denova.novara.core.stream.GameStageState
 import com.denova.novara.core.stream.GameStreamError
 import com.denova.novara.core.stream.GameStreamEvent
 import com.denova.novara.core.stream.DrawLatencyMeter
+import com.denova.novara.core.stream.AgentApprovalLogic
+import com.denova.novara.core.stream.AgentAskAnswer
+import com.denova.novara.core.stream.AgentAskAnswerResult
 import com.denova.novara.core.stream.AgentAskInteraction
+import com.denova.novara.core.stream.AgentAskSelectedOption
 import com.denova.novara.core.stream.AgentAskLogic
+import com.denova.novara.core.stream.ApprovalOption
 import com.denova.novara.core.stream.GameStreamRecoveryCoordinator
 import com.denova.novara.core.stream.NarrativeBuilder
 import com.denova.novara.core.stream.RehydrateRequest
@@ -93,6 +106,8 @@ private const val FULL_BASELINE_TURNS = 20
 data class GameUiState(
     val storyId: String = "",
     val branchId: String = "",
+    /** 故事所属服务端项目（`GET /api/workspace/current`）；配图走项目资源接口需要它。 */
+    val projectId: String = "",
     val stage: GameStageState = GameStageState(),
     /** canonical 历史叙事基线（挂接前/重取时加载）。 */
     val baseline: String = "",
@@ -144,6 +159,31 @@ data class StoryLibraryState(
     val error: UiText? = null,
 )
 
+/**
+ * 配图与上下文状态（P4-A / GAM-016）。
+ *
+ * 附件随输入一次性发送（服务端不落独立上传接口）；配图与压缩都是「命令 + 幂等键」，
+ * 失败保留命令 id 供重试，成功后清空，因此重复点击不会产生两个实体。
+ */
+data class GameMediaState(
+    val attachments: List<PendingAttachment> = emptyList(),
+    val reading: Boolean = false,
+    val attachmentError: UiText? = null,
+    /** 正在生成配图的那一轮；null 表示空闲。 */
+    val generatingTurnId: String? = null,
+    /** turnId → 已生成的图片（本次会话内）。 */
+    val images: Map<String, InteractiveImage> = emptyMap(),
+    /** turnId → 最近一次生成失败 / 跳过的原因。 */
+    val imageNotices: Map<String, UiText> = emptyMap(),
+    val compacting: Boolean = false,
+    val removingCompaction: Boolean = false,
+    /** 压缩 / 移除的结果提示（成功）。 */
+    val compactionNotice: UiText? = null,
+    val compactionError: UiText? = null,
+    /** 服务端返回的压缩摘要（原生引擎才给）。 */
+    val compactionSummary: String? = null,
+)
+
 /** 新建故事对话框状态（P4-A / GAM-001）：表单 + 资源目录 + 提交态。 */
 data class StoryCreationState(
     val visible: Boolean = false,
@@ -186,6 +226,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
+
+    /** 配图 / 附件 / 上下文压缩（GAM-016）。 */
+    private val _media = MutableStateFlow(GameMediaState())
+    val media: StateFlow<GameMediaState> = _media.asStateFlow()
+
+    private val attachmentReader by lazy { GameAttachmentReader(getApplication()) }
+
+    /** 配图幂等键按轮次缓存：失败重试复用，成功后清空（再次点击才是新的生成命令）。 */
+    private val imageCommandIds = mutableMapOf<String, String>()
+    private var compactCommandId: String? = null
+    private var removeCompactionCommandId: String? = null
+
+    /** 当前工作区项目标识（配图资源 URL 用；与外壳的 `currentProjectId` 独立）。 */
+    private var workspaceProjectId = ""
 
     /** 故事库：进入游戏页时加载；切换 / 改名 / 删除成功后按服务端结果更新。 */
     private val _library = MutableStateFlow(StoryLibraryState())
@@ -241,8 +295,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 挂接时探测一次 active：流不会重放 `suspended` 历史，重启后必须靠投影恢复
-     * 「已暂停 / 有待续接输入」的入口，否则用户既续接不了、也放弃不了，新发送还会被服务端拒绝。
+     * 挂接时探测一次 active：流不会重放 `suspended` / `ask_pending` 历史，重启后必须靠投影恢复
+     * 「已暂停 / 有待续接输入 / 待回答提问」的入口，否则用户既续接不了、也放弃不了，新发送还会被服务端拒绝。
      */
     private fun probeActivePhase() {
         val client = client ?: return
@@ -264,12 +318,50 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 active.phase == "suspended" -> GameStageState(phase = GamePhase.SUSPENDED)
                 else -> _uiState.value.stage
             }
-            _uiState.value = _uiState.value.copy(stage = stage, pendingInterruptionId = pending)
+            // GAM-011：重连不重放 ask_pending，仍待回答的提问只能由 active 投影恢复；
+            // 已解决（服务端无 pending_ask）时保留本地已解决卡片，不把答案抹掉。
+            val pendingAsk = active.pendingAsk?.takeIf { it.isPending }
+            val ask = pendingAsk?.let { AgentAskLogic.merge(_uiState.value.ask, it) } ?: _uiState.value.ask
+            _uiState.value = _uiState.value.copy(
+                stage = stage,
+                pendingInterruptionId = pending,
+                ask = ask,
+            )
             DenovaLog.i(
                 "Game",
                 "active probe active=${active.active} phase=${active.phase} pending=${pending != null} " +
-                    "actions=${active.recoveryActions.map { it.kind }}",
+                    "ask=${pendingAsk?.id} actions=${active.recoveryActions.map { it.kind }}",
             )
+        }
+    }
+
+    /**
+     * 故事所属项目：配图是项目受保护资源（`/api/projects/:id/files/asset`），
+     * 外壳的 `currentProjectId` 在冷启动时可能为空（只有切书或手动填 ID 才更新），
+     * 因此这里以服务端 `GET /api/workspace/current` 为准，避免图片 URL 缺项目作用域。
+     */
+    private fun loadWorkspaceProject() {
+        if (workspaceProjectId.isNotBlank()) {
+            if (_uiState.value.projectId != workspaceProjectId) {
+                _uiState.value = _uiState.value.copy(projectId = workspaceProjectId)
+            }
+            return
+        }
+        val client = client ?: return
+        val storyId = _uiState.value.storyId
+        viewModelScope.launch {
+            val projectId = try {
+                client.currentWorkspace().projectId
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "workspace probe failed", e)
+                return@launch
+            }
+            if (projectId.isBlank() || _uiState.value.storyId != storyId) return@launch
+            workspaceProjectId = projectId
+            _uiState.value = _uiState.value.copy(projectId = projectId)
+            DenovaLog.i("Game", "workspace project=$projectId")
         }
     }
 
@@ -360,14 +452,40 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 回答提问：只提交已作答的问题；`ask_stale` 时刷新投影而不是重试。 */
     fun answerAsk(selected: Map<String, List<String>>) {
+        val ask = _uiState.value.ask ?: return
+        if (!AgentAskLogic.canSubmit(ask, selected)) return
+        submitAsk(ask, AgentAskLogic.answers(ask, selected))
+    }
+
+    /**
+     * 审批工具调用（GAM-011，沿用 AGT-003 契约）：审批类 ask 的 `questions` 为空，
+     * 决策在 `approval` 里，答案体固定 `question_id=tool-approval`；
+     * 客户端不自行记忆规则，`allow-workspace` 只按服务端给出的可记忆标记提供。
+     */
+    fun approveAsk(option: ApprovalOption) {
+        val ask = _uiState.value.ask ?: return
+        if (!ask.isToolApproval || !ask.isPending) return
+        if (option == ApprovalOption.ALLOW_WORKSPACE && !AgentApprovalLogic.canAlwaysAllow(ask.approval)) {
+            // 服务端没允许记忆时不要发这个选项，避免请求被拒后状态不明。
+            DenovaLog.w("Game", "approve ignored: workspace scope not allowed id=${ask.id}")
+            _uiState.value = _uiState.value.copy(runtimeError = UiText.of(R.string.agent_remember_not_allowed))
+            return
+        }
+        submitAsk(ask, listOf(AgentApprovalLogic.answer(option)), option)
+    }
+
+    private fun submitAsk(
+        ask: AgentAskInteraction,
+        answers: List<AgentAskAnswer>,
+        approvalOption: ApprovalOption? = null,
+    ) {
         val client = client ?: return
         val state = _uiState.value
-        val ask = state.ask ?: return
-        if (!AgentAskLogic.canSubmit(ask, selected) || state.runtimeBusy) return
+        if (state.runtimeBusy) return
         _uiState.value = state.copy(runtimeBusy = true, runtimeError = null)
         viewModelScope.launch {
             val resolution = try {
-                client.answerInteractiveAsk(state.storyId, state.branchId, ask.id, AgentAskLogic.answers(ask, selected))
+                client.answerInteractiveAsk(state.storyId, state.branchId, ask.id, answers)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: DenovaApiException) {
@@ -386,11 +504,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 return@launch
             }
-            _uiState.value = _uiState.value.copy(
-                runtimeBusy = false,
-                ask = AgentAskLogic.applyResolution(ask, resolution),
+            val resolved = AgentAskLogic.applyResolution(ask, resolution)
+            // 审批类 ask 的 `questions` 为空，服务端 resolution 不会回 `selected_options`；
+            // 用本地实际提交的选项补齐展示态，避免把「允许本次」显示成「已拒绝」。
+            val withChoice = if (approvalOption != null && resolved.answers.isEmpty()) {
+                resolved.copy(
+                    answers = listOf(
+                        AgentAskAnswerResult(
+                            questionId = AgentApprovalLogic.QUESTION_ID,
+                            selectedOptions = listOf(
+                                AgentAskSelectedOption(approvalOption.wireId, approvalOption.wireId),
+                            ),
+                        ),
+                    ),
+                )
+            } else {
+                resolved
+            }
+            _uiState.value = _uiState.value.copy(runtimeBusy = false, ask = withChoice)
+            DenovaLog.i(
+                "Game",
+                "ask resolved id=${ask.id} status=${resolution.status} option=${approvalOption?.wireId}",
             )
-            DenovaLog.i("Game", "ask resolved id=${ask.id} status=${resolution.status}")
         }
     }
 
@@ -566,6 +701,258 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             _uiState.value = _uiState.value.copy(runtimeBusy = false, stage = GameStageState())
             refreshSnapshot()
         }
+    }
+
+    // ---- 附件 / 配图 / 上下文压缩（P4-A / GAM-016）----
+
+    /**
+     * 加入附件（GAM-016）：先按服务端上限（10 / 20MiB / 50MiB）校验，
+     * 再读成 `data_url` 随下一次输入发送；超限只提示，不发注定被拒的请求。
+     */
+    fun addAttachments(uris: List<Uri>) {
+        if (uris.isEmpty() || _media.value.reading) return
+        _media.value = _media.value.copy(reading = true, attachmentError = null)
+        viewModelScope.launch {
+            val accepted = _media.value.attachments.toMutableList()
+            var total = accepted.sumOf { it.sizeBytes }
+            var errorRes: Int? = null
+            for (uri in uris) {
+                when (val read = attachmentReader.read(uri)) {
+                    is GameAttachmentRead.Ok -> {
+                        val reject = GameAttachmentLimits.reject(accepted.size, total, read.attachment.sizeBytes)
+                        if (reject != null) {
+                            errorRes = reject.messageRes()
+                            DenovaLog.w("Game", "attachment rejected reason=$reject name=${read.attachment.name}")
+                            continue
+                        }
+                        accepted += read.attachment
+                        total += read.attachment.sizeBytes
+                        DenovaLog.i(
+                            "Game",
+                            "attachment added name=${read.attachment.name} bytes=${read.attachment.sizeBytes} " +
+                                "total=${accepted.size}",
+                        )
+                    }
+
+                    is GameAttachmentRead.Rejected -> {
+                        errorRes = read.reason.messageRes()
+                        DenovaLog.w("Game", "attachment unreadable name=${read.name} reason=${read.reason}")
+                    }
+                }
+            }
+            _media.value = _media.value.copy(
+                attachments = accepted.toList(),
+                reading = false,
+                attachmentError = errorRes?.let { UiText.of(it) },
+            )
+        }
+    }
+
+    fun removeAttachment(index: Int) {
+        val items = _media.value.attachments
+        if (index !in items.indices) return
+        _media.value = _media.value.copy(
+            attachments = items.filterIndexed { position, _ -> position != index },
+            attachmentError = null,
+        )
+    }
+
+    fun clearAttachments() {
+        if (_media.value.attachments.isEmpty()) return
+        _media.value = _media.value.copy(attachments = emptyList(), attachmentError = null)
+    }
+
+    fun dismissMediaError() {
+        if (_media.value.attachmentError != null) {
+            _media.value = _media.value.copy(attachmentError = null)
+        }
+    }
+
+    /**
+     * 生成某轮配图（GAM-016）：`turn_id` 缺省取最后一轮。
+     *
+     * 命令身份按轮次缓存——失败重试复用同一 `command_id`（服务端按它幂等回放），
+     * 只有成功后才清空，因此「再点一次」才是新的生成命令（`force=true` 覆盖该轮既有图片）。
+     * `manual_mode` / `already_exists` 一类跳过原因必须原样呈现，不能当成成功。
+     */
+    fun generateImage(turnId: String) {
+        val client = client ?: return
+        val state = _uiState.value
+        val target = turnId.ifBlank { loadedTurns.lastOrNull()?.id.orEmpty() }
+        if (state.storyId.isBlank() || target.isBlank() || _media.value.generatingTurnId != null) return
+        val commandId = imageCommandIds.getOrPut(target) { UUID.randomUUID().toString() }
+        _media.value = _media.value.copy(
+            generatingTurnId = target,
+            imageNotices = _media.value.imageNotices - target,
+        )
+        viewModelScope.launch {
+            val result = try {
+                client.generateInteractiveImage(
+                    state.storyId,
+                    GenerateInteractiveImageRequest(
+                        commandId = commandId,
+                        branchId = state.branchId,
+                        turnId = target,
+                        source = GenerateInteractiveImageRequest.SOURCE_MANUAL,
+                        force = true,
+                    ),
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: DenovaApiException) {
+                // 明确 4xx：该命令不会被接受，换新的命令 id 才能重试。
+                DenovaLog.w("Game", "image generate rejected code=${e.code} status=${e.status}")
+                imageCommandIds.remove(target)
+                val notice = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.game_media_image_failed)
+                _media.value = _media.value.copy(
+                    generatingTurnId = null,
+                    imageNotices = _media.value.imageNotices + (target to notice),
+                )
+                return@launch
+            } catch (e: Exception) {
+                // 结果未知（网络中断）：保留命令 id，重试由服务端幂等去重。
+                DenovaLog.w("Game", "image generate uncertain", e)
+                // 传输层异常（超时 / 断网）只给可重试提示：命令 id 已保留，再点一次由服务端幂等去重。
+                _media.value = _media.value.copy(
+                    generatingTurnId = null,
+                    imageNotices = _media.value.imageNotices + (target to UiText.of(R.string.game_media_image_failed)),
+                )
+                return@launch
+            }
+            imageCommandIds.remove(target)
+            val image = result.image
+            if (result.skipped || image == null) {
+                val reason = result.skippedReason
+                DenovaLog.i("Game", "image skipped turn=$target reason=$reason enabled=${result.enabled}")
+                _media.value = _media.value.copy(
+                    generatingTurnId = null,
+                    imageNotices = _media.value.imageNotices + (target to imageSkipNotice(reason)),
+                )
+                return@launch
+            }
+            DenovaLog.i(
+                "Game",
+                "image generated turn=$target path=${image.imagePath} bytes=${image.sizeBytes} " +
+                    "branch=${image.branchId}",
+            )
+            _media.value = _media.value.copy(
+                generatingTurnId = null,
+                images = _media.value.images + (target to image),
+            )
+        }
+    }
+
+    /**
+     * 压缩当前分支上下文（GAM-016）：服务端会先 drain 活动 task，运行中调用等于中止当前回合，
+     * 因此 UI 只在空闲时开放入口，这里再挡一次。
+     */
+    fun compactContext() {
+        val client = client ?: return
+        val state = _uiState.value
+        val media = _media.value
+        if (state.storyId.isBlank() || media.compacting || media.removingCompaction) return
+        if (state.stage.phase == GamePhase.RUNNING || state.sending) return
+        val commandId = compactCommandId ?: UUID.randomUUID().toString().also { compactCommandId = it }
+        _media.value = media.copy(compacting = true, compactionError = null, compactionNotice = null)
+        viewModelScope.launch {
+            val result = try {
+                client.compactInteractiveContext(
+                    state.storyId,
+                    ContextCompactionRequest(commandId = commandId, branchId = state.branchId),
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: DenovaApiException) {
+                DenovaLog.w("Game", "compact rejected code=${e.code} status=${e.status}")
+                if (e.status in 400..499) compactCommandId = null
+                _media.value = _media.value.copy(
+                    compacting = false,
+                    compactionError = UiText.of(R.string.game_media_compact_failed),
+                )
+                return@launch
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "compact uncertain", e)
+                _media.value = _media.value.copy(
+                    compacting = false,
+                    compactionError = UiText.of(R.string.game_media_compact_failed),
+                )
+                return@launch
+            }
+            compactCommandId = null
+            val notice = when {
+                result.triggered && result.tokensBefore != null && result.tokensAfter != null -> UiText.of(
+                    R.string.game_media_compact_done,
+                    result.tokensBefore,
+                    result.tokensAfter,
+                )
+
+                result.triggered -> UiText.of(R.string.game_media_compact_triggered)
+                else -> UiText.raw(result.skippedReason ?: "")
+            }
+            DenovaLog.i(
+                "Game",
+                "compact triggered=${result.triggered} managed=${result.runtimeManaged} " +
+                    "tokens=${result.tokensBefore}->${result.tokensAfter} revision=${result.revision}",
+            )
+            _media.value = _media.value.copy(
+                compacting = false,
+                compactionNotice = notice,
+                compactionSummary = result.summary,
+            )
+            refreshSnapshot()
+        }
+    }
+
+    /** 移除当前分支的活动压缩点（GAM-016）；没有压缩点时如实提示，不当作成功。 */
+    fun removeCompaction() {
+        val client = client ?: return
+        val state = _uiState.value
+        val media = _media.value
+        if (state.storyId.isBlank() || media.compacting || media.removingCompaction) return
+        val commandId = removeCompactionCommandId ?: UUID.randomUUID().toString().also {
+            removeCompactionCommandId = it
+        }
+        _media.value = media.copy(removingCompaction = true, compactionError = null, compactionNotice = null)
+        viewModelScope.launch {
+            val result = try {
+                client.removeInteractiveContextCompaction(state.storyId, state.branchId, commandId)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                DenovaLog.w("Game", "remove compaction failed", e)
+                _media.value = _media.value.copy(
+                    removingCompaction = false,
+                    compactionError = UiText.of(R.string.game_media_compact_failed),
+                )
+                return@launch
+            }
+            removeCompactionCommandId = null
+            DenovaLog.i("Game", "compaction removed=${result.removed}")
+            _media.value = _media.value.copy(
+                removingCompaction = false,
+                compactionNotice = UiText.of(
+                    if (result.removed) R.string.game_media_compact_removed else R.string.game_media_compact_none,
+                ),
+                compactionSummary = null,
+            )
+            refreshSnapshot()
+        }
+    }
+
+    private fun imageSkipNotice(reason: String?): UiText = when (reason) {
+        "manual_mode" -> UiText.of(R.string.game_media_image_skip_manual)
+        "already_exists" -> UiText.of(R.string.game_media_image_skip_exists)
+        "interval" -> UiText.of(R.string.game_media_image_skip_interval)
+        "disabled" -> UiText.of(R.string.game_media_image_skip_disabled)
+        "turn_not_found" -> UiText.of(R.string.game_media_image_skip_turn)
+        else -> UiText.raw(reason ?: "")
+    }
+
+    private fun com.denova.novara.core.game.AttachmentReject.messageRes(): Int = when (this) {
+        com.denova.novara.core.game.AttachmentReject.TOO_MANY -> R.string.game_media_err_too_many
+        com.denova.novara.core.game.AttachmentReject.FILE_TOO_LARGE -> R.string.game_media_err_file_large
+        com.denova.novara.core.game.AttachmentReject.TOTAL_TOO_LARGE -> R.string.game_media_err_total_large
+        com.denova.novara.core.game.AttachmentReject.UNREADABLE -> R.string.game_media_err_unreadable
     }
 
     fun dismissRuntimeError() {
@@ -1079,6 +1466,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _blocks.value = emptyList()
         resetPerfCounters()
         _uiState.value = GameUiState(storyId = storyId, branchId = branchId)
+        // 旧故事的附件、配图与压缩提示不得残留到新故事（GAM-016 作用域隔离）。
+        _media.value = GameMediaState()
+        imageCommandIds.clear()
+        compactCommandId = null
+        removeCompactionCommandId = null
         // 旧故事的台账、行动选项与分页状态不得残留到新故事。
         _ledger.value = StoryLedger()
         loadedTurns = emptyList()
@@ -1086,6 +1478,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         historyHasMore = false
         pendingRegeneration = false
         probeActivePhase()
+        loadWorkspaceProject()
         refreshSnapshot()
         streamJob?.cancel()
         streamJob = viewModelScope.launch {
@@ -1128,10 +1521,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         regenerateFromTurnId: String? = null,
         resumeInterruptionId: String? = null,
         startOpening: Boolean = false,
+        attachments: List<PendingAttachment> = emptyList(),
     ) {
         val client = client ?: return
         val text = message.trim()
-        if ((!startOpening && text.isEmpty()) || storyId.isBlank()) return
+        // 附件可以单独成条（服务端要求 message 与 attachments 至少一个）。
+        if (!startOpening && text.isEmpty() && attachments.isEmpty()) return
+        if (storyId.isBlank()) return
         val commandId = UUID.randomUUID().toString()
         val request = SendInteractiveChatRequest(
             commandId = commandId,
@@ -1141,6 +1537,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             startOpening = if (startOpening) true else null,
             regenerateFromTurnId = regenerateFromTurnId,
             resumeInterruptionId = resumeInterruptionId,
+            attachments = attachments.map { it.toUpload() }.takeIf { it.isNotEmpty() },
         )
         val record = CommandRecord(
             commandId = commandId,
@@ -1218,7 +1615,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     fun sendCurrent(message: String) {
         val state = _uiState.value
         if (state.storyId.isBlank()) return
-        send(state.storyId, state.branchId.ifBlank { DEFAULT_BRANCH }, message)
+        val attachments = _media.value.attachments
+        if (GameAttachmentLimits.isEmptyInput(message, attachments.size)) return
+        // 服务端把「空正文 + 附件」判为 `player input is empty`（2026-10-29 实测流 error），
+        // 先在本地拦下并给出原因，避免发注定失败的回合，也不清空已选附件。
+        if (GameAttachmentLimits.requiresText(message, attachments.size)) {
+            _media.value = _media.value.copy(attachmentError = UiText.of(R.string.game_media_text_required))
+            return
+        }
+        send(
+            storyId = state.storyId,
+            branchId = state.branchId.ifBlank { DEFAULT_BRANCH },
+            message = message,
+            attachments = attachments,
+        )
+        // 命令已带附件落库，界面上的待发送列表随之清空（重试走命令身份，不重读文件）。
+        if (attachments.isNotEmpty()) clearAttachments()
     }
 
     fun stop() {

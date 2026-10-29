@@ -66,6 +66,11 @@ fun GameConsoleContent(
     onSwitchVersion: (String, Int) -> Unit,
     onRegenerate: (String) -> Unit,
     onEditTurn: (String) -> Unit,
+    /** 生成该轮配图（GAM-016）；幂等键由 ViewModel 按轮次管理。 */
+    onGenerateImage: (String) -> Unit,
+    /** 本次会话内已配图的轮次（按钮显示为「重新配图」）。 */
+    imageTurnIds: Set<String>,
+    imageBusyTurnId: String?,
     editingTurnId: String?,
     editingNarrative: String?,
     editingBusy: Boolean,
@@ -207,6 +212,22 @@ fun GameConsoleContent(
                                 }
                                 TextButton(onClick = { onEditTurn(anchor.turnId) }, enabled = !branchBusy) {
                                     Text(stringResource(R.string.game_turn_edit))
+                                }
+                                TextButton(
+                                    onClick = { onGenerateImage(anchor.turnId) },
+                                    enabled = !branchBusy && imageBusyTurnId == null,
+                                ) {
+                                    Text(
+                                        when {
+                                            imageBusyTurnId == anchor.turnId ->
+                                                stringResource(R.string.game_media_image_generating)
+
+                                            anchor.turnId in imageTurnIds ->
+                                                stringResource(R.string.game_media_image_regenerate)
+
+                                            else -> stringResource(R.string.game_media_image_generate)
+                                        },
+                                    )
                                 }
                             }
                         }

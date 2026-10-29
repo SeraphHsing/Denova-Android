@@ -121,6 +121,8 @@ data class SendInteractiveChatRequest(
     @SerialName("regenerate_from_turn_id") val regenerateFromTurnId: String? = null,
     /** 续接挂起的输入（GAM-012）：来自 active 投影的 `pending_interruption_id`。 */
     @SerialName("resume_interruption_id") val resumeInterruptionId: String? = null,
+    /** 随输入发送的附件（GAM-016）；服务端限制 10 个 / 单个 20MiB / 合计 50MiB。 */
+    val attachments: List<ChatAttachmentUpload>? = null,
 )
 
 /**
@@ -323,6 +325,18 @@ class DenovaClient(
         okHttpClient.newBuilder()
             .readTimeout(180, TimeUnit.SECONDS)
             .callTimeout(240, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /**
+     * 互动配图与上下文压缩专用：生图是同步长任务（实测 >30s），
+     * 普通 30s 读超时会把「已开始生成」误判为失败；请求本身带 command_id 幂等，
+     * 因此这里只放宽等待，不改重试语义。
+     */
+    private val mediaHttpClient: OkHttpClient by lazy {
+        okHttpClient.newBuilder()
+            .readTimeout(300, TimeUnit.SECONDS)
+            .callTimeout(360, TimeUnit.SECONDS)
             .build()
     }
 
@@ -1287,6 +1301,72 @@ class DenovaClient(
         withContext(Dispatchers.IO) {
             okHttpClient.newCall(request).execute().use { resp ->
                 if (!resp.isSuccessful) throw toException(resp.code, resp.body?.string().orEmpty())
+            }
+        }
+    }
+
+    // ---- 配图与上下文压缩（P4-A / GAM-016）----
+
+    /**
+     * 生成某轮配图：`POST /api/interactive/stories/:id/images/generate`。
+     * `command_id` 是幂等键（事件 id 由它派生），重试必须复用同一个值。
+     */
+    suspend fun generateInteractiveImage(
+        storyId: String,
+        request: GenerateInteractiveImageRequest,
+    ): GenerateInteractiveImageResult {
+        val body = json.encodeToString(GenerateInteractiveImageRequest.serializer(), request)
+        val httpRequest = Request.Builder()
+            .url(interactiveStoryUrl(storyId, "images/generate"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            mediaHttpClient.newCall(httpRequest).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(GenerateInteractiveImageResult.serializer(), text)
+            }
+        }
+    }
+
+    /**
+     * 压缩当前分支上下文：`POST .../context-compaction`。
+     * 服务端会先 drain 该分支的活动 task（运行中调用等于中止当前回合），因此只在空闲时发。
+     */
+    suspend fun compactInteractiveContext(
+        storyId: String,
+        request: ContextCompactionRequest,
+    ): ContextCompactionResult {
+        val body = json.encodeToString(ContextCompactionRequest.serializer(), request)
+        val httpRequest = Request.Builder()
+            .url(interactiveStoryUrl(storyId, "context-compaction"))
+            .post(body.toRequestBody(jsonMediaType))
+            .build()
+        return withContext(Dispatchers.IO) {
+            mediaHttpClient.newCall(httpRequest).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(ContextCompactionResult.serializer(), text)
+            }
+        }
+    }
+
+    /** 移除当前分支活动压缩点：`DELETE .../context-compaction/active?command_id=&branch=`。 */
+    suspend fun removeInteractiveContextCompaction(
+        storyId: String,
+        branchId: String,
+        commandId: String,
+    ): RemoveCompactionResult {
+        val url = interactiveStoryUrl(storyId, "context-compaction/active").newBuilder()
+            .addQueryParameter("command_id", commandId)
+            .apply { if (branchId.isNotBlank()) addQueryParameter("branch", branchId) }
+            .build()
+        val httpRequest = Request.Builder().url(url).delete().build()
+        return withContext(Dispatchers.IO) {
+            mediaHttpClient.newCall(httpRequest).execute().use { resp ->
+                val text = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) throw toException(resp.code, text)
+                json.decodeFromString(RemoveCompactionResult.serializer(), text)
             }
         }
     }

@@ -906,7 +906,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
                     "Agent",
                     "approval resolved id=$askId option=${option.wireId} status=${resolution.status}",
                 )
-                applyAskResolution(ask, resolution)
+                applyAskResolution(ask, resolution, option)
             } catch (e: DenovaApiException) {
                 DenovaLog.w("Agent", "approval failed id=$askId code=${e.code} status=${e.status}")
                 _state.value = _state.value.copy(askError = AgentAskLogic.askError(e.code, e.message))
@@ -984,8 +984,31 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /** 落定一次回答/取消：从待答列表移除、记入已解决，并以 active 投影校正。 */
-    private fun applyAskResolution(ask: AgentAskInteraction, resolution: AgentAskResolution) {
-        val resolved = AgentAskLogic.applyResolution(ask, resolution)
+    private fun applyAskResolution(
+        ask: AgentAskInteraction,
+        resolution: AgentAskResolution,
+        approvalOption: ApprovalOption? = null,
+    ) {
+        val base = AgentAskLogic.applyResolution(ask, resolution)
+        // 审批类 ask 的 `questions` 为空，服务端 resolution 不回 `selected_options`；
+        // 用本地实际提交的选项补齐，避免把「允许本次」显示成「已拒绝」（与游戏侧同一缺陷）。
+        val resolved = if (approvalOption != null && base.answers.isEmpty()) {
+            base.copy(
+                answers = listOf(
+                    com.denova.novara.core.stream.AgentAskAnswerResult(
+                        questionId = AgentApprovalLogic.QUESTION_ID,
+                        selectedOptions = listOf(
+                            com.denova.novara.core.stream.AgentAskSelectedOption(
+                                approvalOption.wireId,
+                                approvalOption.wireId,
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        } else {
+            base
+        }
         val state = _state.value
         _state.value = state.copy(
             pendingAsks = state.pendingAsks.filterNot { it.id == ask.id },

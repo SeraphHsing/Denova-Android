@@ -49,6 +49,11 @@ data class GameActiveView(
     @SerialName("branch_id") val branchId: String? = null,
     val message: String? = null,
     @SerialName("pending_interruption_id") val pendingInterruptionId: String? = null,
+    /**
+     * 仍待回答的提问（GAM-011）。流不会在重连时重放 `ask_pending`，页面恢复只能靠这个投影，
+     * 否则「同一待处理事项持续存在」不成立。
+     */
+    @SerialName("pending_ask") val pendingAsk: AgentAskInteraction? = null,
     @SerialName("regenerate_from_turn_id") val regenerateFromTurnId: String? = null,
     @SerialName("runtime_recoverable") val runtimeRecoverable: Boolean = false,
     @SerialName("recovery_paused") val recoveryPaused: Boolean = false,
