@@ -22,6 +22,7 @@
 | 06 | [开发、测试与交付](android-web-parity/06-development-and-validation.md) | 测试数据、恢复组合、双端对照、CI、APK 与发布候选 |
 | 07 | [证据、决策与待验证事项](android-web-parity/07-evidence-and-decisions.md) | 固定源码索引、ADR、风险、平台差异和官方依据 |
 | 08 | [页面/表面全量清单](android-web-parity/08-surface-inventory.md) | 顶层表面、子表面、条件入口与 API 族映射（P0-03 静态盘点） |
+| 09 | [视觉与交互差异清单](android-web-parity/09-visual-gap-backlog.md) | 已核对但未对齐的视觉/交互差异，P5 逐屏修正的输入 |
 
 ## 3. 验收矩阵与数据清单
 

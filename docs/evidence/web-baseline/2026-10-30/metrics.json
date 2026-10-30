@@ -1,0 +1,2249 @@
+{
+  "workspace-390": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 48,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(247, 247, 244)"
+    },
+    "sheet": null,
+    "sheetHeader": null,
+    "sheetTitle": null,
+    "sectionLabel": null,
+    "navIcon": null,
+    "rowIcon": null,
+    "navRow": null,
+    "creationRow": null,
+    "navRows": [],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令"
+  },
+  "drawer-390": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 48,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(247, 247, 244)"
+    },
+    "sheet": {
+      "x": 0,
+      "y": 0,
+      "w": 358,
+      "h": 844,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px 24px 24px 0px",
+      "border-top-width": "0px",
+      "padding-left": "0px",
+      "padding-right": "0px",
+      "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px",
+      "font-size": "16px",
+      "font-weight": "400",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.985 0 0)"
+    },
+    "sheetHeader": {
+      "x": 0,
+      "y": 0,
+      "w": 357,
+      "h": 56,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(189, 189, 184)"
+    },
+    "sheetTitle": {
+      "font-size": "17px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "-0.425px",
+      "color": "oklch(0.985 0 0)"
+    },
+    "sectionLabel": {
+      "x": 28,
+      "y": 64,
+      "w": 313,
+      "h": 22,
+      "font-size": "12px",
+      "font-weight": "500",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "rgb(189, 189, 184)"
+    },
+    "navIcon": {
+      "x": 30,
+      "y": 265,
+      "w": 22,
+      "h": 24,
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.205 0 0)"
+    },
+    "rowIcon": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "navRow": {
+      "x": 16,
+      "y": 248,
+      "w": 157.5,
+      "h": 58,
+      "background-color": "oklch(0.922 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none",
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.205 0 0)"
+    },
+    "creationRow": {
+      "x": 16,
+      "y": 248,
+      "w": 157.5,
+      "h": 58,
+      "background-color": "oklch(0.922 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none"
+    },
+    "navRows": [
+      {
+        "label": "写作",
+        "current": true,
+        "x": 16,
+        "y": 248,
+        "w": 157.5,
+        "h": 58
+      },
+      {
+        "label": "游戏",
+        "current": false,
+        "x": 183.5,
+        "y": 248,
+        "w": 157.5,
+        "h": 58
+      },
+      {
+        "label": "工作台",
+        "current": false,
+        "x": 16,
+        "y": 356,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "资料库",
+        "current": false,
+        "x": 16,
+        "y": 408,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "创作方案",
+        "current": false,
+        "x": 16,
+        "y": 460,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "版本管理",
+        "current": false,
+        "x": 16,
+        "y": 512,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "书籍管理",
+        "current": false,
+        "x": 16,
+        "y": 564,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "Skills",
+        "current": false,
+        "x": 16,
+        "y": 616,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "Agents",
+        "current": false,
+        "x": 16,
+        "y": 668,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "自动化",
+        "current": false,
+        "x": 16,
+        "y": 720,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "统计",
+        "current": false,
+        "x": 16,
+        "y": 772,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "资源中心",
+        "current": false,
+        "x": 16,
+        "y": 824,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "设置",
+        "current": false,
+        "x": 16,
+        "y": 896,
+        "w": 325,
+        "h": 52
+      }
+    ],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令\n\n导航菜单\n当前作品\nWuthering Waves\n命令\n1\n消息\n创作\n写作\n游戏\n工具与资料\n工作台\n资料库\n创作方案\n版本管理\n书籍管理\nSkills\nAgents\n自动化\n统计\n资源中心\n设置"
+  },
+  "drawer-bottom-390": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 48,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(247, 247, 244)"
+    },
+    "sheet": {
+      "x": 0,
+      "y": 0,
+      "w": 358,
+      "h": 844,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px 24px 24px 0px",
+      "border-top-width": "0px",
+      "padding-left": "0px",
+      "padding-right": "0px",
+      "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px",
+      "font-size": "16px",
+      "font-weight": "400",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.985 0 0)"
+    },
+    "sheetHeader": {
+      "x": 0,
+      "y": 0,
+      "w": 357,
+      "h": 56,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(189, 189, 184)"
+    },
+    "sheetTitle": {
+      "font-size": "17px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "-0.425px",
+      "color": "oklch(0.985 0 0)"
+    },
+    "sectionLabel": {
+      "x": 28,
+      "y": -56,
+      "w": 313,
+      "h": 22,
+      "font-size": "12px",
+      "font-weight": "500",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "rgb(189, 189, 184)"
+    },
+    "navIcon": {
+      "x": 30,
+      "y": 145,
+      "w": 22,
+      "h": 24,
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.205 0 0)"
+    },
+    "rowIcon": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "navRow": {
+      "x": 16,
+      "y": 128,
+      "w": 157.5,
+      "h": 58,
+      "background-color": "oklch(0.922 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none",
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.205 0 0)"
+    },
+    "creationRow": {
+      "x": 16,
+      "y": 128,
+      "w": 157.5,
+      "h": 58,
+      "background-color": "oklch(0.922 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none"
+    },
+    "navRows": [
+      {
+        "label": "写作",
+        "current": true,
+        "x": 16,
+        "y": 128,
+        "w": 157.5,
+        "h": 58
+      },
+      {
+        "label": "游戏",
+        "current": false,
+        "x": 183.5,
+        "y": 128,
+        "w": 157.5,
+        "h": 58
+      },
+      {
+        "label": "工作台",
+        "current": false,
+        "x": 16,
+        "y": 236,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "资料库",
+        "current": false,
+        "x": 16,
+        "y": 288,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "创作方案",
+        "current": false,
+        "x": 16,
+        "y": 340,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "版本管理",
+        "current": false,
+        "x": 16,
+        "y": 392,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "书籍管理",
+        "current": false,
+        "x": 16,
+        "y": 444,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "Skills",
+        "current": false,
+        "x": 16,
+        "y": 496,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "Agents",
+        "current": false,
+        "x": 16,
+        "y": 548,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "自动化",
+        "current": false,
+        "x": 16,
+        "y": 600,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "统计",
+        "current": false,
+        "x": 16,
+        "y": 652,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "资源中心",
+        "current": false,
+        "x": 16,
+        "y": 704,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "设置",
+        "current": false,
+        "x": 16,
+        "y": 776,
+        "w": 325,
+        "h": 52
+      }
+    ],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令\n\n导航菜单\n当前作品\nWuthering Waves\n命令\n1\n消息\n创作\n写作\n游戏\n工具与资料\n工作台\n资料库\n创作方案\n版本管理\n书籍管理\nSkills\nAgents\n自动化\n统计\n资源中心\n设置"
+  },
+  "command-panel-390": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 48,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(247, 247, 244)"
+    },
+    "sheet": null,
+    "sheetHeader": null,
+    "sheetTitle": null,
+    "sectionLabel": null,
+    "navIcon": null,
+    "rowIcon": null,
+    "navRow": null,
+    "creationRow": null,
+    "navRows": [],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令\n\n工作台\n保存当前章节\n⌘S\n打开创作Agent\n打开版本管理\n打开全局搜索\n⌘⇧F\n继续写作\n⌘↵\n切换右侧栏\n⌘⌥B / CtrlAltB"
+  },
+  "workspace-320": {
+    "url": "/",
+    "viewport": {
+      "w": 320,
+      "h": 640,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 320,
+      "h": 48,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(247, 247, 244)"
+    },
+    "sheet": null,
+    "sheetHeader": null,
+    "sheetTitle": null,
+    "sectionLabel": null,
+    "navIcon": null,
+    "rowIcon": null,
+    "navRow": null,
+    "creationRow": null,
+    "navRows": [],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令"
+  },
+  "drawer-320": {
+    "url": "/",
+    "viewport": {
+      "w": 320,
+      "h": 640,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 320,
+      "h": 48,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(247, 247, 244)"
+    },
+    "sheet": {
+      "x": 0,
+      "y": 0,
+      "w": 288,
+      "h": 640,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px 24px 24px 0px",
+      "border-top-width": "0px",
+      "padding-left": "0px",
+      "padding-right": "0px",
+      "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px",
+      "font-size": "16px",
+      "font-weight": "400",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.985 0 0)"
+    },
+    "sheetHeader": {
+      "x": 0,
+      "y": 0,
+      "w": 287,
+      "h": 56,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(189, 189, 184)"
+    },
+    "sheetTitle": {
+      "font-size": "17px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "-0.425px",
+      "color": "oklch(0.985 0 0)"
+    },
+    "sectionLabel": {
+      "x": 28,
+      "y": 64,
+      "w": 243,
+      "h": 22,
+      "font-size": "12px",
+      "font-weight": "500",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "rgb(189, 189, 184)"
+    },
+    "navIcon": {
+      "x": 30,
+      "y": 265,
+      "w": 22,
+      "h": 24,
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.205 0 0)"
+    },
+    "rowIcon": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "navRow": {
+      "x": 16,
+      "y": 248,
+      "w": 122.5,
+      "h": 58,
+      "background-color": "oklch(0.922 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none",
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.205 0 0)"
+    },
+    "creationRow": {
+      "x": 16,
+      "y": 248,
+      "w": 122.5,
+      "h": 58,
+      "background-color": "oklch(0.922 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none"
+    },
+    "navRows": [
+      {
+        "label": "写作",
+        "current": true,
+        "x": 16,
+        "y": 248,
+        "w": 122.5,
+        "h": 58
+      },
+      {
+        "label": "游戏",
+        "current": false,
+        "x": 148.5,
+        "y": 248,
+        "w": 122.5,
+        "h": 58
+      },
+      {
+        "label": "工作台",
+        "current": false,
+        "x": 16,
+        "y": 356,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "资料库",
+        "current": false,
+        "x": 16,
+        "y": 408,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "创作方案",
+        "current": false,
+        "x": 16,
+        "y": 460,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "版本管理",
+        "current": false,
+        "x": 16,
+        "y": 512,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "书籍管理",
+        "current": false,
+        "x": 16,
+        "y": 564,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "Skills",
+        "current": false,
+        "x": 16,
+        "y": 616,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "Agents",
+        "current": false,
+        "x": 16,
+        "y": 668,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "自动化",
+        "current": false,
+        "x": 16,
+        "y": 720,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "统计",
+        "current": false,
+        "x": 16,
+        "y": 772,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "资源中心",
+        "current": false,
+        "x": 16,
+        "y": 824,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "设置",
+        "current": false,
+        "x": 16,
+        "y": 896,
+        "w": 255,
+        "h": 52
+      }
+    ],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令\n\n导航菜单\n当前作品\nWuthering Waves\n命令\n1\n消息\n创作\n写作\n游戏\n工具与资料\n工作台\n资料库\n创作方案\n版本管理\n书籍管理\nSkills\nAgents\n自动化\n统计\n资源中心\n设置"
+  },
+  "drawer-bottom-320": {
+    "url": "/",
+    "viewport": {
+      "w": 320,
+      "h": 640,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 320,
+      "h": 48,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(247, 247, 244)"
+    },
+    "sheet": {
+      "x": 0,
+      "y": 0,
+      "w": 288,
+      "h": 640,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px 24px 24px 0px",
+      "border-top-width": "0px",
+      "padding-left": "0px",
+      "padding-right": "0px",
+      "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px",
+      "font-size": "16px",
+      "font-weight": "400",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.985 0 0)"
+    },
+    "sheetHeader": {
+      "x": 0,
+      "y": 0,
+      "w": 287,
+      "h": 56,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(189, 189, 184)"
+    },
+    "sheetTitle": {
+      "font-size": "17px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "-0.425px",
+      "color": "oklch(0.985 0 0)"
+    },
+    "sectionLabel": {
+      "x": 28,
+      "y": -260,
+      "w": 243,
+      "h": 22,
+      "font-size": "12px",
+      "font-weight": "500",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "rgb(189, 189, 184)"
+    },
+    "navIcon": {
+      "x": 30,
+      "y": -59,
+      "w": 22,
+      "h": 24,
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.205 0 0)"
+    },
+    "rowIcon": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "navRow": {
+      "x": 16,
+      "y": -76,
+      "w": 122.5,
+      "h": 58,
+      "background-color": "oklch(0.922 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none",
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.205 0 0)"
+    },
+    "creationRow": {
+      "x": 16,
+      "y": -76,
+      "w": 122.5,
+      "h": 58,
+      "background-color": "oklch(0.922 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none"
+    },
+    "navRows": [
+      {
+        "label": "写作",
+        "current": true,
+        "x": 16,
+        "y": -76,
+        "w": 122.5,
+        "h": 58
+      },
+      {
+        "label": "游戏",
+        "current": false,
+        "x": 148.5,
+        "y": -76,
+        "w": 122.5,
+        "h": 58
+      },
+      {
+        "label": "工作台",
+        "current": false,
+        "x": 16,
+        "y": 32,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "资料库",
+        "current": false,
+        "x": 16,
+        "y": 84,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "创作方案",
+        "current": false,
+        "x": 16,
+        "y": 136,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "版本管理",
+        "current": false,
+        "x": 16,
+        "y": 188,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "书籍管理",
+        "current": false,
+        "x": 16,
+        "y": 240,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "Skills",
+        "current": false,
+        "x": 16,
+        "y": 292,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "Agents",
+        "current": false,
+        "x": 16,
+        "y": 344,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "自动化",
+        "current": false,
+        "x": 16,
+        "y": 396,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "统计",
+        "current": false,
+        "x": 16,
+        "y": 448,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "资源中心",
+        "current": false,
+        "x": 16,
+        "y": 500,
+        "w": 255,
+        "h": 52
+      },
+      {
+        "label": "设置",
+        "current": false,
+        "x": 16,
+        "y": 572,
+        "w": 255,
+        "h": 52
+      }
+    ],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令\n\n导航菜单\n当前作品\nWuthering Waves\n命令\n1\n消息\n创作\n写作\n游戏\n工具与资料\n工作台\n资料库\n创作方案\n版本管理\n书籍管理\nSkills\nAgents\n自动化\n统计\n资源中心\n设置"
+  },
+  "command-panel-320": {
+    "url": "/",
+    "viewport": {
+      "w": 320,
+      "h": 640,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 320,
+      "h": 48,
+      "background-color": "rgb(0, 0, 0)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(247, 247, 244)"
+    },
+    "sheet": null,
+    "sheetHeader": null,
+    "sheetTitle": null,
+    "sectionLabel": null,
+    "navIcon": null,
+    "rowIcon": null,
+    "navRow": null,
+    "creationRow": null,
+    "navRows": [],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令\n\n工作台\n保存当前章节\n⌘S\n打开创作Agent\n打开版本管理\n打开全局搜索\n⌘⇧F\n继续写作\n⌘↵\n切换右侧栏\n⌘⌥B / CtrlAltB"
+  },
+  "login-390-light": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#fff",
+        "--nova-surface": "#fafafa",
+        "--nova-text": "#171717",
+        "--nova-text-muted": "#525252",
+        "--nova-border-soft": "#e5e5e5",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": {
+        "x": 16,
+        "y": 223.5,
+        "w": 358,
+        "h": 397,
+        "background-color": "oklch(1 0 0)",
+        "border-radius": "14px",
+        "border-top-width": "0px",
+        "padding-left": "0px",
+        "padding-right": "0px",
+        "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.145 0 0 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+      },
+      "title": {
+        "font-size": "16px",
+        "font-weight": "500",
+        "line-height": "22px",
+        "letter-spacing": "normal",
+        "color": "oklch(0.145 0 0)"
+      },
+      "description": {
+        "font-size": "16px",
+        "font-weight": "400",
+        "line-height": "24px",
+        "letter-spacing": "normal",
+        "color": "oklch(0.556 0 0)"
+      },
+      "input": {
+        "x": 32,
+        "y": 369.5,
+        "w": 326,
+        "h": 32,
+        "font-size": "16px",
+        "font-weight": "400",
+        "line-height": "22px",
+        "letter-spacing": "normal",
+        "background-color": "rgba(0, 0, 0, 0)",
+        "border-radius": "10px",
+        "border-top-width": "1px",
+        "padding-left": "10px",
+        "padding-right": "10px",
+        "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.708 0 0 / 0.5) 0px 0px 0px 3px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+      },
+      "submit": {
+        "x": 32,
+        "y": 572.5,
+        "w": 326,
+        "h": 32,
+        "font-size": "16px",
+        "font-weight": "500",
+        "line-height": "22px",
+        "letter-spacing": "normal",
+        "color": "oklch(0.985 0 0)",
+        "disabled": true
+      },
+      "fields": [
+        {
+          "text": "用户名",
+          "font-size": "16px",
+          "font-weight": "500",
+          "line-height": "22px",
+          "letter-spacing": "normal",
+          "color": "oklch(0.145 0 0)"
+        },
+        {
+          "text": "密码",
+          "font-size": "16px",
+          "font-weight": "500",
+          "line-height": "22px",
+          "letter-spacing": "normal",
+          "color": "oklch(0.145 0 0)"
+        },
+        {
+          "text": "此浏览器将保持登录 30 天，可在设置中退出登录。",
+          "font-size": "16px",
+          "font-weight": "400",
+          "line-height": "24px",
+          "letter-spacing": "normal",
+          "color": "oklch(0.556 0 0)"
+        }
+      ]
+    },
+    "topBar": null,
+    "sheet": null,
+    "sheetHeader": null,
+    "sheetTitle": null,
+    "sectionLabel": null,
+    "navIcon": null,
+    "rowIcon": null,
+    "navRow": null,
+    "creationRow": null,
+    "navRows": [],
+    "bodyText": "登录 Denova\n请输入设置里配置的远程访问用户名和密码。\n用户名\n密码\n\n此浏览器将保持登录 30 天，可在设置中退出登录。\n\n登录"
+  },
+  "login-390-submit-disabled-empty-light": true,
+  "workspace-390-light": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#fff",
+        "--nova-surface": "#fafafa",
+        "--nova-text": "#171717",
+        "--nova-text-muted": "#525252",
+        "--nova-border-soft": "#e5e5e5",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 48,
+      "background-color": "rgb(242, 242, 242)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(23, 23, 23)"
+    },
+    "sheet": null,
+    "sheetHeader": null,
+    "sheetTitle": null,
+    "sectionLabel": null,
+    "navIcon": null,
+    "rowIcon": null,
+    "navRow": null,
+    "creationRow": null,
+    "navRows": [],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令"
+  },
+  "drawer-390-light": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#fff",
+        "--nova-surface": "#fafafa",
+        "--nova-text": "#171717",
+        "--nova-text-muted": "#525252",
+        "--nova-border-soft": "#e5e5e5",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 48,
+      "background-color": "rgb(242, 242, 242)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(23, 23, 23)"
+    },
+    "sheet": {
+      "x": 0,
+      "y": 0,
+      "w": 358,
+      "h": 844,
+      "background-color": "rgb(255, 255, 255)",
+      "border-radius": "0px 24px 24px 0px",
+      "border-top-width": "0px",
+      "padding-left": "0px",
+      "padding-right": "0px",
+      "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px",
+      "font-size": "16px",
+      "font-weight": "400",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.145 0 0)"
+    },
+    "sheetHeader": {
+      "x": 0,
+      "y": 0,
+      "w": 357,
+      "h": 56,
+      "background-color": "rgb(255, 255, 255)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(82, 82, 82)"
+    },
+    "sheetTitle": {
+      "font-size": "17px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "-0.425px",
+      "color": "oklch(0.145 0 0)"
+    },
+    "sectionLabel": {
+      "x": 28,
+      "y": 64,
+      "w": 313,
+      "h": 22,
+      "font-size": "12px",
+      "font-weight": "500",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "rgb(82, 82, 82)"
+    },
+    "navIcon": {
+      "x": 30,
+      "y": 265,
+      "w": 22,
+      "h": 24,
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.985 0 0)"
+    },
+    "rowIcon": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "navRow": {
+      "x": 16,
+      "y": 248,
+      "w": 157.5,
+      "h": 58,
+      "background-color": "oklch(0.205 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none",
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.985 0 0)"
+    },
+    "creationRow": {
+      "x": 16,
+      "y": 248,
+      "w": 157.5,
+      "h": 58,
+      "background-color": "oklch(0.205 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none"
+    },
+    "navRows": [
+      {
+        "label": "写作",
+        "current": true,
+        "x": 16,
+        "y": 248,
+        "w": 157.5,
+        "h": 58
+      },
+      {
+        "label": "游戏",
+        "current": false,
+        "x": 183.5,
+        "y": 248,
+        "w": 157.5,
+        "h": 58
+      },
+      {
+        "label": "工作台",
+        "current": false,
+        "x": 16,
+        "y": 356,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "资料库",
+        "current": false,
+        "x": 16,
+        "y": 408,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "创作方案",
+        "current": false,
+        "x": 16,
+        "y": 460,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "版本管理",
+        "current": false,
+        "x": 16,
+        "y": 512,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "书籍管理",
+        "current": false,
+        "x": 16,
+        "y": 564,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "Skills",
+        "current": false,
+        "x": 16,
+        "y": 616,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "Agents",
+        "current": false,
+        "x": 16,
+        "y": 668,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "自动化",
+        "current": false,
+        "x": 16,
+        "y": 720,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "统计",
+        "current": false,
+        "x": 16,
+        "y": 772,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "资源中心",
+        "current": false,
+        "x": 16,
+        "y": 824,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "设置",
+        "current": false,
+        "x": 16,
+        "y": 896,
+        "w": 325,
+        "h": 52
+      }
+    ],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令\n\n导航菜单\n当前作品\nWuthering Waves\n命令\n1\n消息\n创作\n写作\n游戏\n工具与资料\n工作台\n资料库\n创作方案\n版本管理\n书籍管理\nSkills\nAgents\n自动化\n统计\n资源中心\n设置"
+  },
+  "drawer-bottom-390-light": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#fff",
+        "--nova-surface": "#fafafa",
+        "--nova-text": "#171717",
+        "--nova-text-muted": "#525252",
+        "--nova-border-soft": "#e5e5e5",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 48,
+      "background-color": "rgb(242, 242, 242)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(23, 23, 23)"
+    },
+    "sheet": {
+      "x": 0,
+      "y": 0,
+      "w": 358,
+      "h": 844,
+      "background-color": "rgb(255, 255, 255)",
+      "border-radius": "0px 24px 24px 0px",
+      "border-top-width": "0px",
+      "padding-left": "0px",
+      "padding-right": "0px",
+      "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 10px 15px -3px, rgba(0, 0, 0, 0.1) 0px 4px 6px -4px",
+      "font-size": "16px",
+      "font-weight": "400",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.145 0 0)"
+    },
+    "sheetHeader": {
+      "x": 0,
+      "y": 0,
+      "w": 357,
+      "h": 56,
+      "background-color": "rgb(255, 255, 255)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(82, 82, 82)"
+    },
+    "sheetTitle": {
+      "font-size": "17px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "-0.425px",
+      "color": "oklch(0.145 0 0)"
+    },
+    "sectionLabel": {
+      "x": 28,
+      "y": -56,
+      "w": 313,
+      "h": 22,
+      "font-size": "12px",
+      "font-weight": "500",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "rgb(82, 82, 82)"
+    },
+    "navIcon": {
+      "x": 30,
+      "y": 145,
+      "w": 22,
+      "h": 24,
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.985 0 0)"
+    },
+    "rowIcon": {
+      "x": 0,
+      "y": 0,
+      "w": 0,
+      "h": 0
+    },
+    "navRow": {
+      "x": 16,
+      "y": 128,
+      "w": 157.5,
+      "h": 58,
+      "background-color": "oklch(0.205 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none",
+      "font-size": "15px",
+      "font-weight": "600",
+      "line-height": "22px",
+      "letter-spacing": "normal",
+      "color": "oklch(0.985 0 0)"
+    },
+    "creationRow": {
+      "x": 16,
+      "y": 128,
+      "w": 157.5,
+      "h": 58,
+      "background-color": "oklch(0.205 0 0)",
+      "border-radius": "18px",
+      "border-top-width": "0px",
+      "padding-left": "14px",
+      "padding-right": "14px",
+      "box-shadow": "none"
+    },
+    "navRows": [
+      {
+        "label": "写作",
+        "current": true,
+        "x": 16,
+        "y": 128,
+        "w": 157.5,
+        "h": 58
+      },
+      {
+        "label": "游戏",
+        "current": false,
+        "x": 183.5,
+        "y": 128,
+        "w": 157.5,
+        "h": 58
+      },
+      {
+        "label": "工作台",
+        "current": false,
+        "x": 16,
+        "y": 236,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "资料库",
+        "current": false,
+        "x": 16,
+        "y": 288,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "创作方案",
+        "current": false,
+        "x": 16,
+        "y": 340,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "版本管理",
+        "current": false,
+        "x": 16,
+        "y": 392,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "书籍管理",
+        "current": false,
+        "x": 16,
+        "y": 444,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "Skills",
+        "current": false,
+        "x": 16,
+        "y": 496,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "Agents",
+        "current": false,
+        "x": 16,
+        "y": 548,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "自动化",
+        "current": false,
+        "x": 16,
+        "y": 600,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "统计",
+        "current": false,
+        "x": 16,
+        "y": 652,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "资源中心",
+        "current": false,
+        "x": 16,
+        "y": 704,
+        "w": 325,
+        "h": 52
+      },
+      {
+        "label": "设置",
+        "current": false,
+        "x": 16,
+        "y": 776,
+        "w": 325,
+        "h": 52
+      }
+    ],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令\n\n导航菜单\n当前作品\nWuthering Waves\n命令\n1\n消息\n创作\n写作\n游戏\n工具与资料\n工作台\n资料库\n创作方案\n版本管理\n书籍管理\nSkills\nAgents\n自动化\n统计\n资源中心\n设置"
+  },
+  "command-panel-390-light": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#fff",
+        "--nova-surface": "#fafafa",
+        "--nova-text": "#171717",
+        "--nova-text-muted": "#525252",
+        "--nova-border-soft": "#e5e5e5",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": null,
+      "title": null,
+      "description": null,
+      "input": null,
+      "submit": null,
+      "fields": []
+    },
+    "topBar": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 48,
+      "background-color": "rgb(242, 242, 242)",
+      "border-radius": "0px",
+      "border-top-width": "0px",
+      "padding-left": "12px",
+      "padding-right": "12px",
+      "box-shadow": "none",
+      "font-size": "14px",
+      "font-weight": "400",
+      "line-height": "20px",
+      "letter-spacing": "normal",
+      "color": "rgb(23, 23, 23)"
+    },
+    "sheet": null,
+    "sheetHeader": null,
+    "sheetTitle": null,
+    "sectionLabel": null,
+    "navIcon": null,
+    "rowIcon": null,
+    "navRow": null,
+    "creationRow": null,
+    "navRows": [],
+    "bodyText": "正文\nAgent\n继续你的创作\n点击「文件」选择章节，或切换到 Agent 开始创作。\n打开文件\n命令面板\n\n搜索并执行工作台命令\n\n工作台\n保存当前章节\n⌘S\n打开创作Agent\n打开版本管理\n打开全局搜索\n⌘⇧F\n继续写作\n⌘↵\n切换右侧栏\n⌘⌥B / CtrlAltB"
+  },
+  "login-390": {
+    "url": "/",
+    "viewport": {
+      "w": 390,
+      "h": 844,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": {
+        "x": 16,
+        "y": 223.5,
+        "w": 358,
+        "h": 397,
+        "background-color": "oklch(0.205 0 0)",
+        "border-radius": "14px",
+        "border-top-width": "0px",
+        "padding-left": "0px",
+        "padding-right": "0px",
+        "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.985 0 0 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+      },
+      "title": {
+        "font-size": "16px",
+        "font-weight": "500",
+        "line-height": "22px",
+        "letter-spacing": "normal",
+        "color": "oklch(0.985 0 0)"
+      },
+      "description": {
+        "font-size": "16px",
+        "font-weight": "400",
+        "line-height": "24px",
+        "letter-spacing": "normal",
+        "color": "oklch(0.708 0 0)"
+      },
+      "input": {
+        "x": 32,
+        "y": 369.5,
+        "w": 326,
+        "h": 32,
+        "font-size": "16px",
+        "font-weight": "400",
+        "line-height": "22px",
+        "letter-spacing": "normal",
+        "background-color": "oklab(1 0 0 / 0.045)",
+        "border-radius": "10px",
+        "border-top-width": "1px",
+        "padding-left": "10px",
+        "padding-right": "10px",
+        "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.556 0 0 / 0.5) 0px 0px 0px 3px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+      },
+      "submit": {
+        "x": 32,
+        "y": 572.5,
+        "w": 326,
+        "h": 32,
+        "font-size": "16px",
+        "font-weight": "500",
+        "line-height": "22px",
+        "letter-spacing": "normal",
+        "color": "oklch(0.205 0 0)",
+        "disabled": true
+      },
+      "fields": [
+        {
+          "text": "用户名",
+          "font-size": "16px",
+          "font-weight": "500",
+          "line-height": "22px",
+          "letter-spacing": "normal",
+          "color": "oklch(0.985 0 0)"
+        },
+        {
+          "text": "密码",
+          "font-size": "16px",
+          "font-weight": "500",
+          "line-height": "22px",
+          "letter-spacing": "normal",
+          "color": "oklch(0.985 0 0)"
+        },
+        {
+          "text": "此浏览器将保持登录 30 天，可在设置中退出登录。",
+          "font-size": "16px",
+          "font-weight": "400",
+          "line-height": "24px",
+          "letter-spacing": "normal",
+          "color": "oklch(0.708 0 0)"
+        }
+      ]
+    },
+    "topBar": null,
+    "sheet": null,
+    "sheetHeader": null,
+    "sheetTitle": null,
+    "sectionLabel": null,
+    "navIcon": null,
+    "rowIcon": null,
+    "navRow": null,
+    "creationRow": null,
+    "navRows": [],
+    "bodyText": "登录 Denova\n请输入设置里配置的远程访问用户名和密码。\n用户名\n密码\n\n此浏览器将保持登录 30 天，可在设置中退出登录。\n\n登录"
+  },
+  "login-390-submit-disabled-empty": true,
+  "login-320": {
+    "url": "/",
+    "viewport": {
+      "w": 320,
+      "h": 640,
+      "dpr": 3
+    },
+    "root": {
+      "bg": {
+        "--nova-bg": "#000",
+        "--nova-surface": "#0a0a0a",
+        "--nova-text": "#f7f7f4",
+        "--nova-text-muted": "#bdbdb8",
+        "--nova-border-soft": "#1e1e1e",
+        "--nova-primary": "",
+        "--nova-mobile-radius": "18px",
+        "--nova-mobile-title-size": "max(17px, 14px)",
+        "--nova-mobile-label-size": "max(15px, 13px)"
+      },
+      "fontSize": {
+        "font-size": "16px",
+        "font-family": "\"SF Pro Text\", \"SF Pro Display\", \"PingFang SC\", \"Hiragino Sans GB\", -apple-system, BlinkMacSystemFont, sans-serif"
+      }
+    },
+    "login": {
+      "card": {
+        "x": 16,
+        "y": 110.5,
+        "w": 288,
+        "h": 419,
+        "background-color": "oklch(0.205 0 0)",
+        "border-radius": "14px",
+        "border-top-width": "0px",
+        "padding-left": "0px",
+        "padding-right": "0px",
+        "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.985 0 0 / 0.1) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+      },
+      "title": {
+        "font-size": "16px",
+        "font-weight": "500",
+        "line-height": "22px",
+        "letter-spacing": "normal",
+        "color": "oklch(0.985 0 0)"
+      },
+      "description": {
+        "font-size": "16px",
+        "font-weight": "400",
+        "line-height": "24px",
+        "letter-spacing": "normal",
+        "color": "oklch(0.708 0 0)"
+      },
+      "input": {
+        "x": 32,
+        "y": 278.5,
+        "w": 256,
+        "h": 32,
+        "font-size": "16px",
+        "font-weight": "400",
+        "line-height": "22px",
+        "letter-spacing": "normal",
+        "background-color": "oklab(1 0 0 / 0.045)",
+        "border-radius": "10px",
+        "border-top-width": "1px",
+        "padding-left": "10px",
+        "padding-right": "10px",
+        "box-shadow": "rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, oklab(0.556 0 0 / 0.5) 0px 0px 0px 3px, rgba(0, 0, 0, 0) 0px 0px 0px 0px"
+      },
+      "submit": {
+        "x": 32,
+        "y": 481.5,
+        "w": 256,
+        "h": 32,
+        "font-size": "16px",
+        "font-weight": "500",
+        "line-height": "22px",
+        "letter-spacing": "normal",
+        "color": "oklch(0.205 0 0)",
+        "disabled": true
+      },
+      "fields": [
+        {
+          "text": "用户名",
+          "font-size": "16px",
+          "font-weight": "500",
+          "line-height": "22px",
+          "letter-spacing": "normal",
+          "color": "oklch(0.985 0 0)"
+        },
+        {
+          "text": "密码",
+          "font-size": "16px",
+          "font-weight": "500",
+          "line-height": "22px",
+          "letter-spacing": "normal",
+          "color": "oklch(0.985 0 0)"
+        },
+        {
+          "text": "此浏览器将保持登录 30 天，可在设置中退出登录。",
+          "font-size": "16px",
+          "font-weight": "400",
+          "line-height": "24px",
+          "letter-spacing": "normal",
+          "color": "oklch(0.708 0 0)"
+        }
+      ]
+    },
+    "topBar": null,
+    "sheet": null,
+    "sheetHeader": null,
+    "sheetTitle": null,
+    "sectionLabel": null,
+    "navIcon": null,
+    "rowIcon": null,
+    "navRow": null,
+    "creationRow": null,
+    "navRows": [],
+    "bodyText": "登录 Denova\n请输入设置里配置的远程访问用户名和密码。\n用户名\n密码\n\n此浏览器将保持登录 30 天，可在设置中退出登录。\n\n登录"
+  },
+  "login-320-submit-disabled-empty": true
+}
