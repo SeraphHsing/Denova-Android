@@ -241,6 +241,8 @@
 
 - 2026-10-30 NAV-004 / NAV-006 / NAV-009 收口（真机）：**NAV-004** 抽屉排序改序（游戏 ↑）落 DataStore `activity_order`，`am force-stop` 重启后顺序保持；`ActivityNav.matches` 抽出纯函数并补 8 条断言。**NAV-006** 修复两个真机缺陷——搜索框移到标题栏下方固定区 + 搜索态隐藏书籍/引导 + `imePadding()`（键盘不再遮挡结果）、`LaunchedEffect(query)` 回列表顶部（清空后不再「分组消失」）；输入 `Sk` 过滤到 Skills、选中后清焦点清词关抽屉并进入 Skills 页（该行显示「当前」）。**NAV-009** 菜单 / 建书对话框 / 左抽屉三层返回都只关最上层并停留原页；无浮层返回只 finish Activity，**未复现登出**（此前「返回导致登出」实为退出到桌面的误判）。新登记 [09 VG-009](android-web-parity/09-visual-gap-backlog.md)（编辑器顶栏「退出」在 390dp 下竖排贴边易误触，随 NAV-010 修）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
 
+- 2026-10-30 AUTH-001 / AUTH-007 收口（真机），AUTH-004 记录「机制已实现、端到端待构造」（保持 `未开始`）：连接页四态对齐 Web 登录卡片（标题「登录 Denova」+ 描述 + 30 天保留提示 + 空值/提交中禁用 + 登录中/配对中文案），Checking 与 Failed 都保留地址输入与「重试」（原生比 Web 多这两个入口：构造并发与原地重试所需）；地址输入提升到页面层，断网/错址失败后不被分支重建重置；失败自动恢复走 `ConnectivityManager.onAvailable` 仅对 Failed 态重连（新增 `ACCESS_NETWORK_STATE`）。AUTH-004 新增 `core/auth/SessionExpiryConfirmer`——收到 401 先读 canonical status，只有明确未认证才降级，迟到 401 与探测失败保持会话（JVM 4 例）；真机端到端仍缺可并发入口（Checking 不显示登录表单），构造方法登记在该行 `gap_or_decision`。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |

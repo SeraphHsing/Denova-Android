@@ -58,6 +58,13 @@
     <string name="conn_err_network">Network error, try again</string>
     <string name="conn_err_unreachable">Cannot reach the server (HTTP %1$d)</string>
     <string name="conn_err_cannot_connect">Cannot reach the server</string>
+<string name="conn_retry">Retry</string>
+<string name="conn_connection_failed">Connection failed</string>
+<string name="conn_signing_in">Signing in…</string>
+<string name="conn_pairing">Pairing…</string>
+<string name="conn_login_title">Sign in to Denova</string>
+<string name="conn_login_desc">Enter the remote access username and password configured on the server.</string>
+<string name="conn_remember_hint">Sign-in is kept for 30 days; sign out from settings.</string>
     <string name="editor_project_id">Project ID</string>
     <string name="editor_file_path">File path</string>
     <string name="editor_open">Open</string>

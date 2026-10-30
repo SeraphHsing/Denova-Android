@@ -4,8 +4,11 @@ import com.denova.novara.R
 import com.denova.novara.core.i18n.UiText
 
 import android.app.Application
+import android.net.ConnectivityManager
+import android.net.Network
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.denova.novara.core.auth.SessionExpiryConfirmer
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.model.ServerKey
 import com.denova.novara.core.network.DenovaApiException
@@ -52,14 +55,43 @@ class ConnectionViewModel(
     private val _savedServer = MutableStateFlow<String?>(null)
     val savedServer: StateFlow<String?> = _savedServer.asStateFlow()
 
+    /** 登录 / 配对提交中（按钮禁用、文案切换）。 */
+    private val _submitting = MutableStateFlow(false)
+    val submitting: StateFlow<Boolean> = _submitting.asStateFlow()
+
+    /** 最近一次连接使用的地址原文；重试与网络恢复时复用它（AUTH-007 保留输入）。 */
+    private var lastInput: String? = null
+
     /** 当前连接的 client；登录成功后由上层取出绑定给编辑器。 */
     var client: DenovaClient? = null
         private set
+
+    private val connectivity = application.getSystemService(ConnectivityManager::class.java)
+
+    /**
+     * 网络恢复后自动重连（对齐 Web 的 online / pageshow / visibilitychange 重拉 status）。
+     * 只在失败态触发：已认证时重复拉 status 没有收益，未认证时用户可能正在输入密码。
+     */
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            if (_state.value is ConnectionUiState.Failed) {
+                DenovaLog.i("Connection", "network available, retrying")
+                retry()
+            }
+        }
+    }
 
     init {
         viewModelScope.launch {
             _savedServer.value = store.loadServer()
         }
+        runCatching { connectivity?.registerDefaultNetworkCallback(networkCallback) }
+            .onFailure { DenovaLog.w("Connection", "network callback unavailable", it) }
+    }
+
+    override fun onCleared() {
+        runCatching { connectivity?.unregisterNetworkCallback(networkCallback) }
+        super.onCleared()
     }
 
     fun connect(input: String) {
@@ -67,6 +99,14 @@ class ConnectionViewModel(
         if (key == null) {
             DenovaLog.w("Connection", "rejected invalid server address")
             _state.value = ConnectionUiState.Failed(UiText.of(R.string.conn_err_invalid_server))
+            return
+        }
+        lastInput = input
+        val existing = client
+        if (existing != null && existing.serverOrigin == key.origin) {
+            // 同一服务器：复用客户端，保留 Cookie 与在途请求，只重跑 status。
+            DenovaLog.i("Connection", "reconnecting to ${key.origin}")
+            checkStatus(key)
             return
         }
         DenovaLog.i("Connection", "connecting to ${key.origin}")
@@ -79,11 +119,39 @@ class ConnectionViewModel(
         checkStatus(key)
     }
 
-    /** 会话失效（401）：只处理当前客户端，切回未认证态并给出可读提示。 */
+    /** 重试（连接页错误块 / 网络恢复）：复用已保存的地址原文，不要求用户重新输入。 */
+    fun retry() {
+        val input = lastInput ?: return
+        connect(input)
+    }
+
+    /**
+     * 会话失效（401）：只处理当前客户端，且必须先用 canonical status 二次确认。
+     *
+     * 迟到的 401 可能来自登录完成前发出的旧请求（登录成功后 `resetUnauthorizedFlag()` 会复位一次性标志），
+     * 不确认就直接降级会把刚建立的会话顶掉（AUTH-004）。
+     */
     private fun handleSessionExpired(c: DenovaClient, key: ServerKey) {
         if (c !== client) return
-        DenovaLog.w("Connection", "session expired, returning to login")
         viewModelScope.launch {
+            val confirmer = SessionExpiryConfirmer {
+                runCatching {
+                    // 探测本身要抑制 401 回调，否则会递归触发确认。
+                    c.suppressingUnauthorized { c.status().authenticated }
+                }.getOrElse { error ->
+                    when {
+                        error is DenovaApiException && error.status == 401 -> false
+                        else -> null
+                    }
+                }
+            }
+            if (c !== client) return@launch
+            if (!confirmer.isExpired()) {
+                c.resetUnauthorizedFlag()
+                DenovaLog.i("Connection", "late 401 ignored, session still valid")
+                return@launch
+            }
+            DenovaLog.w("Connection", "session expired, returning to login")
             _state.value = ConnectionUiState.Unauthenticated(key, local = false)
             _actionError.value = UiText.of(R.string.conn_session_expired)
         }
@@ -92,8 +160,10 @@ class ConnectionViewModel(
     fun login(username: String, password: String) {
         val c = client ?: return
         val current = (state.value as? ConnectionUiState.Unauthenticated)?.server ?: return
+        if (_submitting.value || username.isBlank() || password.isEmpty()) return
         viewModelScope.launch {
             val gen = c.generation.snapshot()
+            _submitting.value = true
             try {
                 // D03 恢复耗时埋点：认证往返起点
                 DenovaLog.i("Perf", "login-start")
@@ -119,6 +189,8 @@ class ConnectionViewModel(
             } catch (e: Exception) {
                 DenovaLog.w("Connection", "login failed", e)
                 _actionError.value = UiText.of(R.string.conn_err_network)
+            } finally {
+                _submitting.value = false
             }
         }
     }
@@ -126,7 +198,9 @@ class ConnectionViewModel(
     fun pair(token: String) {
         val c = client ?: return
         val current = (state.value as? ConnectionUiState.Unauthenticated)?.server ?: return
+        if (_submitting.value || token.isBlank()) return
         viewModelScope.launch {
+            _submitting.value = true
             try {
                 val result = c.pair(token.trim())
                 c.generation.retire()
@@ -143,6 +217,8 @@ class ConnectionViewModel(
             } catch (e: Exception) {
                 DenovaLog.w("Connection", "pair failed", e)
                 _actionError.value = UiText.of(R.string.conn_err_network)
+            } finally {
+                _submitting.value = false
             }
         }
     }

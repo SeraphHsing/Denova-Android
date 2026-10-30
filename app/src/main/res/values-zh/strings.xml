@@ -58,6 +58,13 @@
     <string name="conn_err_network">网络错误，请重试</string>
     <string name="conn_err_unreachable">无法连接服务器（HTTP %1$d）</string>
     <string name="conn_err_cannot_connect">无法连接服务器</string>
+<string name="conn_retry">重试</string>
+<string name="conn_connection_failed">连接失败</string>
+<string name="conn_signing_in">登录中…</string>
+<string name="conn_pairing">配对中…</string>
+<string name="conn_login_title">登录 Denova</string>
+<string name="conn_login_desc">请输入设置里配置的远程访问用户名和密码。</string>
+<string name="conn_remember_hint">登录状态保留 30 天，可在设置中退出登录。</string>
     <string name="editor_project_id">项目ID</string>
     <string name="editor_file_path">文件路径</string>
     <string name="editor_open">打开</string>
