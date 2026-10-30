@@ -738,4 +738,66 @@ class EditorSessionTest {
         assertFalse(session.undo())
         assertEquals("标题\n段落一\n段落二服务器\n段落三\n结尾", session.state.value.content)
     }
+
+    // ---- 草稿的服务器作用域（AUTH-006）----
+
+    @Test
+    fun `draft under the same origin is restored`() = runTest {
+        val drafts = FakeDrafts().apply {
+            map["http://a\u0000p\u0000f.md"] = Draft("draftA", "r0", "base")
+        }
+        val session = EditorSession(
+            FileSaveCoordinator(FakeRemote(), drafts), drafts, this, origin = "http://a",
+        )
+        session.open("p", "f.md", "server", "r1")
+        assertEquals("draftA", session.state.value.content)
+    }
+
+    @Test
+    fun `draft from another server is not restored`() = runTest {
+        // 同一 projectId + path 在服务器 A 上有草稿，连到 B 时不能串过来。
+        val drafts = FakeDrafts().apply {
+            map["http://a\u0000p\u0000f.md"] = Draft("draftA", "r0", "base")
+        }
+        val session = EditorSession(
+            FileSaveCoordinator(FakeRemote(), drafts), drafts, this, origin = "http://b",
+        )
+        session.open("p", "f.md", "server", "r1")
+        assertEquals("server", session.state.value.content)
+        assertNotNull(drafts.map["http://a\u0000p\u0000f.md"])
+    }
+
+    @Test
+    fun `legacy draft without server scope is restored and migrated once`() = runTest {
+        // 升级前保存的草稿只有 `projectId\0path`，没有服务器归属：首次打开恢复到当前 origin 并迁移。
+        val drafts = FakeDrafts().apply {
+            map["p\u0000f.md"] = Draft("legacy", "r0", "base")
+        }
+        val session = EditorSession(
+            FileSaveCoordinator(FakeRemote(), drafts), drafts, this, origin = "http://a",
+        )
+        session.open("p", "f.md", "server", "r1")
+        assertEquals("legacy", session.state.value.content)
+        // 迁移完成：旧 key 删除、新 key 存在，所以另一台服务器不会再读到它。
+        assertNull(drafts.map["p\u0000f.md"])
+        assertNotNull(drafts.map["http://a\u0000p\u0000f.md"])
+    }
+
+    @Test
+    fun `migrated legacy draft does not leak to another server`() = runTest {
+        val drafts = FakeDrafts().apply {
+            map["p\u0000f.md"] = Draft("legacy", "r0", "base")
+        }
+        val onA = EditorSession(
+            FileSaveCoordinator(FakeRemote(), drafts), drafts, this, origin = "http://a",
+        )
+        onA.open("p", "f.md", "server", "r1")
+        assertEquals("legacy", onA.state.value.content)
+
+        val onB = EditorSession(
+            FileSaveCoordinator(FakeRemote(), drafts), drafts, this, origin = "http://b",
+        )
+        onB.open("p", "f.md", "server", "r1")
+        assertEquals("server", onB.state.value.content)
+    }
 }

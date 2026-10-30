@@ -65,6 +65,7 @@
 <string name="conn_login_title">登录 Denova</string>
 <string name="conn_login_desc">请输入设置里配置的远程访问用户名和密码。</string>
 <string name="conn_remember_hint">登录状态保留 30 天，可在设置中退出登录。</string>
+<string name="conn_change_server">更换服务器</string>
     <string name="editor_project_id">项目ID</string>
     <string name="editor_file_path">文件路径</string>
     <string name="editor_open">打开</string>

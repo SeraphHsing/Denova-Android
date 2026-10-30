@@ -162,6 +162,11 @@ class EditorSession(
     private val debounceMillis: Long = AUTOSAVE_DEBOUNCE_MILLIS,
     /** 时钟（毫秒）：撤销栈按时间窗合并连续输入，单测需要可控时间。 */
     private val now: () -> Long = { System.currentTimeMillis() },
+    /**
+     * 服务器 origin（AUTH-006）：草稿身份必须带服务器作用域，否则同一 projectId 在两个服务器上会串草稿。
+     * 为空时退化为旧格式 `projectId\0path`（单测与旧数据兼容）。
+     */
+    private val origin: String = "",
 ) {
     companion object {
         /** 自动保存防抖；也是「最后一次编辑 → 草稿落盘」的固定下限（G2 指标口径）。 */
@@ -199,7 +204,7 @@ class EditorSession(
     private var openEpoch = 0L
 
     suspend fun open(projectId: String, path: String, serverContent: String, serverRevision: String) {
-        val key = "$projectId\u0000$path"
+        val key = draftKey(projectId, path)
         // 切换文件：取消在途保存并推进世代，旧文件的回执不得写进新文件状态（G3-d）。
         cancelPendingSaves()
         openEpoch++
@@ -208,7 +213,16 @@ class EditorSession(
         val epoch = _state.value.contentEpoch + 1
         // 打开（含重新打开）即新基线：旧文件的编辑历史不得跨文件撤销（WRI-014）。
         history.reset()
-        when (val decision = EditorOpen.decide(serverContent, serverRevision, drafts.loadDraft(key))) {
+        // 旧格式草稿回退：升级前保存的草稿只有 `projectId\0path`，没有服务器归属。
+        // 首次打开时读到并**迁移到当前 origin 的新 key，同时删掉旧 key**——只迁一次，
+        // 否则同一份旧草稿会被多个服务器先后读到（AUTH-006 隔离会失效）。
+        val draft = drafts.loadDraft(key) ?: legacyDraftKey(projectId, path)?.let { legacyKey ->
+            drafts.loadDraft(legacyKey)?.also { migrated ->
+                drafts.saveDraft(key, migrated)
+                drafts.clearDraft(legacyKey)
+            }
+        }
+        when (val decision = EditorOpen.decide(serverContent, serverRevision, draft)) {
             is OpenDecision.Server -> {
                 drafts.clearDraft(key) // 清理残留草稿（内容已与服务器一致）
                 _state.value = EditorUiState(
@@ -495,5 +509,13 @@ class EditorSession(
         return true
     }
 
-    private fun fileKey(s: EditorUiState): String = "${s.projectId}\u0000${s.filePath}"
+    private fun fileKey(s: EditorUiState): String = draftKey(s.projectId, s.filePath)
+
+    /** 草稿身份：`origin\0projectId\0path`（origin 为空时退化为旧格式）。 */
+    private fun draftKey(projectId: String, path: String): String =
+        if (origin.isBlank()) "$projectId\u0000$path" else "$origin\u0000$projectId\u0000$path"
+
+    /** 升级前的旧格式 key；origin 为空时没有旧格式可言。 */
+    private fun legacyDraftKey(projectId: String, path: String): String? =
+        if (origin.isBlank()) null else "$projectId\u0000$path"
 }

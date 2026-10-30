@@ -113,7 +113,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             local = LocalConflictArchive(File(getApplication<Application>().filesDir, "conflicts")),
         )
         val coordinator = FileSaveCoordinator(client, drafts, archive)
-        val s = EditorSession(coordinator, drafts, viewModelScope)
+        // 草稿身份带服务器作用域（AUTH-006）：A/B 两个服务器上同名项目互不串草稿。
+        val s = EditorSession(coordinator, drafts, viewModelScope, origin = origin)
         this.session = s
         collectJob?.cancel()
         collectJob = viewModelScope.launch {

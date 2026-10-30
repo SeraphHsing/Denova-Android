@@ -126,6 +126,19 @@ class ConnectionViewModel(
     }
 
     /**
+     * 更换服务器（AUTH-006）：回到地址输入态。
+     *
+     * 会话 Cookie 按 origin 落盘，切换后互不影响；当前 client 丢弃，旧会话的在途回执因
+     * `c !== client` 被判为过期，不会把新连接状态覆盖掉。
+     */
+    fun changeServer() {
+        client?.generation?.retire()
+        client = null
+        _actionError.value = null
+        _state.value = ConnectionUiState.Empty
+    }
+
+    /**
      * 会话失效（401）：只处理当前客户端，且必须先用 canonical status 二次确认。
      *
      * 迟到的 401 可能来自登录完成前发出的旧请求（登录成功后 `resetUnauthorizedFlag()` 会复位一次性标志），

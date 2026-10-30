@@ -243,6 +243,8 @@
 
 - 2026-10-30 AUTH-001 / AUTH-007 收口（真机），AUTH-004 记录「机制已实现、端到端待构造」（保持 `未开始`）：连接页四态对齐 Web 登录卡片（标题「登录 Denova」+ 描述 + 30 天保留提示 + 空值/提交中禁用 + 登录中/配对中文案），Checking 与 Failed 都保留地址输入与「重试」（原生比 Web 多这两个入口：构造并发与原地重试所需）；地址输入提升到页面层，断网/错址失败后不被分支重建重置；失败自动恢复走 `ConnectivityManager.onAvailable` 仅对 Failed 态重连（新增 `ACCESS_NETWORK_STATE`）。AUTH-004 新增 `core/auth/SessionExpiryConfirmer`——收到 401 先读 canonical status，只有明确未认证才降级，迟到 401 与探测失败保持会话（JVM 4 例）；真机端到端仍缺可并发入口（Checking 不显示登录表单），构造方法登记在该行 `gap_or_decision`。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
 
+- 2026-10-30 AUTH-006 收口（真机）：草稿身份改为 `origin\0projectId\0path`（`EditorSession` 由 `EditorViewModel.bindClient` 传 `serverOrigin`），升级前旧格式草稿首次读取时迁移到当前 origin 并删除旧 key（只迁一次，避免多服务器反复读到）；登录页新增「更换服务器」入口（`changeServer()` 丢弃 client + retire 世代）。真机闭环：A 断网编辑产生草稿 → 改连 B（同后端的代理 origin）打开同一文件**无**「已恢复未保存的编辑」→ 切回 A 恢复草稿；B 首次连接需重新登录（Cookie 按 origin），换服务器清空标签。`EditorSessionTest` 新增 4 例。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |

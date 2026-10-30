@@ -65,6 +65,7 @@
 <string name="conn_login_title">Sign in to Denova</string>
 <string name="conn_login_desc">Enter the remote access username and password configured on the server.</string>
 <string name="conn_remember_hint">Sign-in is kept for 30 days; sign out from settings.</string>
+<string name="conn_change_server">Change server</string>
     <string name="editor_project_id">Project ID</string>
     <string name="editor_file_path">File path</string>
     <string name="editor_open">Open</string>

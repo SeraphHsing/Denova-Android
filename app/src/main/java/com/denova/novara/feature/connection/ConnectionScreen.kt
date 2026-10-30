@@ -18,6 +18,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -145,6 +146,15 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
                 if (s.local) {
                     Spacer(Modifier.height(4.dp))
                     Text(stringResource(R.string.conn_local), color = MaterialTheme.colorScheme.primary)
+                }
+                // AUTH-006：登录页也要能换服务器，否则连到 B 只能靠杀进程重来。
+                TextButton(
+                    onClick = {
+                        serverEdited = false
+                        viewModel.changeServer()
+                    },
+                ) {
+                    Text(stringResource(R.string.conn_change_server))
                 }
                 AuthForms(viewModel, actionError, submitting)
             }
