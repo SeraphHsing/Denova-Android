@@ -529,6 +529,14 @@
     <string name="approval_state_allowed_workspace">Allowed (workspace rule)</string>
     <string name="approval_state_denied">Denied</string>
     <string name="approval_state_cancelled">Cancelled</string>
+    <string name="verify_title">Verify an interrupted operation</string>
+    <string name="verify_description">The operation below may have taken effect before the connection stopped. Check its current state. This task will wait for your answer; you can also cancel the task.</string>
+    <string name="verify_question">Did this operation take effect?</string>
+    <string name="verify_executed">It took effect</string>
+    <string name="verify_not_executed">It did not take effect</string>
+    <string name="verify_unknown">I cannot determine this yet</string>
+    <string name="verify_still_pending">Verification is still pending. The task will keep waiting.</string>
+    <string name="verify_cancel_task">Cancel task</string>
     <string name="approval_risk_low">Low risk</string>
     <string name="approval_risk_medium">Medium risk</string>
     <string name="approval_risk_high">High risk</string>

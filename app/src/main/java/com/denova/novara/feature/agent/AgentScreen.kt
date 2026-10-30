@@ -73,6 +73,7 @@ import com.denova.novara.core.stream.ApprovalRisk
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.stream.AgentAskQuestion
+import com.denova.novara.core.stream.AgentVerificationLogic
 import com.denova.novara.core.stream.AgentPhase
 import com.denova.novara.core.stream.ApprovalOption
 import com.denova.novara.core.stream.ApprovalState
@@ -251,6 +252,10 @@ private fun AgentApprovalCard(
 /**
  * 提问卡片（AGT-004）：逐题列出服务端选项，选中才能提交；取消按固定原因上报。
  * 选项文案、推荐项与新选项全部来自服务端问句，本地不构造问题。
+ *
+ * 工具副作用验证（AGT-004 补验）沿用同一张卡片，但按 Web `AskInteractionCard` 覆盖：
+ * 标题/问题换成本地文案、选项 label 本地化、不展示推荐项与选项描述，
+ * 并在待答态展示宿主证据（工具名 + 调用参数）。
  */
 @Composable
 private fun AgentAskCard(
@@ -261,6 +266,7 @@ private fun AgentAskCard(
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
 ) {
+    val verification = ask.verification
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -268,8 +274,38 @@ private fun AgentAskCard(
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
             .padding(10.dp),
     ) {
+        if (verification != null) {
+            Text(stringResource(R.string.verify_title), style = MaterialTheme.typography.titleSmall)
+            Text(
+                stringResource(R.string.verify_description),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+            if (verification.tool.isNotBlank()) {
+                Text(
+                    verification.tool,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            AgentVerificationLogic.argumentsText(verification)?.let { arguments ->
+                Text(
+                    arguments,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    maxLines = 8,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
         ask.questions.forEach { question ->
-            Text(question.question, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                if (verification != null) stringResource(R.string.verify_question) else question.question,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(top = if (verification != null) 8.dp else 0.dp),
+            )
             val picked = selected[question.id].orEmpty()
             question.options.forEach { option ->
                 Row(
@@ -281,12 +317,22 @@ private fun AgentAskCard(
                 ) {
                     Text(if (option.id in picked) "●" else "○", modifier = Modifier.padding(end = 8.dp))
                     Column {
+                        val localized = AgentVerificationLogic.optionLabelRes(option.id)
+                            ?.takeIf { verification != null }
+                            ?.let { stringResource(it) }
                         Text(
-                            option.label + if (option.id == question.recommendedOptionId) stringResource(R.string.agent_recommended) else "",
+                            (localized ?: option.label) +
+                                if (verification == null && option.id == question.recommendedOptionId) {
+                                    stringResource(R.string.agent_recommended)
+                                } else {
+                                    ""
+                                },
                             style = MaterialTheme.typography.bodySmall,
                         )
-                        option.description?.takeIf { it.isNotBlank() }?.let {
-                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                        if (verification == null) {
+                            option.description?.takeIf { it.isNotBlank() }?.let {
+                                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+                            }
                         }
                     }
                 }
@@ -300,7 +346,13 @@ private fun AgentAskCard(
                 onClick = onCancel,
                 enabled = !submitting,
                 modifier = Modifier.padding(start = 8.dp),
-            ) { Text(stringResource(R.string.ask_cancel)) }
+            ) {
+                Text(
+                    stringResource(
+                        if (verification != null) R.string.verify_cancel_task else R.string.ask_cancel,
+                    ),
+                )
+            }
         }
     }
 }

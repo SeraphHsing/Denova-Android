@@ -5,6 +5,8 @@ import com.denova.novara.core.i18n.UiText
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Agent 提问交互（AGT-004）。
@@ -53,6 +55,20 @@ data class AgentAskAnswerResult(
     @SerialName("custom_input") val customInput: String? = null,
 )
 
+/**
+ * 工具副作用验证的宿主证据（后端 `agentinteraction.ToolEffectVerification`）。
+ *
+ * 只在「有副作用的工具已开始执行、但结果未落盘，随后运行恢复」时下发
+ * （`agent/lifecycle/lifecycle_tool_facts.go` 的 `restoreEffectInteractions`），
+ * 交互 id 固定为 `verify-<callId>`；`arguments` 是当时的原始调用参数。
+ */
+@Serializable
+data class AgentToolEffectVerification(
+    @SerialName("execution_id") val executionId: String = "",
+    val tool: String = "",
+    val arguments: JsonElement? = null,
+)
+
 @Serializable
 data class AgentAskInteraction(
     val schema: String = "",
@@ -66,6 +82,8 @@ data class AgentAskInteraction(
     @SerialName("allow_other") val allowOther: Boolean = false,
     /** 工具审批类提问（`kind=tool_approval`）携带的决策信息；提问类为空。 */
     val approval: AgentToolApproval? = null,
+    /** 工具副作用验证（普通提问形状 + 宿主证据）；其余交互为空。 */
+    val verification: AgentToolEffectVerification? = null,
     val answers: List<AgentAskAnswerResult> = emptyList(),
     @SerialName("cancel_reason") val cancelReason: String? = null,
 ) {
@@ -73,6 +91,9 @@ data class AgentAskInteraction(
 
     /** 是否为工具审批（`questions` 为空、决策在 [approval]）。 */
     val isToolApproval: Boolean get() = kind == AgentApprovalLogic.KIND_TOOL_APPROVAL && approval != null
+
+    /** 是否为工具副作用验证（有宿主证据、`questions` 非空）。 */
+    val isVerification: Boolean get() = verification != null
 }
 
 /** 回答 / 取消接口的返回：`status`、答案与取消原因。 */
@@ -84,6 +105,50 @@ data class AgentAskResolution(
     val answers: List<AgentAskAnswerResult> = emptyList(),
     @SerialName("cancel_reason") val cancelReason: String? = null,
 )
+
+/**
+ * 工具副作用验证（AGT-004 补验）：文案与证据展示的纯逻辑。
+ *
+ * 与 Web `AskInteractionCard` 对齐：有 `verification` 时标题/问题改用本地文案，
+ * `allow_other` 强制关闭、推荐项不展示、选项 label 按 `executed`/`not_executed`/`unknown` 本地化；
+ * 服务端只把前两者当作已核实，`unknown` 会保持 `status=pending`。
+ */
+object AgentVerificationLogic {
+
+    const val QUESTION_ID = "effect"
+    const val EXECUTED = "executed"
+    const val NOT_EXECUTED = "not_executed"
+    const val UNKNOWN = "unknown"
+
+    /** Web 在验证场景下取消时使用的原因（区分普通提问的 `user_cancelled`）。 */
+    const val CANCEL_REASON_TASK_ABORTED = "task_aborted"
+
+    /** 已知三项映射到本地文案；其他值回落到服务端给的 label，不伪造。 */
+    fun optionLabelRes(optionId: String): Int? = when (optionId.trim()) {
+        EXECUTED -> R.string.verify_executed
+        NOT_EXECUTED -> R.string.verify_not_executed
+        UNKNOWN -> R.string.verify_unknown
+        else -> null
+    }
+
+    fun cancelReason(ask: AgentAskInteraction): String =
+        if (ask.isVerification) CANCEL_REASON_TASK_ABORTED else AgentAskLogic.CANCEL_REASON_USER
+
+    /** 提交后仍待核实（服务端对 `unknown` / 取消 / 多答案返回 pending）。 */
+    fun stillPending(resolution: AgentAskResolution): Boolean =
+        resolution.status == AgentAskLogic.STATUS_PENDING
+
+    /**
+     * 宿主证据里的调用参数，缩进后用于卡片展示；超长时截断，避免一屏被参数占满。
+     */
+    fun argumentsText(verification: AgentToolEffectVerification?, limit: Int = 2000): String? {
+        val element = verification?.arguments ?: return null
+        val text = runCatching { PRETTY.encodeToString(JsonElement.serializer(), element) }.getOrNull() ?: return null
+        return if (text.length <= limit) text else text.take(limit) + "…"
+    }
+
+    private val PRETTY = Json { prettyPrint = true }
+}
 
 /**
  * 提问交互的纯逻辑：选项切换、可否提交、答案体构造、已解决文案。

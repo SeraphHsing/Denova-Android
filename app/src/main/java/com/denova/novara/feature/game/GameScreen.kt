@@ -82,6 +82,7 @@ import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.stream.AgentApprovalLogic
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
+import com.denova.novara.core.stream.AgentVerificationLogic
 import com.denova.novara.core.stream.ApprovalMode
 import com.denova.novara.core.stream.ApprovalOption
 import com.denova.novara.core.stream.ApprovalReason
@@ -760,6 +761,7 @@ private fun AskCard(
             Text(
                 when {
                     ask.isPending && ask.isToolApproval -> stringResource(R.string.approval_title)
+                    ask.isPending && ask.isVerification -> stringResource(R.string.verify_title)
                     ask.isPending -> stringResource(R.string.game_ask_title)
                     ask.isToolApproval -> approvalStateLabel(ask)
                     else -> AgentAskLogic.statusText(ask).resolve()
@@ -813,9 +815,31 @@ private fun AskCard(
                 }
                 return@Column
             }
+            // 工具副作用验证（AGT-004 补验）：与 Agent 卡片同一套文案与证据展示。
+            if (ask.isVerification) {
+                val verification = ask.verification
+                Text(
+                    stringResource(R.string.verify_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                if (!verification?.tool.isNullOrBlank()) {
+                    Text(verification?.tool.orEmpty(), style = MaterialTheme.typography.bodySmall)
+                }
+                AgentVerificationLogic.argumentsText(verification)?.let { arguments ->
+                    Text(
+                        arguments,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline,
+                        maxLines = 6,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             ask.questions.forEach { question ->
                 Text(
-                    question.question,
+                    if (ask.isVerification) stringResource(R.string.verify_question) else question.question,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -824,6 +848,9 @@ private fun AskCard(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     question.options.forEach { option ->
+                        val localized = AgentVerificationLogic.optionLabelRes(option.id)
+                            ?.takeIf { ask.isVerification }
+                            ?.let { stringResource(it) }
                         FilterChip(
                             selected = selected[question.id]?.contains(option.id) == true,
                             onClick = {
@@ -835,7 +862,7 @@ private fun AskCard(
                                     )
                                     )
                             },
-                            label = { Text(option.label.ifBlank { option.id }, maxLines = 1) },
+                            label = { Text(localized ?: option.label.ifBlank { option.id }, maxLines = 1) },
                         )
                     }
                 }
@@ -843,7 +870,11 @@ private fun AskCard(
             if (ask.isPending) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(onClick = onCancel, enabled = !busy) {
-                        Text(stringResource(R.string.common_cancel))
+                        Text(
+                            stringResource(
+                                if (ask.isVerification) R.string.verify_cancel_task else R.string.common_cancel,
+                            ),
+                        )
                     }
                     TextButton(
                         onClick = { onSubmit(selected) },

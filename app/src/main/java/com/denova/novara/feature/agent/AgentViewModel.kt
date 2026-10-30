@@ -30,6 +30,7 @@ import com.denova.novara.core.stream.AgentPartLogic
 import com.denova.novara.core.stream.AgentToolPart
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
+import com.denova.novara.core.stream.AgentVerificationLogic
 import com.denova.novara.core.stream.AgentAskQuestion
 import com.denova.novara.core.stream.AgentAskResolution
 import com.denova.novara.core.stream.SessionScope
@@ -956,7 +957,10 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** 取消提问：原因固定 `user_cancelled`（与 Web 默认值一致）。 */
+    /**
+     * 取消提问：普通提问用 `user_cancelled`（Web 默认值）；
+     * 工具副作用验证用 `task_aborted`（Web 在验证卡片上点「取消任务」时的原因）。
+     */
     fun cancelAsk(askId: String) {
         val client = client ?: return
         val sessionId = _state.value.sessionId.trim()
@@ -965,7 +969,7 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
         _state.value = _state.value.copy(askSubmitting = true, askError = null)
         viewModelScope.launch {
             try {
-                val resolution = client.cancelSessionAsk(sessionId, askId)
+                val resolution = client.cancelSessionAsk(sessionId, askId, AgentVerificationLogic.cancelReason(ask))
                 DenovaLog.i("Agent", "ask cancelled id=$askId status=${resolution.status} reason=${resolution.cancelReason}")
                 applyAskResolution(ask, resolution)
             } catch (e: DenovaApiException) {
@@ -1010,6 +1014,15 @@ class AgentViewModel(application: Application) : AndroidViewModel(application) {
             base
         }
         val state = _state.value
+        if (resolved.isPending) {
+            // 工具副作用验证选了 `unknown`（或取消/多答案）时，服务端会保持 pending 等继续确认：
+            // 卡片留在待答位并给出提示，不能当成已解决，否则用户既看不到证据也无法再选。
+            _state.value = state.copy(
+                pendingAsks = state.pendingAsks.filterNot { it.id == ask.id } + resolved,
+                askError = UiText.of(R.string.verify_still_pending),
+            )
+            return
+        }
         _state.value = state.copy(
             pendingAsks = state.pendingAsks.filterNot { it.id == ask.id },
             resolvedAsks = (state.resolvedAsks.filterNot { it.id == ask.id } + resolved).takeLast(5),

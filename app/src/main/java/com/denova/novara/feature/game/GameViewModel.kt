@@ -53,6 +53,7 @@ import com.denova.novara.core.stream.AgentAskAnswerResult
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskSelectedOption
 import com.denova.novara.core.stream.AgentAskLogic
+import com.denova.novara.core.stream.AgentVerificationLogic
 import com.denova.novara.core.stream.ApprovalOption
 import com.denova.novara.core.stream.GameStreamRecoveryCoordinator
 import com.denova.novara.core.stream.NarrativeBuilder
@@ -521,7 +522,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 resolved
             }
-            _uiState.value = _uiState.value.copy(runtimeBusy = false, ask = withChoice)
+            _uiState.value = _uiState.value.copy(
+                runtimeBusy = false,
+                ask = withChoice,
+                // 工具副作用验证选 `unknown`（或服务端仍需确认）时保持待答，并说明为什么没结束。
+                runtimeError = if (withChoice.isVerification && withChoice.isPending) {
+                    UiText.of(R.string.verify_still_pending)
+                } else {
+                    null
+                },
+            )
             DenovaLog.i(
                 "Game",
                 "ask resolved id=${ask.id} status=${resolution.status} option=${approvalOption?.wireId}",
@@ -529,7 +539,9 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** 取消提问（与 Web 一致，原因 `user_cancelled`）。 */
+    /**
+     * 取消提问：普通提问用 `user_cancelled`；工具副作用验证用 `task_aborted`（与 Web 一致）。
+     */
     fun cancelAsk() {
         val client = client ?: return
         val state = _uiState.value
@@ -538,7 +550,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = state.copy(runtimeBusy = true, runtimeError = null)
         viewModelScope.launch {
             val resolution = try {
-                client.cancelInteractiveAsk(state.storyId, state.branchId, ask.id)
+                client.cancelInteractiveAsk(
+                    state.storyId,
+                    state.branchId,
+                    ask.id,
+                    AgentVerificationLogic.cancelReason(ask),
+                )
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
