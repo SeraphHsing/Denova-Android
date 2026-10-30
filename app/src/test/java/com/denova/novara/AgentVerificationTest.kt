@@ -1,5 +1,6 @@
 package com.denova.novara
 
+import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.stream.AgentAskInteraction
 import com.denova.novara.core.stream.AgentAskLogic
 import com.denova.novara.core.stream.AgentAskResolution
@@ -133,6 +134,39 @@ class AgentVerificationTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun `answered verification text localizes the submitted choice`() {
+        val base = json.decodeFromString(AgentAskInteraction.serializer(), verificationJson)
+
+        fun answered(optionId: String) = base.copy(
+            status = "answered",
+            answers = listOf(
+                com.denova.novara.core.stream.AgentAskAnswerResult(
+                    questionId = "effect",
+                    selectedOptions = listOf(
+                        com.denova.novara.core.stream.AgentAskSelectedOption(optionId, "It took effect"),
+                    ),
+                ),
+            ),
+        )
+
+        assertEquals(UiText.of(R.string.verify_state_executed), AgentAskLogic.statusText(answered("executed")))
+        assertEquals(
+            UiText.of(R.string.verify_state_not_executed),
+            AgentAskLogic.statusText(answered("not_executed")),
+        )
+        assertEquals(UiText.of(R.string.verify_state_unknown), AgentAskLogic.statusText(answered("unknown")))
+
+        // 普通提问仍按服务端 label 列出（不受验证分支影响）。
+        val normal = json.decodeFromString(
+            AgentAskInteraction.serializer(),
+            """{"schema":"ask.pending.v1","id":"ask-2","status":"answered",
+                "questions":[{"id":"q1","question":"去哪？"}],
+                "answers":[{"question_id":"q1","question":"去哪？","selected_options":[{"id":"north","label":"北上"}]}]}""".trimIndent(),
+        )
+        assertEquals(UiText.of(R.string.ask_status_answered_items, "北上"), AgentAskLogic.statusText(normal))
     }
 
     @Test

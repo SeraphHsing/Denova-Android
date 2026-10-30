@@ -537,6 +537,9 @@
     <string name="verify_unknown">暂时无法确定</string>
     <string name="verify_still_pending">尚未确认操作结果，任务将继续等待。</string>
     <string name="verify_cancel_task">取消任务</string>
+    <string name="verify_state_executed">已验证：操作已生效</string>
+    <string name="verify_state_not_executed">已验证：操作未生效</string>
+    <string name="verify_state_unknown">仍待确认：暂时无法确定</string>
     <string name="approval_risk_low">低风险</string>
     <string name="approval_risk_medium">中风险</string>
     <string name="approval_risk_high">高风险</string>

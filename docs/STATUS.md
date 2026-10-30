@@ -235,7 +235,7 @@
 
 以上数字来自规划包的静态提取结果，不代表完整盘点已结束或运行测试已通过。
 
-- 2026-10-30 补齐 AGT-004 的 `verification`（工具副作用验证）分支：契约 `AgentToolEffectVerification`、Agent 与游戏两侧卡片文案与宿主证据展示、取消原因 `task_aborted`、`unknown` 保持待答提示；`AgentVerificationTest` 6 例通过，`testDebugUnitTest / lintDebug / assembleDebug` 全绿。**真机端到端未执行**：需要副作用工具 `started` 无 `result` 后触发运行恢复；当日测试服务器模型代理 `192.168.2.102:8317` 对全部 profile 返回 `400 User location is not supported`，任何 Agent 都无法发起工具调用（[证据](evidence/agt-004/verification/README.md) 第 4 节含补验步骤）。
+- 2026-10-30 补齐 AGT-004 的 `verification`（工具副作用验证）分支：契约 `AgentToolEffectVerification`、Agent 与游戏两侧卡片文案与宿主证据展示、取消原因 `task_aborted`、`unknown` 保持待答提示、已解决态按选项本地化；`AgentVerificationTest` 7 例，`testDebugUnitTest / lintDebug / assembleDebug` 全绿。**真机端到端已通过**：用「bash 全量 sha256 执行中 SIGKILL + resume」构造出 `verify-<callId>` 交互，App 显示「核实中断的操作」，验证 `pending → answered` 与 `pending_asks` 清空（[证据](evidence/agt-004/verification/README.md) 含 4 张截图与复现步骤）。
 
 ## 已完成（退出条件满足）
 

@@ -206,10 +206,29 @@ object AgentAskLogic {
     /** 已解决文案：回答列出选项名，取消显示原因。 */
     fun statusText(ask: AgentAskInteraction): UiText = when (ask.status) {
         STATUS_ANSWERED -> {
-            val picked = ask.answers.flatMap { result ->
-                result.selectedOptions.map { it.label.ifBlank { it.id } }
-            }.filter { it.isNotBlank() }
-            if (picked.isEmpty()) UiText.of(R.string.ask_status_answered) else UiText.of(R.string.ask_status_answered_items, picked.joinToString("、"))
+            // 工具副作用验证的选项 label 由服务端以英文下发，已解决态按 id 换成本地文案。
+            val verificationChoice = if (ask.isVerification) {
+                ask.answers.flatMap { it.selectedOptions }.firstOrNull()?.id
+            } else {
+                null
+            }
+            if (verificationChoice != null) {
+                when (verificationChoice) {
+                    AgentVerificationLogic.EXECUTED -> UiText.of(R.string.verify_state_executed)
+                    AgentVerificationLogic.NOT_EXECUTED -> UiText.of(R.string.verify_state_not_executed)
+                    AgentVerificationLogic.UNKNOWN -> UiText.of(R.string.verify_state_unknown)
+                    else -> UiText.of(R.string.ask_status_answered)
+                }
+            } else {
+                val picked = ask.answers.flatMap { result ->
+                    result.selectedOptions.map { it.label.ifBlank { it.id } }
+                }.filter { it.isNotBlank() }
+                if (picked.isEmpty()) {
+                    UiText.of(R.string.ask_status_answered)
+                } else {
+                    UiText.of(R.string.ask_status_answered_items, picked.joinToString("、"))
+                }
+            }
         }
 
         STATUS_CANCELLED -> ask.cancelReason

@@ -537,6 +537,9 @@
     <string name="verify_unknown">I cannot determine this yet</string>
     <string name="verify_still_pending">Verification is still pending. The task will keep waiting.</string>
     <string name="verify_cancel_task">Cancel task</string>
+    <string name="verify_state_executed">Verified: the operation took effect</string>
+    <string name="verify_state_not_executed">Verified: the operation did not take effect</string>
+    <string name="verify_state_unknown">Still pending: cannot determine yet</string>
     <string name="approval_risk_low">Low risk</string>
     <string name="approval_risk_medium">Medium risk</string>
     <string name="approval_risk_high">High risk</string>

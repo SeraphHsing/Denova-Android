@@ -1,7 +1,7 @@
 # AGT-004 补验：工具副作用验证（verification）
 
 日期：2026-10-30
-状态：**契约与界面已实现并经 JVM 单测锁定；真机端到端未执行（环境阻塞，见第 4 节）**
+状态：**契约、界面与真机端到端均已通过**
 
 ## 1. 这是什么
 
@@ -25,7 +25,8 @@
 | 推荐项与自由输入 | 验证场景不显示推荐标记、选项描述；`allow_other` 不生效（与 Web 强制 false 一致） |
 | 取消 | `AgentVerificationLogic.cancelReason`：验证场景 `task_aborted`，普通提问仍 `user_cancelled` |
 | `unknown` 提交 | `Agent` / `Game` 两侧都在 `status=pending` 时保留待答卡片并提示 `verify_still_pending`，不移入已解决 |
-| 界面 | `AgentScreen.AgentAskCard` 与 `GameScreen.AskCard` 共用同一逻辑与字符串（中英各 8 条） |
+| 已解决态 | `AgentAskLogic.statusText` 按提交选项 id 换成本地文案（「已验证：操作已生效 / 未生效 / 仍待确认」），不再回显服务端英文 label |
+| 界面 | `AgentScreen.AgentAskCard` 与 `GameScreen.AskCard` 共用同一逻辑与字符串 |
 
 ## 3. 自动化验证
 
@@ -34,37 +35,46 @@
 BUILD SUCCESSFUL
 ```
 
-`AgentVerificationTest` 覆盖：带证据的解码、JSON 参数 pretty/截断、选项本地化映射、
-取消原因分流、答案体 `question_id=effect` + `selected=unknown`、`pending` 判定。
+`AgentVerificationTest` 7 例：带证据的解码、JSON 参数 pretty/截断、选项本地化映射、
+取消原因分流、答案体 `question_id=effect` + `selected=unknown`、`pending` 判定、
+已解决态按选项本地化（并确认普通提问仍按服务端 label 列出）。
 
-同时执行（本次改动）：
+同时执行：
 
 ```
 ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 BUILD SUCCESSFUL（2026-10-30）
 ```
 
-## 4. 真机端到端（未执行）
+## 4. 真机端到端（2026-10-30，小米 14 Pro / `135babde`）
 
-构造该交互需要：让一个副作用工具（如 `bash sleep`）开始执行后强杀服务端，使其停在
-`started && result==nil`，再触发运行恢复。2026-10-30 在测试服务器上按此路径尝试时被环境阻塞：
+构造方法（可复现）：
 
-- 尝试对象：隔离写作会话（`full_access`），指令 `Run bash sleep 240 now`
-- 结果：模型调用在工具执行前即失败，多次（gemini-3.8-flash-high / claude-sonnet-4-6 / gpt-5.6-luna）一致返回
-  `400 Bad Request`：
-  `provider API error (status 400): POST "http://192.168.2.102:8317/v1/chat/completions": ... "User location is not supported for the API use." (FAILED_PRECONDITION)`
-- 结论：测试服务器的模型聚合代理当前对所有 profile 拒绝调用，任何 Agent 都无法产生工具调用，
-  因而无法进入「工具执行中断」状态。这是外部依赖故障，与本次客户端改动无关。
+1. 测试服务器前台项目切到含 63 个文件的工作区（`projects/1`），新建写作会话并设 `approval_mode=full_access`；
+2. 让 Agent 用 bash 执行 `find . -type f -exec sha256sum {} +`（实测 3.3s，`mutation_scope=external`）；
+3. SSE 出现 `tool-input-available` 后 0.2s 执行 `docker kill -s KILL denova`
+   （SIGKILL，避免 SIGTERM 优雅落盘把 `tool_result` 补上）；
+4. `docker start denova` 就绪后 `GET /api/chat/active` 显示 `open_tools=[{name:bash}]`、`phase=suspended`、
+   `recovery_actions[kind=resume]`；
+5. 用该 resume 动作调 `POST /api/chat/recovery` → 恢复入口执行 `restoreEffectInteractions()`，补出 ask。
 
-补验步骤（代理恢复后）：
+观测结果：
 
-1. 隔离写作会话，`approval_mode=full_access`，发送要求 `bash sleep 240` 的指令；
-2. 检测到 bash 工具开始（SSE `data-agent-tool` / 服务端 `tool` 日志）后 3 秒内重启容器；
-3. App 重新挂接该会话，确认 `pending_ask.id` 以 `verify-` 开头、卡片显示工具与参数；
-4. 选「暂时无法确定」→ 服务端回 `pending`、卡片留在待答并提示；再选「已经生效」→ 落定；
-5. 记录截图与 `GET /api/chat/active` 的 `pending_asks` 前后对比。
+- ask：`id=verify-tool-…`、`kind=question`、`questions=[{id:effect, options: executed/not_executed/unknown}]`，
+  与后端 `verify-<callId>` 约定一致；
+- App 挂接后显示「核实中断的操作」+ 说明文案 + 工具名 `bash` + 三个本地化选项 + 「提交 / 取消任务」（`shot-1-pending.png`）；
+- 选「暂时无法确定」提交：服务端返回 `status=pending`（`ask answered … status=pending`），
+  卡片保留待答并提示「尚未确认操作结果，任务将继续等待。」（`shot-2-unknown-pending.png`）；
+- 再选「已经生效」提交：`status=answered`，状态行显示「已验证：操作已生效」，
+  `GET /api/chat/active` 变为 `active=false / phase=idle`、`pending_asks` 清空（`shot-4-verified-zh.png`）；
+- 修复前已解决态曾回显服务端英文 label（`shot-3-answered.png`，It took effect），
+  本轮已按选项 id 本地化，并补了单测防止回退。
 
-注意：第 2 步会中断服务器上其他会话，需在维护窗口执行，并在矩阵中登记影响范围。
+影响与恢复：
+
+- 构造期间对测试服务器执行过一次 `docker kill -s KILL`（容器 `unless-stopped`，实测需手动 `docker start`），
+  另有一次普通 `docker restart` 用于清理活动会话路径错乱；两次都只影响测试环境。
+- 验证完成后前台项目已切回原书籍（`Wuthering Waves`），探测会话保留（`verify-hash-1030` / `verify-slow-1030`）。
 
 ## 5. 不涉及
 
