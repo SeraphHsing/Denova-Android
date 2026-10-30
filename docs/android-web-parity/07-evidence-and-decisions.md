@@ -84,6 +84,12 @@
 
 候选项不是自动豁免。应用内容缺失、数据损失、错误副作用和未经解释的操作差异不能归入系统差异。
 
+### 已登记条目
+
+| ID | 矩阵行 | Web 行为 | Android 行为 | 原因 | 证据 | 替代操作 | 决定 |
+|---|---|---|---|---|---|---|---|
+| PD-01 | [NAV-008](parity-matrix.csv) | 浏览器内可从左右 24px 边缘滑动打开抽屉，无系统级抢占 | 三键导航下与 Web 一致；手势导航下系统返回优先，应用边缘手势收不到事件，`Modifier.systemGestureExclusion()` 的 200dp 中部排除带在 MIUI/HyperOS 实测无效 | Android 系统手势导航保留屏幕左右边缘的返回热区，且 OEM 可忽略应用的排除区 | [nav-008 真机结果](../evidence/nav-008/xiaomi-14-pro/result.md) | 顶栏 ☰ 按钮打开左抽屉、页面内按钮打开右抽屉；三键导航下边缘手势照常可用 | Hsing，2026-10-30，接受为平台差异；不关闭系统手势、不降低校验 |
+
 ## 6. 官方开发依据
 
 - [Compose UI架构](https://developer.android.com/develop/ui/compose/architecture)：状态与事件分离。

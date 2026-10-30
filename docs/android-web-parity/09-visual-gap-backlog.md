@@ -24,6 +24,7 @@
 | VG-004 | component | 排序交互不同 | 设置/自定义内拖拽重排（dnd-kit） | 抽屉内「排序 / ↑↓ / 恢复默认」按钮 | `WorkbenchShell.tsx:303-324`、`AppShell.kt:200-205` |
 | VG-005 | token | 抽屉与行尺寸未对齐 | 抽屉宽 `100% - 2rem`（390 下 358px，上限 24rem）、内容侧圆角 24px、标题栏 56px、创作行 58px/圆角 18px、工具行 52px、图标 22px 容器 + 20px svg（stroke 1.7）、标题 17px/600（−0.025em）、分组标签 12px/500 `#bdbdb8` | `ModalDrawerSheet` 默认 336dp 宽 / 16dp 圆角；`TextButton` 40dp 行高；M3 默认字号与图标 24dp | `drawer-390.png`、`metrics.json` |
 | VG-006 | token | 色板为手挑近似值，未从基线变量取值 | 深色：`--nova-bg #000`、`--nova-surface #0a0a0a`、`--nova-text #f7f7f4`、`--nova-text-muted #bdbdb8`、`--nova-border-soft #1e1e1e`；浅色：`--nova-bg #ffffff`、`--nova-surface #fafafa` 等 | `ui/theme/Color.kt` 自定义 primary `#5B5BD6`、background `#FBFAFF` / `#131318` | `metrics.json`、`Color.kt` |
+| VG-008 | component | 抽屉边缘手势没有跟手位移 | 触摸移动时抽屉随位移实时跟随，松手才判定开合 | 只在抬起时判定并开合，拖动过程无位移映射 | `use-mobile-drawer-swipe.ts`、`EdgeSwipeGesture.kt` |
 | VG-007 | token | 登录页尺寸与控件形态不同 | 卡片 358×397、圆角 14px、1px 描边；标题 16px/500；输入框 326×32、圆角 10px、padding 10px；按钮 326×32 | M3 `OutlinedTextField`（约 56dp 高）与 `Button` 默认 40dp，圆角 4/20dp | `login-390.png`、`metrics.json` |
 
 ## 2. 待决定（需产品判断，不阻塞 P5 其余条目）

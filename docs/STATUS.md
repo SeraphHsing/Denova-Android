@@ -237,6 +237,8 @@
 
 - 2026-10-30 补齐 AGT-004 的 `verification`（工具副作用验证）分支：契约 `AgentToolEffectVerification`、Agent 与游戏两侧卡片文案与宿主证据展示、取消原因 `task_aborted`、`unknown` 保持待答提示、已解决态按选项本地化；`AgentVerificationTest` 7 例，`testDebugUnitTest / lintDebug / assembleDebug` 全绿。**真机端到端已通过**：用「bash 全量 sha256 执行中 SIGKILL + resume」构造出 `verify-<callId>` 交互，App 显示「核实中断的操作」，验证 `pending → answered` 与 `pending_asks` 清空（[证据](evidence/agt-004/verification/README.md) 含 4 张截图与复现步骤）。
 
+- 2026-10-30 NAV-003 / NAV-008 收口：新增 `feature/shell/EdgeSwipeGesture.kt`（按基线 `use-mobile-drawer-swipe.ts` 移植：边缘 24dp、方向 8dp、位移 48dp、比例 1.35、纵向主导放弃、标题栏起手才可关闭、内容区/交互控件/浮层不认领）与 `DrawerSwipeModifier.kt`（`PointerEventPass.Initial` 采样，认领后才 consume），关闭 M3 `ModalNavigationDrawer` 默认整屏手势；左抽屉入口统一 `openLeftDrawer()`（先收右抽屉）、本地 `leftDrawerOpen` + 120ms 轮询兜底互斥，且手势只在已认证抽屉壳生效。真机（小米 14 Pro / Android 16 / 后端 0.6.3-b）通过：左右边缘开抽屉、标题栏滑动关闭、内容区横滑不关闭、边缘垂直滑动不误触；`EdgeSwipeGestureTest` 13 例。**平台差异**：手势导航下系统返回抢走边缘触摸、`systemGestureExclusion` 中部 200dp 排除带在 MIUI 实测无效，登记 [07 PD-01](android-web-parity/07-evidence-and-decisions.md#5-平台差异登记)，☰ 按钮为等价入口。同日建立 Web 移动视口抓图取证（`tools/web_parity_capture.py`，390/320 × 深/浅，登录页/工作台/抽屉/命令面板）与 [09 视觉与交互差异清单](android-web-parity/09-visual-gap-backlog.md)（VG-001…008、VD-001）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |

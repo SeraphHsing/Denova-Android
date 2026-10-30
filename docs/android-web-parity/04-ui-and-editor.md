@@ -65,6 +65,8 @@ DesignTokens 覆盖背景 / surface / hover / active / border / text / muted / p
 
 Android 系统边缘返回与抽屉识别存在交汇，需要真机分别验证手势导航和三键导航。保持系统返回的优先权；抽屉始终有可点击入口，系统占用区域记录为平台差异，不假设所有边缘坐标均由 App 接收。
 
+2026-10-30 真机结论（小米 14 Pro / Android 16，[证据](../evidence/nav-008/xiaomi-14-pro/result.md)）：三键导航下上述阈值、标题栏关闭、内容区不认领、垂直阅读放弃全部通过；手势导航下系统返回抢走左右边缘触摸，`Modifier.systemGestureExclusion()` 声明的中部 200dp 排除带实测无效，登记为 [PD-01](07-evidence-and-decisions.md#5-平台差异登记)。实现上关闭 M3 `ModalNavigationDrawer` 的默认手势（整屏可拖、无比例与排除判定），改由自建 `EdgeSwipeGesture` + `drawerEdgeSwipe` 判定，指针采样走 `PointerEventPass.Initial`。
+
 来源：[手势实现](https://github.com/SeraphHsing/denova/blob/85ec97cc047d9e8ea52ebdae0c268c3df1c39a7e/web/src/components/layout/use-mobile-drawer-swipe.ts#L23)。
 
 ## 6. 安全区、键盘与滚动

@@ -7,12 +7,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -27,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -77,7 +84,10 @@ import com.denova.novara.feature.shell.ChaptersContent
 import com.denova.novara.feature.shell.ChangesContent
 import com.denova.novara.feature.shell.VersionsContent
 import com.denova.novara.feature.shell.ProjectDirectoryContent
+import com.denova.novara.feature.shell.DrawerSide
+import com.denova.novara.feature.shell.EdgeSwipeGesture
 import com.denova.novara.feature.shell.RightDrawer
+import com.denova.novara.feature.shell.drawerEdgeSwipe
 import com.denova.novara.feature.books.BooksScreen
 import com.denova.novara.feature.lore.LoreScreen
 import com.denova.novara.feature.presets.PresetsScreen
@@ -89,6 +99,7 @@ import com.denova.novara.feature.workbench.WorkbenchScreen
 import com.denova.novara.feature.workbench.WorkbenchTreeContent
 import com.denova.novara.feature.workbench.WorkbenchViewModel
 import com.denova.novara.ui.theme.NovaraTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
@@ -140,6 +151,8 @@ class MainActivity : AppCompatActivity() {
     val chaptersState by chaptersViewModel.state.collectAsState()
                 var showDebug by remember { mutableStateOf(false) }
                 var showRightDrawer by remember { mutableStateOf(false) }
+                // 左抽屉可见性由本地状态驱动（NAV-008 起手区判定需要稳定的可观察值）。
+                var leftDrawerOpen by remember { mutableStateOf(false) }
                 var rightTab by remember { mutableStateOf(0) }
                 // 当前编辑项目：书籍切换或编辑器输入框同步，供右抽屉项目目录加载。
                 var currentProjectId by remember { mutableStateOf("") }
@@ -163,13 +176,35 @@ class MainActivity : AppCompatActivity() {
                 // 登记位置必须在 NavHost **之后**（见下方 Box 末尾）：Compose 的返回分发按登记顺序
                 // 「后登记者优先」，写在 NavHost 之前会被导航图的回调抢先，真机上表现为
                 // 「抽屉开着按返回却退到了上一页」（P4-B 工作台实测）。
+                // NAV-003：左抽屉入口统一走这里，先收起右抽屉再打开左抽屉，避免两侧同时可见。
+                fun openLeftDrawer() {
+                    showRightDrawer = false
+                    leftDrawerOpen = true
+                    scope.launch { drawerState.open() }
+                }
+                fun closeLeftDrawer() {
+                    leftDrawerOpen = false
+                    scope.launch { drawerState.close() }
+                }
+                // M3 的 DrawerState 读值不一定触发重组，边缘手势的起手区判定改用本地状态，
+                // 并轮询一次真实状态做兜底同步（scrim 点击、返回键、导航后自动收起都会走到这里）。
+                LaunchedEffect(drawerState) {
+                    while (true) {
+                        val actualOpen = drawerState.currentValue == DrawerValue.Open
+                        if (actualOpen != leftDrawerOpen) {
+                            leftDrawerOpen = actualOpen
+                            if (actualOpen) showRightDrawer = false
+                        }
+                        delay(120)
+                    }
+                }
                 fun closeTopLayer(): Boolean = when {
                     showRightDrawer -> {
                         showRightDrawer = false
                         true
                     }
-                    drawerState.isOpen -> {
-                        scope.launch { drawerState.close() }
+                    leftDrawerOpen -> {
+                        closeLeftDrawer()
                         true
                     }
                     else -> false
@@ -180,7 +215,58 @@ class MainActivity : AppCompatActivity() {
                 // 换页时收起右抽屉：右抽屉内容按当前页面切换，留着会把上一页的「项目目录」盖在新页面上。
                 LaunchedEffect(currentRoute) { showRightDrawer = false }
 
-                Box(modifier = Modifier.fillMaxSize()) {
+                // NAV-008：边缘手势由 [drawerEdgeSwipe] 统一判定（基线 use-mobile-drawer-swipe）。
+                // 起手区：都关闭时左右各 24dp；某侧打开时只有抽屉标题栏（56dp + 状态栏）可关闭。
+                // 挂在最外层 Box 上：Initial pass 从根往叶分发，父节点先于页面滚动容器看到指针。
+                val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+                val openSide = when {
+                    showRightDrawer -> DrawerSide.RIGHT
+                    leftDrawerOpen -> DrawerSide.LEFT
+                    else -> null
+                }
+                // 只有已认证的抽屉壳才响应手势：连接页没有抽屉，响应会把状态带到登录后的首屏。
+                val swipeModifier = if (state is ConnectionUiState.Authenticated) {
+                    Modifier.drawerEdgeSwipe(
+                        openSide = openSide,
+                        headerHeight = 56.dp + statusBarTop,
+                        onOpen = { side ->
+                            when (side) {
+                                DrawerSide.LEFT -> openLeftDrawer()
+                                DrawerSide.RIGHT -> {
+                                    closeLeftDrawer()
+                                    showRightDrawer = true
+                                }
+                            }
+                        },
+                        onClose = {
+                            if (showRightDrawer) showRightDrawer = false else closeLeftDrawer()
+                        },
+                    )
+                } else {
+                    Modifier
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .then(swipeModifier),
+                ) {
+                    // NAV-008 平台差异：Android 左右边缘是系统返回手势区，先到先得。
+                    // 在屏幕中部各声明一条 200dp 高的排除带（系统对该类区域的硬上限），
+                    // 让抽屉边缘手势在这段生效；顶部与底部边缘仍归系统返回。
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .width(EdgeSwipeGesture.EDGE_BAND_DP.dp)
+                            .height(SYSTEM_GESTURE_EXCLUSION_HEIGHT)
+                            .systemGestureExclusion(),
+                    )
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterEnd)
+                            .width(EdgeSwipeGesture.EDGE_BAND_DP.dp)
+                            .height(SYSTEM_GESTURE_EXCLUSION_HEIGHT)
+                            .systemGestureExclusion(),
+                    )
                     when (state) {
                         is ConnectionUiState.Authenticated -> {
                             val client = connectionViewModel.client
@@ -205,6 +291,9 @@ class MainActivity : AppCompatActivity() {
                             }
                             ModalNavigationDrawer(
                                 drawerState = drawerState,
+                                // 关掉 M3 默认手势：它整屏可拖、没有方向比例与排除区判定，
+                                // 会抢走页面横向控件并让垂直阅读误开抽屉（NAV-008 按基线改由 drawerEdgeSwipe 判定）。
+                                gesturesEnabled = false,
                                 drawerContent = {
                                     ModalDrawerSheet {
                                         AppDrawer(
@@ -227,6 +316,7 @@ class MainActivity : AppCompatActivity() {
                                                         currentProjectId = book.projectId
                                                         // 每个项目各自一份文件标签桶（WRI-003）。
                                                         editorViewModel.setProject(book.projectId)
+                                                        leftDrawerOpen = false
                                                         drawerState.close()
                                                     }
                                                 }
@@ -234,14 +324,14 @@ class MainActivity : AppCompatActivity() {
                                             onOpenDebug = if (BuildConfig.DEBUG) {
                                                 // 抽屉入口先关闭抽屉再打开面板，避免面板被抽屉遮住。
                                                 {
-                                                    scope.launch { drawerState.close() }
+                                                    closeLeftDrawer()
                                                     showDebug = true
                                                 }
                                             } else {
                                                 null
                                             },
                                             onOpenMessages = {
-                                                scope.launch { drawerState.close() }
+                                                closeLeftDrawer()
                                                 navController.navigate("messages") {
                                                     launchSingleTop = true
                                                 }
@@ -255,18 +345,18 @@ class MainActivity : AppCompatActivity() {
                                             },
                                             onSkipOnboarding = { bookShelfViewModel.clearJustCreated() },
                                             onCreateBook = {
-                                                scope.launch { drawerState.close() }
+                                                closeLeftDrawer()
                                                 showCreateBook = true
                                             },
                                             onFillFirstPrompt = {
                                                 val book = bookState.justCreatedName
                                                 bookShelfViewModel.clearJustCreated()
-                                                scope.launch { drawerState.close() }
+                                                closeLeftDrawer()
                                                 val encoded = android.net.Uri.encode(OnboardingLogic.firstChapterPrompt(book).resolve(applicationContext))
                                                 navController.navigate("agent?projectId=$currentProjectId&filePath=&prompt=$encoded")
                                             },
                                             onNavigate = { destination ->
-                                                scope.launch { drawerState.close() }
+                                                closeLeftDrawer()
                                                 navController.navigate(destination.route) {
                                                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                                     launchSingleTop = true
@@ -319,10 +409,10 @@ class MainActivity : AppCompatActivity() {
                                     composable("editor") {
                                         EditorScreen(
                                             viewModel = editorViewModel,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             onOpenRightDrawer = {
                                                 // 打开右抽屉先收起左抽屉，避免两个面板同屏（NAV-003）。
-                                                scope.launch { drawerState.close() }
+                                                closeLeftDrawer()
                                                 showRightDrawer = true
                                             },
                                             onOpenTerminal = { projectId ->
@@ -370,10 +460,10 @@ class MainActivity : AppCompatActivity() {
                                             viewModel = gameViewModel,
                                             projectId = currentProjectId,
                                             client = connectionViewModel.client,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             onOpenRightDrawer = {
                                                 // 打开右抽屉先收起左抽屉，避免两个面板同屏（NAV-003）。
-                                                scope.launch { drawerState.close() }
+                                                closeLeftDrawer()
                                                 showRightDrawer = true
                                             },
                                             onBack = { navController.popBackStack() },
@@ -390,7 +480,7 @@ class MainActivity : AppCompatActivity() {
                                     ) { entry ->
                                         AgentScreen(
                                             viewModel = agentViewModel,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             onBack = { navController.popBackStack() },
                                             projectId = entry.arguments?.getString("projectId").orEmpty(),
                                             initialFile = entry.arguments?.getString("filePath").orEmpty(),
@@ -401,7 +491,7 @@ class MainActivity : AppCompatActivity() {
                                     composable("agents") {
                                         AgentsScreen(
                                             client = connectionViewModel.client,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             onOpenSession = { sessionId ->
                                                 navController.navigate(
                                                     "agent?projectId=$currentProjectId&filePath=&sessionId=$sessionId",
@@ -413,9 +503,9 @@ class MainActivity : AppCompatActivity() {
                                         WorkbenchScreen(
                                             viewModel = workbenchViewModel,
                                             client = connectionViewModel.client,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             onOpenRightDrawer = {
-                                                scope.launch { drawerState.close() }
+                                                closeLeftDrawer()
                                                 showRightDrawer = true
                                             },
                                         )
@@ -427,7 +517,7 @@ class MainActivity : AppCompatActivity() {
                                         val projectId = entry.arguments?.getString("projectId").orEmpty()
                                         TerminalScreen(
                                             viewModel = terminalViewModel,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             initialProjectId = projectId,
                                             onBack = { navController.popBackStack() },
                                         )
@@ -436,7 +526,7 @@ class MainActivity : AppCompatActivity() {
                                         BooksScreen(
                                             client = connectionViewModel.client,
                                             currentProjectId = currentProjectId,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             onCurrentBookChanged = { book ->
                                                 // 书籍页里切换 / 新建 / 导入 / 移除后，同步外壳的项目上下文，
                                                 // 否则抽屉、编辑器与项目目录还停在上一个项目上。
@@ -452,34 +542,34 @@ class MainActivity : AppCompatActivity() {
                                         LoreScreen(
                                             client = connectionViewModel.client,
                                             projectId = currentProjectId,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             viewModel = loreViewModel,
                                         )
                                     }
                                     composable("teller") {
                                         PresetsScreen(
                                             client = connectionViewModel.client,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                         )
                                     }
                                     composable("skills") {
                                         SkillsScreen(
                                             client = connectionViewModel.client,
                                             projectId = currentProjectId,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                         )
                                     }
                                     composable("settings") {
                                         SettingsScreen(
                                             client = connectionViewModel.client,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                         )
                                     }
                                     composable("automations") {
                                         AutomationsScreen(
                                             client = connectionViewModel.client,
                                             projectId = currentProjectId,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             viewModel = automationsViewModel,
                                         )
                                     }
@@ -487,7 +577,7 @@ class MainActivity : AppCompatActivity() {
                                         VersionsScreen(
                                             client = connectionViewModel.client,
                                             projectId = currentProjectId,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             viewModel = versionsViewModel,
                                         )
                                     }
@@ -496,7 +586,7 @@ class MainActivity : AppCompatActivity() {
                                             client = connectionViewModel.client,
                                             language = language,
                                             projectId = currentProjectId,
-                                            onOpenDrawer = { scope.launch { drawerState.open() } },
+                                            onOpenDrawer = { openLeftDrawer() },
                                             viewModel = marketViewModel,
                                         )
                                     }
@@ -520,7 +610,7 @@ class MainActivity : AppCompatActivity() {
                                         composable(destination.route) {
                                             PlaceholderScreen(
                                                 labelRes = destination.labelRes,
-                                                onOpenDrawer = { scope.launch { drawerState.open() } },
+                                                onOpenDrawer = { openLeftDrawer() },
                                             )
                                         }
                                     }
@@ -762,3 +852,9 @@ class MainActivity : AppCompatActivity() {
         private var logcatInstalled = false
     }
 }
+
+/**
+ * 系统手势排除带高度（NAV-008）：Android 对左右边缘排除区的单边上限是 200dp，
+ * 超出部分会被系统截断，所以按上限声明一条中部的带。
+ */
+private val SYSTEM_GESTURE_EXCLUSION_HEIGHT = 200.dp
