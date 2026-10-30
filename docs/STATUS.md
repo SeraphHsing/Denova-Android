@@ -239,6 +239,8 @@
 
 - 2026-10-30 NAV-003 / NAV-008 收口：新增 `feature/shell/EdgeSwipeGesture.kt`（按基线 `use-mobile-drawer-swipe.ts` 移植：边缘 24dp、方向 8dp、位移 48dp、比例 1.35、纵向主导放弃、标题栏起手才可关闭、内容区/交互控件/浮层不认领）与 `DrawerSwipeModifier.kt`（`PointerEventPass.Initial` 采样，认领后才 consume），关闭 M3 `ModalNavigationDrawer` 默认整屏手势；左抽屉入口统一 `openLeftDrawer()`（先收右抽屉）、本地 `leftDrawerOpen` + 120ms 轮询兜底互斥，且手势只在已认证抽屉壳生效。真机（小米 14 Pro / Android 16 / 后端 0.6.3-b）通过：左右边缘开抽屉、标题栏滑动关闭、内容区横滑不关闭、边缘垂直滑动不误触；`EdgeSwipeGestureTest` 13 例。**平台差异**：手势导航下系统返回抢走边缘触摸、`systemGestureExclusion` 中部 200dp 排除带在 MIUI 实测无效，登记 [07 PD-01](android-web-parity/07-evidence-and-decisions.md#5-平台差异登记)，☰ 按钮为等价入口。同日建立 Web 移动视口抓图取证（`tools/web_parity_capture.py`，390/320 × 深/浅，登录页/工作台/抽屉/命令面板）与 [09 视觉与交互差异清单](android-web-parity/09-visual-gap-backlog.md)（VG-001…008、VD-001）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
 
+- 2026-10-30 NAV-004 / NAV-006 / NAV-009 收口（真机）：**NAV-004** 抽屉排序改序（游戏 ↑）落 DataStore `activity_order`，`am force-stop` 重启后顺序保持；`ActivityNav.matches` 抽出纯函数并补 8 条断言。**NAV-006** 修复两个真机缺陷——搜索框移到标题栏下方固定区 + 搜索态隐藏书籍/引导 + `imePadding()`（键盘不再遮挡结果）、`LaunchedEffect(query)` 回列表顶部（清空后不再「分组消失」）；输入 `Sk` 过滤到 Skills、选中后清焦点清词关抽屉并进入 Skills 页（该行显示「当前」）。**NAV-009** 菜单 / 建书对话框 / 左抽屉三层返回都只关最上层并停留原页；无浮层返回只 finish Activity，**未复现登出**（此前「返回导致登出」实为退出到桌面的误判）。新登记 [09 VG-009](android-web-parity/09-visual-gap-backlog.md)（编辑器顶栏「退出」在 390dp 下竖排贴边易误触，随 NAV-010 修）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |

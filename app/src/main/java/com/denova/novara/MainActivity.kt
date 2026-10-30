@@ -366,6 +366,7 @@ class MainActivity : AppCompatActivity() {
                                             activityItems = ActivityNav.sort(order = activityOrder),
                                             onMoveActivity = { id, delta ->
                                                 activityOrder = ActivityNav.move(activityOrder, id, delta)
+                                                DenovaLog.d("NavOrder", "move id=$id delta=$delta")
                                                 scope.launch { navPrefs.setActivityOrder(activityOrder) }
                                             },
                                             onResetActivityOrder = {

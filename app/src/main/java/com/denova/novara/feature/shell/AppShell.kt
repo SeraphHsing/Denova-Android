@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.systemGestures
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -30,12 +32,14 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
@@ -87,10 +91,11 @@ fun AppDrawer(
     // 排序模式与搜索词都是抽屉内的临时界面状态，不参与业务状态。
     var reorderMode by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
-    // 过滤与分组要在组合作用域里算（stringResource 是 @Composable，不能写在 LazyListScope 内）。
-    val visible = activityItems.filter { spec ->
-        query.isBlank() || stringResource(spec.labelRes).contains(query.trim(), ignoreCase = true)
-    }
+    // 选中结果后先收键盘再导航：否则键盘会盖住目标页首屏，且焦点留在已关闭的抽屉里（NAV-006）。
+    val focusManager = LocalFocusManager.current
+    // 过滤与分组在组合作用域里算：`filter` 是 inline，lambda 内可以调 `stringResource`；
+    // 匹配规则在 ActivityNav.matches 里（纯函数，JVM 覆盖 trim / 大小写 / 空词）。
+    val visible = activityItems.filter { ActivityNav.matches(query, stringResource(it.labelRes)) }
     val grouped = ActivityNav.grouped(visible)
     // 标题固定，其余内容全部放进同一个 LazyColumn。
     // 之前是「固定底栏 + 中间 Column(weight + verticalScroll)」：横屏时可视高度只剩百来像素，
@@ -108,7 +113,10 @@ fun AppDrawer(
     Column(
         Modifier
             .fillMaxSize()
-            .windowInsetsPadding(WindowInsets.statusBars),
+            .windowInsetsPadding(WindowInsets.statusBars)
+            // NAV-006：搜索框聚焦时键盘会盖住结果列表（edge-to-edge 下 adjustResize 不缩窗口），
+            // 按 IME insets 让内容上移，结果行始终可点。
+            .imePadding(),
     ) {
         Text(
             stringResource(R.string.drawer_title),
@@ -116,12 +124,41 @@ fun AppDrawer(
             modifier = Modifier.padding(16.dp),
         )
         HorizontalDivider()
+        // NAV-004 / NAV-006 工具区固定在标题栏下方：
+        // 搜索框原本在列表中部，键盘弹出后结果整块被盖住（真机确认），固定到顶部后结果仍在可视区。
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.drawer_nav_section), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
+            TextButton(onClick = { reorderMode = !reorderMode }) {
+                Text(stringResource(if (reorderMode) R.string.drawer_sort_done else R.string.drawer_sort))
+            }
+            if (reorderMode) {
+                TextButton(onClick = onResetActivityOrder) { Text(stringResource(R.string.drawer_sort_reset)) }
+            }
+        }
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            singleLine = true,
+            label = { Text(stringResource(R.string.drawer_search_actions)) },
+            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        )
+        // 搜索态只留结果：书籍区与引导卡会让结果被挤出键盘可视区。
+        val searching = query.isNotBlank()
+        // 搜索词变化后回到列表顶部：搜索时列表项变少，保留旧滚动位置会停在中间，
+        // 清空搜索后看起来像「书籍区和创作组消失」（真机确认）。
+        val listState = rememberLazyListState()
+        LaunchedEffect(query) { listState.scrollToItem(0) }
         LazyColumn(
             Modifier.weight(1f),
+            state = listState,
             contentPadding = PaddingValues(bottom = listBottomPadding),
         ) {
             // 新手引导（WRI-001）：三步核心，完成或跳过就不再出现。
-            if (onboardingStep != null) {
+            if (!searching && onboardingStep != null) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
                         Row(
@@ -147,73 +184,51 @@ fun AppDrawer(
                 }
             }
 
-            // 当前书籍切换（P3 链路起点）：选择后作为编辑器 / 项目目录的工作区。
-            item {
-                Text(
-                    stringResource(R.string.current_book),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-            if (books.isEmpty()) {
+            if (!searching) {
+                // 当前书籍切换（P3 链路起点）：选择后作为编辑器 / 项目目录的工作区。
                 item {
                     Text(
-                        stringResource(R.string.book_empty),
+                        stringResource(R.string.current_book),
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                     )
                 }
-            } else {
-                items(books.size) { index ->
-                    val book = books[index]
-                    val selected = book.projectId == currentProjectId
-                    TextButton(onClick = { onSelectBook(book) }, modifier = Modifier.fillMaxWidth()) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                book.name,
-                                color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                            )
-                            if (selected) Text("✓", color = MaterialTheme.colorScheme.primary)
+                if (books.isEmpty()) {
+                    item {
+                        Text(
+                            stringResource(R.string.book_empty),
+                            color = MaterialTheme.colorScheme.outline,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                        )
+                    }
+                } else {
+                    items(books.size) { index ->
+                        val book = books[index]
+                        val selected = book.projectId == currentProjectId
+                        TextButton(onClick = { onSelectBook(book) }, modifier = Modifier.fillMaxWidth()) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    book.name,
+                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                )
+                                if (selected) Text("✓", color = MaterialTheme.colorScheme.primary)
+                            }
                         }
                     }
                 }
-            }
-            // 建书入口常驻：引导卡只在新手期出现，跳过后仍要能新建书籍（对齐 Web 书籍管理入口）。
-            item {
-                TextButton(onClick = onCreateBook, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.drawer_new_book), style = MaterialTheme.typography.bodyMedium)
+                // 建书入口常驻：引导卡只在新手期出现，跳过后仍要能新建书籍（对齐 Web 书籍管理入口）。
+                item {
+                    TextButton(onClick = onCreateBook, modifier = Modifier.fillMaxWidth()) {
+                        Text(stringResource(R.string.drawer_new_book), style = MaterialTheme.typography.bodyMedium)
+                    }
+                    HorizontalDivider()
                 }
-                HorizontalDivider()
             }
 
             // 一级导航：分组（创作 / 工具 / 设置）+ 图标 + 尾部状态（当前 ✓ / 其余 ›）。
-            // 排序与搜索都是抽屉内的临时状态，不写业务状态（NAV-004 / NAV-006）。
-            item {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(stringResource(R.string.drawer_nav_section), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { reorderMode = !reorderMode }) {
-                        Text(stringResource(if (reorderMode) R.string.drawer_sort_done else R.string.drawer_sort))
-                    }
-                    if (reorderMode) {
-                        TextButton(onClick = onResetActivityOrder) { Text(stringResource(R.string.drawer_sort_reset)) }
-                    }
-                }
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    singleLine = true,
-                    label = { Text(stringResource(R.string.drawer_search_actions)) },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                )
-            }
-
             grouped.forEach { (group, specs) ->
                 // 设置组按基线不带分组标题。
                 if (group != ActivityGroup.SETTINGS) {
@@ -239,7 +254,12 @@ fun AppDrawer(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         TextButton(
-                            onClick = { onNavigate(destination) },
+                            onClick = {
+                                focusManager.clearFocus()
+                                // 命令面板语义：选中即清空搜索词，避免下次打开仍被过滤（NAV-006）。
+                                query = ""
+                                onNavigate(destination)
+                            },
                             enabled = spec.implemented,
                             modifier = Modifier.weight(1f),
                         ) {

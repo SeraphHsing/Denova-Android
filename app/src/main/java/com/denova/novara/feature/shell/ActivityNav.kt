@@ -96,6 +96,17 @@ object ActivityNav {
             .filter { (_, list) -> list.isNotEmpty() }
     }
 
+    /**
+     * 抽屉搜索（NAV-006）的单条匹配：本地化标签做大小写不敏感子串匹配，空搜索视为全部命中。
+     *
+     * 只做纯判定，标签由界面用 `stringResource` 求值后传入（在 `filter` 的 inline lambda 里调用），
+     * 这样既能在组合作用域取资源，又能被 JVM 覆盖 trim / 大小写 / 空词边界。
+     */
+    fun matches(query: String, label: String): Boolean {
+        val keyword = query.trim()
+        return keyword.isEmpty() || label.contains(keyword, ignoreCase = true)
+    }
+
     /** 在当前顺序里把某个条目移动 [delta] 位；越界或条目不存在时原样返回。 */
     fun move(order: List<String>, id: String, delta: Int): List<String> {
         val current = insertMissing(order)
