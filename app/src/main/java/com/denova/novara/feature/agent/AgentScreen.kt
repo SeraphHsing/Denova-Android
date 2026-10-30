@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -797,7 +798,8 @@ fun AgentScreen(
 
         // 完整消息部件（AGT-001）：历史按 part 渲染（文本 / 推理 / 工具 / 图片 / 事件），
         // 末尾再显示本轮流式正文。工具详情、推理与原始事件都可展开，图片按需取字节。
-        val listState = rememberLazyListState()
+        // NAV-002：切到别的页面再回来时保留消息列表的滚动位置（原先每次返回都跳回底部/顶部）。
+        val listState = rememberSaveable(saver = LazyListState.Saver) { LazyListState() }
         // 阅读锚点（AGT-010）：用户不在底部时到达新内容只挂「有新消息」提示，不抢滚动位置；
         // 在底部时才贴底。往上翻页由列表滚到顶部触发，翻页前记下当前首项，回包后按 key 复位。
         var anchorId by remember { mutableStateOf<String?>(null) }

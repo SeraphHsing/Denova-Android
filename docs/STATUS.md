@@ -245,6 +245,8 @@
 
 - 2026-10-30 AUTH-006 收口（真机）：草稿身份改为 `origin\0projectId\0path`（`EditorSession` 由 `EditorViewModel.bindClient` 传 `serverOrigin`），升级前旧格式草稿首次读取时迁移到当前 origin 并删除旧 key（只迁一次，避免多服务器反复读到）；登录页新增「更换服务器」入口（`changeServer()` 丢弃 client + retire 世代）。真机闭环：A 断网编辑产生草稿 → 改连 B（同后端的代理 origin）打开同一文件**无**「已恢复未保存的编辑」→ 切回 A 恢复草稿；B 首次连接需重新登录（Cookie 按 origin），换服务器清空标签。`EditorSessionTest` 新增 4 例。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
 
+- 2026-10-30 NAV-002 部分完成（**保持未开始**）：`AgentScreen` 消息列表改用 `rememberSaveable(LazyListState.Saver)`，切页返回不再重建滚动位置；编辑器按 `uiState.content + caret` 重建。真机通过「草稿保留」：断网编辑 → 切写作 Agent → 返回编辑器，编辑态仍在（显示保存失败而非重置），恢复网络保存后写入服务器。滚动位置的逐屏对照缺长内容证据，按 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)「步骤只做到一部分不回写」保持 `未开始`，补齐后即可回写。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |
