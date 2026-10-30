@@ -8,6 +8,7 @@ import com.denova.novara.R
 import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.persistence.Draft
+import com.denova.novara.core.persistence.DraftKey
 import com.denova.novara.core.persistence.DraftStorage
 import com.denova.novara.core.save.FileSaveCoordinator
 import com.denova.novara.core.save.SaveOutcome
@@ -216,10 +217,19 @@ class EditorSession(
         // 旧格式草稿回退：升级前保存的草稿只有 `projectId\0path`，没有服务器归属。
         // 首次打开时读到并**迁移到当前 origin 的新 key，同时删掉旧 key**——只迁一次，
         // 否则同一份旧草稿会被多个服务器先后读到（AUTH-006 隔离会失效）。
-        val draft = drafts.loadDraft(key) ?: legacyDraftKey(projectId, path)?.let { legacyKey ->
-            drafts.loadDraft(legacyKey)?.also { migrated ->
-                drafts.saveDraft(key, migrated)
-                drafts.clearDraft(legacyKey)
+        val legacyKey = legacyDraftKey(projectId, path)
+        val scopedDraft = drafts.loadDraft(key)
+        val draft = if (scopedDraft != null) {
+            // 新 key 已有草稿：旧 key 只是历史残留（例如上次迁移在两步之间被杀），清掉，
+            // 否则它会长期充当「公共草稿」，被别的服务器再迁移一次。
+            legacyKey?.let { drafts.clearDraft(it) }
+            scopedDraft
+        } else {
+            legacyKey?.let { legacy ->
+                drafts.loadDraft(legacy)?.also { migrated ->
+                    drafts.saveDraft(key, migrated)
+                    drafts.clearDraft(legacy)
+                }
             }
         }
         when (val decision = EditorOpen.decide(serverContent, serverRevision, draft)) {
@@ -261,6 +271,14 @@ class EditorSession(
      * 关闭最后一个标签：取消在途保存、推进世代并清空编辑器（无打开文件）。
      * 调用方负责先 [flush]，避免丢弃未提交内容。
      */
+    /**
+     * 丢弃在途保存与防抖计时但保留编辑态（换 client / 换服务器重连时用）。
+     * 不取消的话，旧会话的作业会在 800ms 后带着旧 client 继续发 PUT。
+     */
+    fun cancelInFlight() {
+        cancelPendingSaves()
+    }
+
     fun clear() {
         cancelPendingSaves()
         openEpoch++
@@ -511,11 +529,10 @@ class EditorSession(
 
     private fun fileKey(s: EditorUiState): String = draftKey(s.projectId, s.filePath)
 
-    /** 草稿身份：`origin\0projectId\0path`（origin 为空时退化为旧格式）。 */
-    private fun draftKey(projectId: String, path: String): String =
-        if (origin.isBlank()) "$projectId\u0000$path" else "$origin\u0000$projectId\u0000$path"
+    /** 草稿身份：与 [com.denova.novara.core.save.FileSaveCoordinator] 共用同一个构造（AUTH-006）。 */
+    private fun draftKey(projectId: String, path: String): String = DraftKey.of(origin, projectId, path)
 
     /** 升级前的旧格式 key；origin 为空时没有旧格式可言。 */
     private fun legacyDraftKey(projectId: String, path: String): String? =
-        if (origin.isBlank()) null else "$projectId\u0000$path"
+        if (origin.isBlank()) null else DraftKey.legacy(projectId, path)
 }

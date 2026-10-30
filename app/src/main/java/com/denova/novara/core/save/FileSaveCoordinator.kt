@@ -66,6 +66,13 @@ class FileSaveCoordinator(
     private val drafts: DraftStorage,
     /** 冲突材料归档端口；为空时只产出冲突选择、不落盘（单测里不需要网络与文件）。 */
     private val archive: ConflictArchive? = null,
+    /**
+     * 草稿 key 构造（AUTH-006）：必须与 [com.denova.novara.feature.editor.EditorSession] 用同一份身份，
+     * 否则自动保存写旧 key、打开时读新 key，草稿会「写了却读不到」或跨服务器串用。
+     */
+    private val keyFor: (projectId: String, path: String) -> String = { projectId, path ->
+        "$projectId\u0000$path"
+    },
 ) {
     private val mutexes = ConcurrentHashMap<String, Mutex>()
 
@@ -76,7 +83,7 @@ class FileSaveCoordinator(
         baseContent: String,
         content: String,
     ): SaveOutcome {
-        val key = "$projectId\u0000$path"
+        val key = keyFor(projectId, path)
         return mutexes.getOrPut(key) { Mutex() }.withLock {
             // 先落草稿，保证进程被杀后未提交编辑可恢复。
             drafts.saveDraft(key, Draft(content, baseRevision, baseContent))

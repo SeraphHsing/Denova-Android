@@ -61,6 +61,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -105,6 +107,11 @@ fun EditorScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val tabsState by viewModel.tabs.collectAsState()
+    // NAV-010：窄屏或大字体时把顶栏次要动作收进溢出菜单、输入区改纵向，
+    // 否则整排动作会被挤出屏幕，输入框只能显示几个字符。
+    // 阈值取 440dp：英文「Terminal / Write / Sign out」比中文长，400~430dp 下标题会被压到 0 宽、» 贴边。
+    val compactHeader = LocalConfiguration.current.screenWidthDp < 440 ||
+        LocalDensity.current.fontScale >= 1.3f
     var mode by remember { mutableStateOf(EditorMode.SOURCE) }
     var projectId by remember { mutableStateOf(currentProjectId) }
     var filePath by remember { mutableStateOf("") }
@@ -188,7 +195,15 @@ fun EditorScreen(
         } else {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text(stringResource(R.string.editor_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+            // 标题参与压缩（NAV-010）：不设 weight 时窄屏会把后面的动作整排挤出屏幕，
+            // 320dp 下「终端 / 写作 / 退出」直接消失且点不到。
+            Text(
+                stringResource(R.string.editor_title),
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+            )
             // 手动保存（WRI-011）：未打开 / 保存中 / 冲突未解决时禁用；冲突走「已解决，保存」。
             TextButton(
                 onClick = { viewModel.save() },
@@ -196,12 +211,44 @@ fun EditorScreen(
                     uiState.saveStatus != SaveStatus.SAVING &&
                     uiState.saveStatus != SaveStatus.CONFLICT,
             ) { Text(stringResource(R.string.save)) }
-            TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text(stringResource(R.string.terminal_title)) }
-            TextButton(
-                onClick = { onOpenAgent(projectId.trim(), filePath.trim()) },
-                enabled = projectId.isNotBlank(),
-            ) { Text(stringResource(R.string.writing)) }
-            TextButton(onClick = onLogout) { Text(stringResource(R.string.logout)) }
+            if (compactHeader) {
+                // 窄屏把终端 / 写作 / 退出收进溢出菜单，保证关键动作始终可达。
+                var moreOpen by remember { mutableStateOf(false) }
+                Box {
+                    IconButton(onClick = { moreOpen = true }) { Text("⋯") }
+                    DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.terminal_title)) },
+                            onClick = {
+                                moreOpen = false
+                                onOpenTerminal(projectId.trim())
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.writing)) },
+                            enabled = projectId.isNotBlank(),
+                            onClick = {
+                                moreOpen = false
+                                onOpenAgent(projectId.trim(), filePath.trim())
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.logout)) },
+                            onClick = {
+                                moreOpen = false
+                                onLogout()
+                            },
+                        )
+                    }
+                }
+            } else {
+                TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text(stringResource(R.string.terminal_title)) }
+                TextButton(
+                    onClick = { onOpenAgent(projectId.trim(), filePath.trim()) },
+                    enabled = projectId.isNotBlank(),
+                ) { Text(stringResource(R.string.writing)) }
+                TextButton(onClick = onLogout) { Text(stringResource(R.string.logout)) }
+            }
             IconButton(onClick = onOpenRightDrawer) { Text("»") }
         }
 
@@ -214,23 +261,47 @@ fun EditorScreen(
             onMoveRight = { viewModel.moveActiveTab(1) },
         )
 
-        // 打开文件
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-            OutlinedTextField(
-                value = projectId,
-                onValueChange = { projectId = it; onProjectIdChange(it) },
-                label = { Text(stringResource(R.string.editor_project_id)) },
-                singleLine = true,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-            )
-            OutlinedTextField(
-                value = filePath,
-                onValueChange = { filePath = it },
-                label = { Text(stringResource(R.string.editor_file_path)) },
-                singleLine = true,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-            )
-            OutlinedButton(onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) }) { Text(stringResource(R.string.editor_open)) }
+        // 打开文件（NAV-010）：窄屏或大字体下并排会把输入内容压成几个字符（label 还会竖排换行），
+        // 改为纵向堆叠；宽屏保持并排。
+        if (compactHeader) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                OutlinedTextField(
+                    value = projectId,
+                    onValueChange = { projectId = it; onProjectIdChange(it) },
+                    label = { Text(stringResource(R.string.editor_project_id)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = filePath,
+                    onValueChange = { filePath = it },
+                    label = { Text(stringResource(R.string.editor_file_path)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                )
+                OutlinedButton(
+                    onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) },
+                    modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
+                ) { Text(stringResource(R.string.editor_open)) }
+            }
+        } else {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                OutlinedTextField(
+                    value = projectId,
+                    onValueChange = { projectId = it; onProjectIdChange(it) },
+                    label = { Text(stringResource(R.string.editor_project_id)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
+                OutlinedTextField(
+                    value = filePath,
+                    onValueChange = { filePath = it },
+                    label = { Text(stringResource(R.string.editor_file_path)) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                )
+                OutlinedButton(onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) }) { Text(stringResource(R.string.editor_open)) }
+            }
         }
         }
 
@@ -293,19 +364,33 @@ fun EditorScreen(
         // 撤销放在这一行而不是顶栏：顶栏已有保存/终端/写作/退出/右抽屉，再塞两个按钮会把
         // 「写作」「»」挤出屏幕（真机复现过顶栏溢出），模式行还有余量且三模式都可见。
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            // NAV-010：只有窄屏才需要横向滚动（否则「撤销/重做」被挤成竖排两个字）；
+            // 宽屏保持原版式，撤销/重做仍靠 Spacer(weight) 右对齐。
+            modifier = Modifier.fillMaxWidth()
+                .then(if (compactHeader) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ModeButton(stringResource(R.string.editor_mode_source), mode == EditorMode.SOURCE) { mode = EditorMode.SOURCE }
             ModeButton(stringResource(R.string.editor_mode_rich), mode == EditorMode.RICH) { mode = EditorMode.RICH }
             ModeButton(stringResource(R.string.editor_mode_preview), mode == EditorMode.PREVIEW) { mode = EditorMode.PREVIEW }
-            Spacer(Modifier.weight(1f))
+            if (compactHeader) Spacer(Modifier.width(8.dp)) else Spacer(Modifier.weight(1f))
             // 可用性来自会话历史栈；加载外部版本 / 采纳合并结果后归零。
             TextButton(onClick = { viewModel.undo() }, enabled = uiState.undoAvailable) {
-                Text(stringResource(R.string.editor_undo))
+                Text(
+                    stringResource(R.string.editor_undo),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             TextButton(onClick = { viewModel.redo() }, enabled = uiState.redoAvailable) {
-                Text(stringResource(R.string.editor_redo))
+                Text(
+                    stringResource(R.string.editor_redo),
+                    maxLines = 1,
+                    softWrap = false,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
 

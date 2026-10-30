@@ -8,6 +8,7 @@ import com.denova.novara.R
 import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
+import com.denova.novara.core.persistence.DraftKey
 import com.denova.novara.core.persistence.DraftStore
 import com.denova.novara.core.persistence.EditorTabsStore
 import com.denova.novara.core.save.FallbackConflictArchive
@@ -112,7 +113,11 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             remote = client,
             local = LocalConflictArchive(File(getApplication<Application>().filesDir, "conflicts")),
         )
-        val coordinator = FileSaveCoordinator(client, drafts, archive)
+        // 旧会话的在途保存必须先取消：否则它会在防抖到期后带着旧 client 继续 PUT。
+        session?.cancelInFlight()
+        val coordinator = FileSaveCoordinator(client, drafts, archive) { projectId, path ->
+            DraftKey.of(origin, projectId, path)
+        }
         // 草稿身份带服务器作用域（AUTH-006）：A/B 两个服务器上同名项目互不串草稿。
         val s = EditorSession(coordinator, drafts, viewModelScope, origin = origin)
         this.session = s

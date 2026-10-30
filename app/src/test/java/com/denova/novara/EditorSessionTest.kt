@@ -6,6 +6,7 @@ import com.denova.novara.core.network.DenovaApiException
 import com.denova.novara.core.network.ProjectFileDocument
 import com.denova.novara.core.network.SaveFileResponse
 import com.denova.novara.core.persistence.Draft
+import com.denova.novara.core.persistence.DraftKey
 import com.denova.novara.core.persistence.DraftStorage
 import com.denova.novara.core.save.AutosaveConflictRecord
 import com.denova.novara.core.save.ConflictArchive
@@ -799,5 +800,48 @@ class EditorSessionTest {
         )
         onB.open("p", "f.md", "server", "r1")
         assertEquals("server", onB.state.value.content)
+        // B 不能留下迁移产物（否则下次它自己会变成「B 的草稿」）。
+        assertNull(drafts.map["http://b\u0000p\u0000f.md"])
+    }
+
+    @Test
+    fun `autosave writes draft under the server scoped key`() = runTest {
+        // 保存编排与 EditorSession 必须用同一个 key：协调器自己拼旧 key 的话，
+        // 「A 上保存失败留下草稿」会以无作用域的 key 落盘，切到 B 后被迁移过去（AUTH-006 失效）。
+        val remote = FakeRemote().apply {
+            conflictOnFirstSave = true
+            serverContent = "标题\n段落一\n段落二服务器\n段落三\n结尾"
+            serverRevision = "r2"
+        }
+        val drafts = FakeDrafts()
+        val coordinator = FileSaveCoordinator(remote, drafts) { projectId, path ->
+            DraftKey.of("http://a", projectId, path)
+        }
+        val session = EditorSession(coordinator, drafts, this, origin = "http://a")
+        val base = "标题\n段落一\n段落二\n段落三\n结尾"
+        val ours = "标题\n段落一\n段落二本地\n段落三\n结尾"
+        session.open("p", "f.md", base, "r0")
+        session.edit(ours)
+        advanceUntilIdle()
+
+        assertNull(drafts.map["p\u0000f.md"])
+        val scoped = drafts.map["http://a\u0000p\u0000f.md"]
+        assertNotNull(scoped)
+        assertEquals(ours, scoped?.content)
+    }
+
+    @Test
+    fun `scoped draft supersedes stale legacy key`() = runTest {
+        // 上次迁移在 save 与 clear 之间被杀，旧 key 残留：新 key 命中时要顺手清掉旧 key。
+        val drafts = FakeDrafts().apply {
+            map["http://a\u0000p\u0000f.md"] = Draft("scoped", "r0", "base")
+            map["p\u0000f.md"] = Draft("scoped", "r0", "base")
+        }
+        val session = EditorSession(
+            FileSaveCoordinator(FakeRemote(), drafts), drafts, this, origin = "http://a",
+        )
+        session.open("p", "f.md", "server", "r1")
+        assertEquals("scoped", session.state.value.content)
+        assertNull(drafts.map["p\u0000f.md"])
     }
 }

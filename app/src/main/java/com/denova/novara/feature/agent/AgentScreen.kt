@@ -804,7 +804,9 @@ fun AgentScreen(
         // 在底部时才贴底。往上翻页由列表滚到顶部触发，翻页前记下当前首项，回包后按 key 复位。
         var anchorId by remember { mutableStateOf<String?>(null) }
         var anchorOffset by remember { mutableStateOf(0) }
-        var lastContentLen by remember { mutableStateOf(0) }
+        // 初始值取当前正文长度：切页返回时重组会重置这个变量，若从 0 开始，
+        // 第一次内容比较会被判成「流式增长」，在非底部误挂「有新消息」。
+        var lastContentLen by remember { mutableStateOf(state.ui.content.length) }
         var pinnedOnce by remember { mutableStateOf(false) }
         val scrollScope = rememberCoroutineScope()
         // 首次历史到达后贴底一次：布局完成前 totalItemsCount 还是 0，直接滚会被忽略。
@@ -812,6 +814,11 @@ fun AgentScreen(
             if (pinnedOnce || state.messages.isEmpty()) return@LaunchedEffect
             delay(80)
             val total = listState.layoutInfo.totalItemsCount
+            // NAV-002：切页返回时 LazyListState 已恢复到原位置（非顶部），不能再用「首次贴底」覆盖它。
+            if (listState.firstVisibleItemIndex != 0 || listState.firstVisibleItemScrollOffset != 0) {
+                pinnedOnce = true
+                return@LaunchedEffect
+            }
             if (total > 0) {
                 listState.scrollToItem(total - 1)
                 pinnedOnce = true

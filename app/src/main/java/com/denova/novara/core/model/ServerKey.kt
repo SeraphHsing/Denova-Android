@@ -27,7 +27,9 @@ data class ServerKey(
                 val uri = java.net.URI(withScheme)
                 val scheme = uri.scheme?.lowercase() ?: return null
                 if (scheme != "http" && scheme != "https") return null
-                val host = uri.host ?: return null
+                // host 归一成小写：`MyHost` 与 `myhost` 是同一台服务器，
+                // 不归一的话草稿作用域与 Cookie jar 会各存一份（表现为「同一台服务器还要重新登录」）。
+                val host = uri.host?.lowercase() ?: return null
                 if (host.isEmpty()) return null
                 val port = if (uri.port == -1) (if (scheme == "https") 443 else 80) else uri.port
                 var path = uri.rawPath.orEmpty()

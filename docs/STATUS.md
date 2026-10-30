@@ -247,6 +247,10 @@
 
 - 2026-10-30 NAV-002 部分完成（**保持未开始**）：`AgentScreen` 消息列表改用 `rememberSaveable(LazyListState.Saver)`，切页返回不再重建滚动位置；编辑器按 `uiState.content + caret` 重建。真机通过「草稿保留」：断网编辑 → 切写作 Agent → 返回编辑器，编辑态仍在（显示保存失败而非重置），恢复网络保存后写入服务器。滚动位置的逐屏对照缺长内容证据，按 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)「步骤只做到一部分不回写」保持 `未开始`，补齐后即可回写。
 
+- 2026-10-30 NAV-010 收口（真机逐档）：320 / 430 / 768 / 1023dp、横屏 914×411dp、2.0 倍字体共 6 档全部通过「关键动作可达、无整排遮挡」。修复四处：编辑器顶栏标题加 `weight + Ellipsis`（原先窄屏把「终端 / 写作 / 退出 / »」整排挤出屏幕，320dp 实测这三个动作直接消失）；宽度 < 400dp 或 `fontScale >= 1.3` 时三者收进「⋯」溢出菜单；同条件下「打开文件」区改纵向堆叠（2.0 字体并排只剩 6~7 个字符、label 竖排）；模式行加 `horizontalScroll` + `maxLines = 1`（320dp 下「撤销 / 重做」原被挤成竖排）。横屏 411dp 高度下「导航」行在首屏外需滚动（LazyColumn 可滚动，非裁切）。证据 [nav-010](evidence/nav-010/xiaomi-14-pro/result.md)（6 张截图 + 档位构造方法）。缺口：抽屉宽度仍是 M3 默认 360dp、标题 56dp / 行高 52dp / 24dp 圆角等尺寸契约未落地，已补进 [09 视觉缺口清单](android-web-parity/09-visual-gap-backlog.md) 留 P5。
+
+- 2026-10-30 代码审查修复（AUTH-006 / NAV-002 / NAV-010 收尾）：新增 `core/persistence/DraftKey` 作为草稿身份的单点构造，`EditorSession` 与 `FileSaveCoordinator` 共用（审查发现协调器原先自己拼 `projectId\0path`，会让「保存失败留下的草稿」以无作用域 key 落盘、再被其它服务器通过 legacy 回退迁移走，隔离实际失效）；`open` 在新 key 命中时清掉残留旧 key；`bindClient` 先 `cancelInFlight()` 再换 session（旧 client 的防抖 PUT 不再继续）；`ServerKey.host` 归一为小写。`AgentScreen` 的「首次贴底」改为「已在顶部才贴底」，否则切页返回会立刻覆盖恢复的滚动位置；`lastContentLen` 初值取当前正文长度避免误判流式增长。编辑器 `compactHeader` 阈值 400→440dp（英文文案更长），模式行只在窄屏才横向滚动（宽屏保持撤销/重做右对齐），撤销/重做加 `overflow = Ellipsis`。`EditorSessionTest` 增到 7 例（含保存路径写新 key、新 key 优先清旧 key、B 不留迁移产物）。复测：A 上断网保存失败的草稿在切走并换服务器再切回后完好；B 侧同文件对照因当前书籍上下文不一致未能构造（如实登记在 AUTH-006 `gap_or_decision` 与证据文件）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |
@@ -287,6 +291,8 @@
 
 4. **P3 需回补的 P1 台账条目：** 只剩 G1-d 迟到 401 端到端（阻塞点：当前 UI 在 Checking 期间地址与连接按钮不可用，构造不出「登录在途时 status 返回」，需先补可并发的入口，工具 `tools/g3d_slow_proxy.py --status-delay-ms` 已就绪）。G2-c 全节点与 G4-d 跨包升级安装已于 2026-10-26 补测通过，G3 关卡（G3-b/c/d）已于 2026-10-25 全部补齐，**G6-b 权限分层已于 2026-10-29 随 P4-D 通过**（设置分层 + 远程/本机分层两层证据）。补齐并验收后再更新对应矩阵行。
 5. **遗留（不阻塞阶段推进）：** 其余未回写的首批场景（见矩阵 `未开始` 行）仍需按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
+6. **P4 之后的功能验收轮（2026-10-30，已收口）**：NAV-003/008（边缘手势）、NAV-004/006/009（抽屉交互）、NAV-010（自适应）、AUTH-001/007（连接页四态）、AUTH-006（服务器作用域隔离）共 9 条真机回写；NAV-002 只缺「长内容滚动位置」的逐屏对照，按严格口径保持 `未开始`（实现已就绪）；AUTH-004 仍缺可并发入口（阻塞点已写明在该行 `gap_or_decision`）。
+7. **下一步：P5（逐屏 1:1 视觉对齐）**，输入是 [09 视觉与交互差异清单](android-web-parity/09-visual-gap-backlog.md)：先落 `ui/theme/DesignTokens.kt`（颜色/圆角/间距/字号/行高/图标尺寸的唯一来源），再把抽屉、顶栏、按钮、输入四类共用件换成 token 并逐屏比对（Web 390×844 真实截图 vs 真机 390dp 截图），同时补 GAM-001…017 的双端对照与 SYS-001…004。
 
 ## 状态记录规则
 

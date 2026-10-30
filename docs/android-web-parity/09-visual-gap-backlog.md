@@ -1,40 +1,56 @@
-# 09 视觉与交互差异清单（P5 逐屏对齐输入）
+# 09 · 视觉缺口清单（P5 输入）
 
-本文件记录「已实现但与固定 Web 基线视觉/交互不一致」的条目。它**不是**验收台账：矩阵行仍是唯一验收来源（见 [parity-matrix.csv](parity-matrix.csv) 与 [01 §8](01-product-and-parity.md#8-全量完成标准)）。这里只登记对照结论、证据位置和归因，用于 P5 按公共 token / 组件 / 页面逐层修正。
+> 本文是 **P5「逐屏 1:1 视觉对齐」的待办清单**，由 P4 收口后的功能验收轮次（2026-10-30）逐条对照 Web 基线
+> `SeraphHsing/denova@85ec97c` 与真机现状后建立。每项都写明「现状 / 基线 / 影响面 / 怎么改」，
+> 完成一项就把该行改成 `已对齐` 并附截图，不要在本文堆积新的未验证结论。
 
-**登记口径**
+## 0. 根因：`DesignTokens` 尚未落地
 
-- 只登记「已核对过真实 Web 页面或基线源码」的差异，写明实测值与 Android 当前值；没有实测的猜测不写入。
-- 每条给出归因层级：`token`（色/字号/圆角/间距等 DesignTokens）、`component`（公共组件）、`page`（单页布局或信息架构）。
-- 视觉对齐在 P5 统一处理；功能与验收阶段（NAV/AUTH 等）发现差异只登记，不在本轮改。
+`04-ui-and-editor.md` 把 `DesignTokens`（颜色、圆角、间距、字号、行高、图标尺寸的唯一来源）列为硬要求，
+但当前 `app/src/main/java/com/denova/novara/ui/theme/` 只有 `Color.kt` 与 `Theme.kt`：色值是手挑的近似色，
+尺寸散落在各个 Composable 的 `dp` 字面量里，没有任何 token 层。
 
-**对照环境**
+**影响**：抽屉宽度、行高、圆角、顶栏高度、按钮高度全部跟随 Material3 默认值，与 Web 基线系统性不一致；
+同一组件在不同页面可能用不同尺寸。
 
-- Web：`http://192.168.2.102:18081`，固定基线 `SeraphHsing/denova@85ec97c`，390×844 / 320×640，DPR 3，zh-CN，深色（默认）与浅色（`data-theme="light"`）。
-- 证据：`docs/evidence/web-baseline/2026-10-30/`（截图 + `metrics.json` computed 读数 + README 汇总）。
-- Android：小米 14 Pro（Android 16），`com.denova.novara` Debug 构建。
+**怎么改（P5 第一步，独立提交）**：
 
-## 1. 待修正（已核对）
+1. 新增 `ui/theme/DesignTokens.kt`，按基线 `web/src/mobile.css` + `web/src/index.css` 的 `--nova-*` 变量
+   与移动端尺寸逐项抄写（颜色、圆角、间距、字号、行高、图标尺寸），并保留 `MaterialTheme` 作为 Compose 适配层。
+2. 把现有 `dp` 字面量换成 token（先做抽屉/顶栏/按钮/输入四类共用件，再逐屏替换）。
+3. 每次替换用「Web 390×844 截图 vs 真机截图」同屏比对，读数记入本文对应行。
 
-| 编号 | 层级 | 差异 | Web 实测 | Android 当前 | 证据 |
+## 1. 已确认的具体差异（本轮实测）
+
+| # | 元素 | 现状（Android） | 基线（Web 85ec97c） | 影响面 | 处理 |
 |---|---|---|---|---|---|
-| VG-001 | page | 一级导航缺「统计」（trajectory 条件入口），多出独立「写作 Agent」入口 | 13 项：写作 / 游戏 / 工作台 / 资料库 / 创作方案 / 版本管理 / 书籍管理 / Skills / Agents / 自动化 / **统计** / 资源中心 / 设置；Agent 是写作页右侧面板 | `ActivityNav.SPECS` 13 项含 `agent`、无 `trajectory` | `drawer-390.png`、`ActivityNav.kt` |
-| VG-002 | component | 抽屉信息结构不同 | 标题栏（返回箭头 + 标题）→「当前作品」单个下拉卡 →「命令 / 消息」两列快捷动作 →「创作」两列大卡 →「工具与资料」整组卡片列表 → 设置条目 | 文本标题 → 书籍文本列表 → 排序按钮 → 内嵌搜索框 → 图标列表 → 深色/语言开关 → 消息/调试 | `drawer-390.png`、`AppShell.kt` |
-| VG-003 | component | 搜索入口语义不同 | 「命令」按钮打开命令面板：搜索命令 + 分组动作（保存当前章节 / 打开创作 Agent / 打开版本管理 / 打开全局搜索 / 继续写作 / 切换右侧栏）+ 快捷键标注 | 抽屉内 `OutlinedTextField` 只过滤导航目的地 | `command-panel-390.png`、`AppShell.kt:207-215` |
-| VG-004 | component | 排序交互不同 | 设置/自定义内拖拽重排（dnd-kit） | 抽屉内「排序 / ↑↓ / 恢复默认」按钮 | `WorkbenchShell.tsx:303-324`、`AppShell.kt:200-205` |
-| VG-005 | token | 抽屉与行尺寸未对齐 | 抽屉宽 `100% - 2rem`（390 下 358px，上限 24rem）、内容侧圆角 24px、标题栏 56px、创作行 58px/圆角 18px、工具行 52px、图标 22px 容器 + 20px svg（stroke 1.7）、标题 17px/600（−0.025em）、分组标签 12px/500 `#bdbdb8` | `ModalDrawerSheet` 默认 336dp 宽 / 16dp 圆角；`TextButton` 40dp 行高；M3 默认字号与图标 24dp | `drawer-390.png`、`metrics.json` |
-| VG-006 | token | 色板为手挑近似值，未从基线变量取值 | 深色：`--nova-bg #000`、`--nova-surface #0a0a0a`、`--nova-text #f7f7f4`、`--nova-text-muted #bdbdb8`、`--nova-border-soft #1e1e1e`；浅色：`--nova-bg #ffffff`、`--nova-surface #fafafa` 等 | `ui/theme/Color.kt` 自定义 primary `#5B5BD6`、background `#FBFAFF` / `#131318` | `metrics.json`、`Color.kt` |
-| VG-009 | page | 编辑器顶栏在 390dp 宽度下溢出，「退出」被挤成竖排两行贴在右边缘 | 顶栏 48px，标题居中、动作分组靠右，动作不换行 | 页内自绘顶栏（☰ / 标题 / 保存 / 终端 / 写作 / 退出）在窄屏被压缩，「退出」竖排且紧贴边缘，易误触登出 | `e1.png`（2026-10-30 真机截图，随 nav-009 证据目录）、`EditorScreen.kt` |
-| VG-008 | component | 抽屉边缘手势没有跟手位移 | 触摸移动时抽屉随位移实时跟随，松手才判定开合 | 只在抬起时判定并开合，拖动过程无位移映射 | `use-mobile-drawer-swipe.ts`、`EdgeSwipeGesture.kt` |
-| VG-007 | token | 登录页尺寸与控件形态不同 | 卡片 358×397、圆角 14px、1px 描边；标题 16px/500；输入框 326×32、圆角 10px、padding 10px；按钮 326×32 | M3 `OutlinedTextField`（约 56dp 高）与 `Button` 默认 40dp，圆角 4/20dp | `login-390.png`、`metrics.json` |
+| VG-001 | 抽屉宽度 | M3 `ModalDrawerSheet` 默认 360dp（1023dp 宽屏实测 385dp） | `24rem` 手机 / `32rem` 宽屏（≈384px / 512px），且不超过可用宽度 - 32px | 左抽屉、右抽屉 | P5：改 `min(可用宽度-32dp, 384dp/512dp)` |
+| VG-002 | 抽屉标题栏 | M3 默认标题排版（无固定 56dp） | 标题栏 56px，标题 18px/600，右侧动作 20px 图标 | 左抽屉、右抽屉 | P5：固定 56dp + token 字号 |
+| VG-003 | 抽屉导航行高 | `TextButton`/行内容约 48dp | 52px 行高，写作/游戏入口 58px | 抽屉全部导航行 | P5：行高 52dp / 入口 58dp |
+| VG-004 | 抽屉内容侧圆角 | 16dp（M3 默认） | 内容侧 24px / 18px（按断点） | 左抽屉、右抽屉 | P5：24dp 圆角 |
+| VG-005 | 顶栏高度与动作 | 48dp 行高，动作是文字 `TextButton`（保存/终端/写作/退出），图标用 `☰ » ⋯` 文本字符 | 顶栏 52~58px，动作为 20px 线性图标 | 编辑器、工作台、游戏等所有页顶栏 | P5：图标化 + token 尺寸 |
+| VG-006 | 输入框 | `OutlinedTextField`：56dp 高、1dp 描边、浮动 label、16dp 圆角 | 48px 高、1px 描边、label 在框内固定位置、圆角 8~12px | 连接页、编辑器项目 ID/文件路径、搜索框 | P5：共用 `NovaTextField` 组件 |
+| VG-007 | 按钮 | `Button`/`TextButton`：40dp 行高、20dp 圆角（胶囊） | 44~48px 高、10~12px 圆角、字号 15px | 全站 | P5：共用 `NovaButton` |
+| VG-008 | 搜索框 | 抽屉内 `OutlinedTextField`（56dp 高、全宽） | 抽屉内搜索 40~44px 高、圆角 10px、左侧 20px 放大镜图标 | 抽屉搜索 | P5 |
+| VG-009 | 编辑器顶栏动作 | 文字按钮（「保存 / 终端 / 写作 / 退出」）+ 溢出菜单 | 图标 + 文字（窄屏折叠为图标） | 编辑器 | P5：图标化；本轮已修「窄屏被挤出」的功能问题，样式仍待对齐 |
+| VG-010 | 侧栏交替、抽屉阴影 | M3 默认 elevation/tint | 基线有独立 scrim 透明度与阴影 | 抽屉 | P5 |
 
-## 2. 待决定（需产品判断，不阻塞 P5 其余条目）
+> 说明：VG-009 的「窄屏动作消失」是**功能缺陷**，本轮（NAV-010）已修（标题 `weight` + 溢出菜单 + 纵向输入区），
+> 但动作的**图标与尺寸**仍是 Material3 默认，属于本文的视觉待办。
 
-| 编号 | 决策点 | Web 实测 | 冲突 |
-|---|---|---|---|
-| VD-001 | 登录输入框与按钮高度 | 32px | 与 [04 §2](04-ui-and-editor.md#2-从源码提取的首批参数)「常规触控目标至少 44×44」冲突：照抄 32dp 视觉会让可点区域偏小，取 44dp 则不是 1:1 |
+## 2. 待补的 Web 对照读数（P5 开工前）
 
-## 3. 回填规则
+本轮已建立移动视口抓图能力（`tools/web_parity_capture.py`，产物在 `docs/evidence/web-baseline/2026-10-30/`），
+但只采了连接页/抽屉/编辑器三处。P5 开工前需补采并把读数写进上表：
 
-- 每条差异在 P5 修正并真机对照通过后，在本表标记「已修正」并追加证据链接；只改视觉不改行为的条目不需要回写矩阵行。
-- 若差异导致某矩阵行 `steps` 无法满足（如 VG-001 影响 NAV-001 的「默认顺序与唯一高亮对应」），以矩阵行为准，视觉差异作为该行的 `gap_or_decision` 记录。
+- 抽屉：宽度、标题栏高、行高（普通 / 写作 / 游戏入口）、圆角、图标尺寸、scrim 透明度。
+- 顶栏：高度、内边距、标题字号字重、动作图标尺寸与间距。
+- 输入框 / 按钮 / 标签：高度、圆角、描边、字号、行高。
+- 列表：行高、分割线、缩进。
+- 编辑器：正文 16px 行高 1.7、代码块、表格、预览排版。
+
+## 3. 完成标准（P5 退出条件）
+
+1. `DesignTokens` 存在且被抽屉/顶栏/按钮/输入四类共用件引用；`grep -r "\.dp\b" feature/` 里不再有散落的尺寸字面量（允许 token 定义处除外）。
+2. 每屏都有「Web 390×844 截图 / 真机 390dp 截图」成对证据，尺寸差 ≤ 1dp（字号 ≤ 1sp）。
+3. 本文第 1 节表格逐行变为 `已对齐` + 证据链接。
