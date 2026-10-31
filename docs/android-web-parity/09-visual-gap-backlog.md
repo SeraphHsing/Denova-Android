@@ -16,6 +16,13 @@
 > **2026-10-31 第三轮（收口）**：14 处页面顶栏全部换成 `NovaTopBar`，74 处输入框换成 `NovaTextField`，
 > 30 处实体按钮换成 `NovaButton`，`☰ » ⋯ ⋮ ⟳ ⇅ ＋` 文本字符图标全部换成矢量图标
 > （[证据 3](../evidence/p5-tokens/xiaomi-14-pro/pages.md)）。VG-001…009 已全部对齐。
+> **2026-11-01 第四轮（token 全量收口）**：`DesignTokens.kt` 按 04 §3 的覆盖面补全——颜色补齐 `:root` /
+> `[data-theme="light"]` 两段全部 `--nova-*`（开关、`--nova-danger-foreground`、消息气泡、浮层与选择、
+> 文件树、`chip` / `style-chip` / `lore-chip`、代码块与表头、`dialogue-highlight`、滚动条、IDE 面板），
+> 并新增 `NovaStroke`（描边 / 图标 `stroke-width` 1.8 / 1.7）、`NovaWeight`、`NovaTracking`（`-0.025em` / `-0.012em`）、
+> `NovaFont`、`NovaShadow` + `NovaShadows`（`--nova-shadow` 深浅两套、抽屉 `0 10px 15px -3px`、字段聚焦外环）、
+> `NovaMotion`（`--nova-motion-*`、面板时长、`--nova-ease` / `--nova-motion-ease` 的三次贝塞尔）；
+> 半透明值的 alpha 按 `CSS 值 × 255` 写死并由 `DesignTokensTest` 锁定。
 > 仍未做的是**列表行、卡片、编辑区正文排版的尺寸字面量**（属 04 的逐屏细化，不在 VG-005…009 范围）。
 
 `04-ui-and-editor.md` 把 `DesignTokens`（颜色、圆角、间距、字号、行高、图标尺寸的唯一来源）列为硬要求。
