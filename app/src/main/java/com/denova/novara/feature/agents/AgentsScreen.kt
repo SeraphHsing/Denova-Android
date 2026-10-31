@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -55,6 +54,12 @@ import com.denova.novara.core.network.CustomAgentDefinition
 import com.denova.novara.core.network.DenovaClient
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaTopBar
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * Agents（P4-C / DEF-001·002），对齐基线 `features/agents/AgentsView.tsx` 的定义管理形态：
@@ -93,27 +98,21 @@ fun AgentsScreen(
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding(),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.dest_agents), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.agents_layer_user) + " · " + state.customAgents.size +
-                        " · rev " + state.revision.take(8).ifBlank { "-" },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+        NovaTopBar(
+            title = stringResource(R.string.dest_agents),
+            subtitle = stringResource(R.string.agents_layer_user) + " · " + state.customAgents.size +
+                " · rev " + state.revision.take(8).ifBlank { "-" },
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                NovaIconButton(
+                    icon = Icons.Filled.Refresh,
+                    contentDescription = stringResource(R.string.action_refresh),
+                    onClick = { viewModel.load() },
                 )
-            }
-            if (state.loading) {
-                Text("…", style = MaterialTheme.typography.labelSmall)
-            }
-            IconButton(onClick = { viewModel.load() }) { Text("⟳") }
-        }
+            },
+        )
         HorizontalDivider()
 
         LazyColumn(
@@ -472,23 +471,23 @@ private fun AgentEditorCard(
                 color = MaterialTheme.colorScheme.outline,
             )
         }
-        OutlinedTextField(
+        NovaTextField(
             value = state.editName,
             onValueChange = onName,
-            label = { Text(stringResource(R.string.agents_name)) },
+            label = stringResource(R.string.agents_name),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        OutlinedTextField(
+        NovaTextField(
             value = state.editDescription,
             onValueChange = onDescription,
-            label = { Text(stringResource(R.string.agents_description)) },
+            label = stringResource(R.string.agents_description),
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        NovaTextField(
             value = state.editInstructions,
             onValueChange = onInstructions,
-            label = { Text(stringResource(R.string.agents_instructions)) },
+            label = stringResource(R.string.agents_instructions),
             modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 300.dp),
             textStyle = MaterialTheme.typography.bodySmall,
         )

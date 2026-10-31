@@ -8,6 +8,10 @@
     <string name="drawer_open">打开导航</string>
     <string name="drawer_end_open">打开侧栏</string>
     <string name="editor_more_actions">更多操作</string>
+    <string name="action_sort">排序</string>
+    <string name="action_refresh">刷新</string>
+    <string name="action_more">更多</string>
+    <string name="action_add">新建</string>
     <string name="dest_workbench">工作台</string>
     <string name="dest_editor">写作</string>
     <string name="dest_game">游戏</string>

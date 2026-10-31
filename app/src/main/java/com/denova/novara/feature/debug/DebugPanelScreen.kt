@@ -16,7 +16,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -43,6 +42,8 @@ import com.denova.novara.core.logging.LogLevel
 import com.denova.novara.core.network.DenovaClient
 import java.util.Calendar
 import kotlinx.coroutines.delay
+import com.denova.novara.ui.components.NovaTextField
+import com.denova.novara.ui.components.NovaButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,10 +98,10 @@ fun DebugPanelScreen(
                 imageLoader = imageLoader,
                 assetUrl = assetUrl,
             )
-            OutlinedTextField(
+            NovaTextField(
                 value = state.filter,
                 onValueChange = viewModel::setFilter,
-                label = { Text(stringResource(R.string.debug_filter_hint)) },
+                label = stringResource(R.string.debug_filter_hint),
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -150,23 +151,23 @@ private fun AssetProbe(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedTextField(
+            NovaTextField(
                 value = assetProjectId,
                 onValueChange = onProjectIdChange,
-                label = { Text(stringResource(R.string.debug_asset_project)) },
+                label = stringResource(R.string.debug_asset_project),
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
-            OutlinedTextField(
+            NovaTextField(
                 value = assetPath,
                 onValueChange = onPathChange,
-                label = { Text(stringResource(R.string.debug_asset_path)) },
+                label = stringResource(R.string.debug_asset_path),
                 singleLine = true,
                 modifier = Modifier.weight(1f),
             )
         }
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            OutlinedButton(onClick = onLoad, enabled = client != null) { Text(stringResource(R.string.debug_load_image)) }
+            NovaButton(onClick = onLoad, enabled = client != null, text = stringResource(R.string.debug_load_image), primary = false,)
             Spacer(Modifier.width(12.dp))
             Text(
                 when {

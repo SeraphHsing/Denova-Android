@@ -49,6 +49,14 @@ import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.PresetKind
 import com.denova.novara.core.network.PresetResource
 import kotlinx.coroutines.delay
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaTopBar
+import com.denova.novara.ui.theme.NovaText
+import com.denova.novara.ui.theme.NovaTheme
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 创作方案（P4-C / PLN-001·002），对齐基线 `SettingPanel mode="teller"`（六类预设资源）：
@@ -86,24 +94,23 @@ fun PresetsScreen(
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding(),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.dest_teller), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.presets_count, entries.size, kindLabel(state.kind)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
+        NovaTopBar(
+            title = stringResource(R.string.dest_teller),
+            subtitle = stringResource(R.string.presets_count, entries.size, kindLabel(state.kind)),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                if (state.loading) {
+                    Text(stringResource(R.string.presets_loading), style = NovaText.micro, color = NovaTheme.colors.textMuted)
+                }
+                NovaIconButton(
+                    icon = Icons.Filled.Refresh,
+                    contentDescription = stringResource(R.string.action_refresh),
+                    onClick = { viewModel.load(force = true) },
                 )
-            }
-            if (state.loading) {
-                Text(stringResource(R.string.presets_loading), style = MaterialTheme.typography.labelSmall)
-            }
-            IconButton(onClick = { viewModel.load(force = true) }) { Text("⟳") }
-        }
+            },
+        )
         HorizontalDivider()
 
         LazyColumn(
@@ -129,12 +136,12 @@ fun PresetsScreen(
 
             item(key = "search") {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
+                    NovaTextField(
                         value = state.query,
                         onValueChange = viewModel::setQuery,
                         modifier = Modifier.weight(1f),
                         singleLine = true,
-                        label = { Text(stringResource(R.string.presets_search)) },
+                        label = stringResource(R.string.presets_search),
                     )
                     TextButton(onClick = { viewModel.beginCreate() }) {
                         Text(stringResource(R.string.presets_new))
@@ -358,31 +365,31 @@ private fun PresetEditorCard(
             style = MaterialTheme.typography.titleSmall,
         )
         if (state.creating) {
-            OutlinedTextField(
+            NovaTextField(
                 value = state.editId,
                 onValueChange = onId,
-                label = { Text(stringResource(R.string.presets_id_hint)) },
+                label = stringResource(R.string.presets_id_hint),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
             )
         }
-        OutlinedTextField(
+        NovaTextField(
             value = state.editName,
             onValueChange = onName,
-            label = { Text(stringResource(R.string.presets_name)) },
+            label = stringResource(R.string.presets_name),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
         )
-        OutlinedTextField(
+        NovaTextField(
             value = state.editDescription,
             onValueChange = onDescription,
-            label = { Text(stringResource(R.string.presets_description)) },
+            label = stringResource(R.string.presets_description),
             modifier = Modifier.fillMaxWidth(),
         )
-        OutlinedTextField(
+        NovaTextField(
             value = state.editDetail,
             onValueChange = onDetail,
-            label = { Text(stringResource(R.string.presets_detail_label)) },
+            label = stringResource(R.string.presets_detail_label),
             modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 420.dp),
             textStyle = MaterialTheme.typography.bodySmall,
         )

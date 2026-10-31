@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -60,9 +64,12 @@ import com.denova.novara.core.image.imageLoaderFor
 import com.denova.novara.core.network.BookRecord
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.UploadFile
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaTopBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 书籍管理（P4-C / BOK-001·002·003），对齐基线 `components/Home/HomeView.tsx`：
@@ -127,20 +134,18 @@ fun BooksScreen(
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.home_title), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.home_bookCount, state.books.size),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
-                )
-            }
-            IconButton(onClick = { sortMenu = true }) { Text("⇅") }
+        NovaTopBar(
+            title = stringResource(R.string.home_title),
+            subtitle = stringResource(R.string.home_bookCount, state.books.size),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+            NovaIconButton(
+                icon = Icons.AutoMirrored.Filled.List,
+                contentDescription = stringResource(R.string.action_sort),
+                onClick = { sortMenu = true },
+            )
             DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.home_sortLink_manual)) },
@@ -157,8 +162,13 @@ fun BooksScreen(
                     },
                 )
             }
-            TextButton(onClick = { viewModel.load() }) { Text(stringResource(R.string.refresh)) }
-        }
+            NovaIconButton(
+                icon = Icons.Filled.Refresh,
+                contentDescription = stringResource(R.string.action_refresh),
+                onClick = { viewModel.load() },
+            )
+            },
+        )
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -466,24 +476,24 @@ private fun BookFormDialog(
         title = { Text(titleText) },
         text = {
             Column {
-                OutlinedTextField(
+                NovaTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.home_bookTitlePlaceholder)) },
+                    label = stringResource(R.string.home_bookTitlePlaceholder),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = author,
                     onValueChange = { author = it },
-                    label = { Text(authorPlaceholder) },
+                    label = authorPlaceholder,
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.home_descriptionPlaceholder)) },
+                    label = stringResource(R.string.home_descriptionPlaceholder),
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp),
                 )
@@ -531,24 +541,24 @@ private fun NovelImportDialog(
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-                OutlinedTextField(
+                NovaTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.home_bookTitlePlaceholder)) },
+                    label = stringResource(R.string.home_bookTitlePlaceholder),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = author,
                     onValueChange = { author = it },
-                    label = { Text(stringResource(R.string.home_authorPlaceholder)) },
+                    label = stringResource(R.string.home_authorPlaceholder),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.home_descriptionPlaceholder)) },
+                    label = stringResource(R.string.home_descriptionPlaceholder),
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp),
                 )
@@ -590,10 +600,10 @@ private fun CardImportDialog(
                 preview.compatibility.warnings.take(2).forEach {
                     Text("· $it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                 }
-                OutlinedTextField(
+                NovaTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.home_bookTitlePlaceholder)) },
+                    label = stringResource(R.string.home_bookTitlePlaceholder),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )

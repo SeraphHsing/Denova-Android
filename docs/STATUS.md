@@ -255,6 +255,8 @@
 
 - 2026-10-31 **P5 第二步：共用件 `NovaTopBar` / `NovaTextField` / `NovaButton`**（真机 390dp）：新增 `ui/components/NovaComponents.kt`，六个组件全部只从 `DesignTokens` 取值——`NovaTopBar`（48dp 高、左右 12dp、标题 17sp/600 参与压缩、尾部动作区）、`NovaIconButton`（44dp 触控 + 20dp 图标）、`NovaTextAction`（44dp + 15sp/600）、`NovaTextField`（44dp 高、10dp 圆角、1dp 描边、label 在框外上方 16sp/500、可带前置图标）、`NovaButton`（44dp、最小宽 72dp、主/次两态）、`NovaSearchField`（紧凑搜索）。接入：连接页 4 个输入 + 4 个按钮；编辑器顶栏整体替换（`☰`/`»`/`⋯` 文本字符换成 `Menu`/箭头/`MoreVert` 图标，保存/终端/写作/退出换 `NovaTextAction`）+ 项目 ID/文件路径输入框 + 「打开」按钮；抽屉搜索框。**输入框与按钮 32px（Web）vs 44dp 的取舍定为触控优先**：圆角/描边/字号照抄，只加高度，登记在 [09](android-web-parity/09-visual-gap-backlog.md) VG-006/007。证据 [p5-components](evidence/p5-tokens/xiaomi-14-pro/components.md)（3 张截图 + 逐项读数）。**未做**：其余 14 处页面顶栏（工作台/游戏/终端/设置等仍是 `Row + Text("☰")`）、编辑器模式行与工作台内嵌顶栏的胶囊按钮；均已写进 09 状态列。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
 
+- 2026-10-31 **P5 收口：VG-005…009 全部对齐**（真机 390dp）：①14 处页面顶栏换成 `NovaTopBar`（编辑器/工作台/游戏/终端/设置/资料库/书籍/Skills/Agents/自动化/创作方案/版本管理/资源中心/Agent 舞台/占位页）；②`☰ » ⋯ ⋮ ⟳ ⇅ ＋` 20 处文本字符图标全部换成 `material-icons-core` 矢量图标；③74 处 `OutlinedTextField` → `NovaTextField`（扩展多行 `minLines`/`maxLines`、`textStyle`、`supportingText`、`keyboardActions`、前置图标）；④30 处 `Button`/`OutlinedButton` → `NovaButton`（含编辑器模式行/格式按钮、游戏故事选择器；新增 `bold` 与 `containerColor` 变体）。转换后逐项编译并修完 7 处脚本误伤。口径：`TextButton`（行内 ghost 文字动作）与 M3 `FilterChip`（32dp 高，与基线 chip 一致）保留，写入 09。证据 [pages](evidence/p5-tokens/xiaomi-14-pro/pages.md)（5 张截图 + 覆盖数量 + 读数）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |
@@ -296,7 +298,7 @@
 4. **P3 需回补的 P1 台账条目：** 只剩 G1-d 迟到 401 端到端（阻塞点：当前 UI 在 Checking 期间地址与连接按钮不可用，构造不出「登录在途时 status 返回」，需先补可并发的入口，工具 `tools/g3d_slow_proxy.py --status-delay-ms` 已就绪）。G2-c 全节点与 G4-d 跨包升级安装已于 2026-10-26 补测通过，G3 关卡（G3-b/c/d）已于 2026-10-25 全部补齐，**G6-b 权限分层已于 2026-10-29 随 P4-D 通过**（设置分层 + 远程/本机分层两层证据）。补齐并验收后再更新对应矩阵行。
 5. **遗留（不阻塞阶段推进）：** 其余未回写的首批场景（见矩阵 `未开始` 行）仍需按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
 6. **P4 之后的功能验收轮（2026-10-30，已收口）**：NAV-003/008（边缘手势）、NAV-004/006/009（抽屉交互）、NAV-010（自适应）、AUTH-001/007（连接页四态）、AUTH-006（服务器作用域隔离）共 9 条真机回写；NAV-002 只缺「长内容滚动位置」的逐屏对照，按严格口径保持 `未开始`（实现已就绪）；AUTH-004 仍缺可并发入口（阻塞点已写明在该行 `gap_or_decision`）。
-7. **P5（逐屏 1:1 视觉对齐）进行中**，输入是 [09 视觉与交互差异清单](android-web-parity/09-visual-gap-backlog.md)：`DesignTokens`、抽屉/右抽屉、共用件（`NovaTopBar`/`NovaTextField`/`NovaButton`/`NovaSearchField`）均已落地并接入连接页、编辑器与抽屉搜索（2026-10-31，VG-001…009 部分完成）。下一步顺序：①把剩余 14 处页面顶栏替换成 `NovaTopBar`（VG-005），顺带把编辑器模式行与工作台内嵌顶栏换成 `NovaButton`（VG-007）；②抽屉信息架构对齐（当前作品下拉卡、命令/消息快捷动作、统计入口，VG-011…013）与抽屉阴影（VG-010）；③补齐各屏「Web 390×844 / 真机 390dp」成对证据；④GAM-001…017 双端对照与 SYS-001…004。
+7. **P5（逐屏 1:1 视觉对齐）进行中**，输入是 [09 视觉与交互差异清单](android-web-parity/09-visual-gap-backlog.md)：`DesignTokens`、抽屉/右抽屉、共用件、14 处页面顶栏、74 处输入框、30 处实体按钮已全部对齐（2026-10-31，**VG-001…009 完成**）。下一步：①抽屉信息架构对齐（当前作品下拉卡、命令/消息快捷动作、统计入口，VG-011…013）与抽屉阴影（VG-010）；②列表行/卡片/编辑区正文排版的尺寸细化（09 §0 剩余项）；③补齐各屏「Web 390×844 / 真机 390dp」成对证据；④GAM-001…017 双端对照与 SYS-001…004。
 
 ## 状态记录规则
 

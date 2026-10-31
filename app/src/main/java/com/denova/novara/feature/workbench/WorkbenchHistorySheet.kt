@@ -49,6 +49,10 @@ import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.network.AgentChatHistoryItem
 import com.denova.novara.core.network.AgentChatProject
 import com.denova.novara.core.workbench.HistoryList
+import com.denova.novara.ui.components.NovaTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import com.denova.novara.ui.components.NovaIconButton
 
 /**
  * 工作台会话历史（P4-B / WB-006）。
@@ -98,10 +102,10 @@ fun WorkbenchHistorySheet(
                 }
             }
 
-            OutlinedTextField(
+            NovaTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChange,
-                label = { Text(stringResource(R.string.workbench_history_search)) },
+                label = stringResource(R.string.workbench_history_search),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             )
@@ -208,11 +212,11 @@ fun WorkbenchHistorySheet(
             onDismissRequest = viewModel::cancelRename,
             title = { Text(stringResource(R.string.workbench_rename)) },
             text = {
-                OutlinedTextField(
+                NovaTextField(
                     value = state.renameDraft,
                     onValueChange = viewModel::onRenameDraftChange,
                     singleLine = true,
-                    label = { Text(stringResource(R.string.workbench_history_rename_hint)) },
+                    label = stringResource(R.string.workbench_history_rename_hint),
                 )
             },
             confirmButton = {
@@ -346,7 +350,7 @@ private fun HistoryRow(
             }
         }
         Box {
-            TextButton(onClick = onOpenMenu, enabled = !exporting) { Text("⋮") }
+            NovaIconButton(icon = Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more), onClick = onOpenMenu, enabled = !exporting)
             DropdownMenu(expanded = menuOpen, onDismissRequest = onDismissMenu) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.workbench_history_open)) },

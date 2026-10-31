@@ -29,6 +29,12 @@ import androidx.compose.ui.unit.dp
 import com.denova.novara.R
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.feature.shell.VersionsContent
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaTopBar
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 版本管理一级页面（P4-D / NAV-001）。
@@ -51,23 +57,21 @@ fun VersionsScreen(
     val state by viewModel.state.collectAsState()
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.versions_page_title), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    projectId.ifBlank { stringResource(R.string.versions_page_no_project) },
-                    style = MaterialTheme.typography.labelSmall,
+        NovaTopBar(
+            title = stringResource(R.string.versions_page_title),
+            subtitle = projectId.ifBlank { stringResource(R.string.versions_page_no_project) },
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                NovaIconButton(
+                    icon = Icons.Filled.Refresh,
+                    contentDescription = stringResource(R.string.action_refresh),
+                    onClick = { if (projectId.isNotBlank()) viewModel.load(projectId, force = true) },
+                    enabled = projectId.isNotBlank(),
                 )
-            }
-            TextButton(
-                onClick = { if (projectId.isNotBlank()) viewModel.load(projectId, force = true) },
-                enabled = projectId.isNotBlank(),
-            ) { Text(stringResource(R.string.refresh)) }
-        }
+            },
+        )
         HorizontalDivider()
         // 宿主还没确定当前项目时（例如上次打开的书已归档）允许手动指定项目，否则页面只能显示空态。
         var manualProject by remember { mutableStateOf("") }
@@ -76,10 +80,10 @@ fun VersionsScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedTextField(
+                NovaTextField(
                     value = manualProject,
                     onValueChange = { manualProject = it },
-                    label = { Text(stringResource(R.string.market_project_id)) },
+                    label = stringResource(R.string.market_project_id),
                     modifier = Modifier.weight(1f),
                     singleLine = true,
                 )

@@ -12,6 +12,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.denova.novara.ui.theme.NovaRadius
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaText
 
 /**
  * 设计 token 唯一来源（04 §2 硬要求，P5 第一步）。

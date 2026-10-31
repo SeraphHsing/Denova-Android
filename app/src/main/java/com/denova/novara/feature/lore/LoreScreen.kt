@@ -73,6 +73,14 @@ import com.denova.novara.core.network.UploadFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaTextAction
+import com.denova.novara.ui.components.NovaTopBar
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 资料库页面（P4-C / LOR-001…004）。
@@ -128,23 +136,28 @@ private fun LoreContent(
         // imePadding：表单底部（保存 / 材料）要能被键盘顶上来，否则手机上永远点不到。
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding(),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.lore_title), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.lore_subtitle, state.items.size),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
+        NovaTopBar(
+            title = stringResource(R.string.lore_title),
+            subtitle = stringResource(R.string.lore_subtitle, state.items.size),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                NovaTextAction(
+                    text = stringResource(R.string.lore_index),
+                    onClick = { showIndex = !showIndex },
                 )
-            }
-            TextButton(onClick = { showIndex = !showIndex }) { Text(stringResource(R.string.lore_index)) }
-            TextButton(onClick = viewModel::startNewItem) { Text("＋") }
-            Box {
-                TextButton(onClick = { menu = true }) { Text("⋮") }
+                NovaIconButton(
+                    icon = Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.action_add),
+                    onClick = viewModel::startNewItem,
+                )
+                Box {
+                    NovaIconButton(
+                        icon = Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.action_more),
+                        onClick = { menu = true },
+                    )
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.lore_new_item)) },
@@ -175,8 +188,9 @@ private fun LoreContent(
                         },
                     )
                 }
-            }
-        }
+                }
+            },
+        )
         HorizontalDivider()
 
         val notice = state.notice?.resolve()
@@ -454,7 +468,7 @@ private fun LoreList(
                     }
                     // 分类管理入口：点分类名切换筛选，点「⋮」改名/删除（移动端替代右键菜单）。
                     Box {
-                        TextButton(onClick = { menu = true }) { Text("⋮") }
+                        NovaIconButton(icon = Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more), onClick = { menu = true })
                         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.common_rename)) },
@@ -477,10 +491,10 @@ private fun LoreList(
                 }
             }
         }
-        OutlinedTextField(
+        NovaTextField(
             value = state.query,
             onValueChange = viewModel::setQuery,
-            label = { Text(stringResource(R.string.lore_search_hint)) },
+            label = stringResource(R.string.lore_search_hint),
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
         )
@@ -617,10 +631,10 @@ private fun LoreEditor(
             )
         }
 
-        OutlinedTextField(
+        NovaTextField(
             value = draft.name,
             onValueChange = { value -> viewModel.updateDraft { it.copy(name = value) } },
-            label = { Text(stringResource(R.string.lore_field_name)) },
+            label = stringResource(R.string.lore_field_name),
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         )
@@ -647,30 +661,30 @@ private fun LoreEditor(
             selected = draft.loadMode,
             onSelect = { value -> viewModel.updateDraft { it.copy(loadMode = value) } },
         )
-        OutlinedTextField(
+        NovaTextField(
             value = draft.tagsText,
             onValueChange = { value -> viewModel.updateDraft { it.copy(tagsText = value) } },
-            label = { Text(stringResource(R.string.lore_field_tags)) },
+            label = stringResource(R.string.lore_field_tags),
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         )
-        OutlinedTextField(
+        NovaTextField(
             value = draft.keywordsText,
             onValueChange = { value -> viewModel.updateDraft { it.copy(keywordsText = value) } },
-            label = { Text(stringResource(R.string.lore_field_keywords)) },
+            label = stringResource(R.string.lore_field_keywords),
             singleLine = true,
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         )
-        OutlinedTextField(
+        NovaTextField(
             value = draft.briefDescription,
             onValueChange = { value -> viewModel.updateDraft { it.copy(briefDescription = value) } },
-            label = { Text(stringResource(R.string.lore_field_brief)) },
+            label = stringResource(R.string.lore_field_brief),
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         )
-        OutlinedTextField(
+        NovaTextField(
             value = draft.content,
             onValueChange = { value -> viewModel.updateDraft { it.copy(content = value) } },
-            label = { Text(stringResource(R.string.lore_field_content)) },
+            label = stringResource(R.string.lore_field_content),
             minLines = 6,
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         )
@@ -821,10 +835,10 @@ private fun LoreIndexPanel(state: LoreUiState, viewModel: LoreViewModel, onClose
         if (state.busy) {
             LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp))
         }
-        OutlinedTextField(
+        NovaTextField(
             value = state.indexIntro,
             onValueChange = viewModel::setIndexIntro,
-            label = { Text(stringResource(R.string.lore_index_intro)) },
+            label = stringResource(R.string.lore_index_intro),
             minLines = 4,
             modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         )
@@ -1010,10 +1024,10 @@ private fun LoreTextDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            OutlinedTextField(
+            NovaTextField(
                 value = value,
                 onValueChange = { value = it },
-                label = { Text(label) },
+                label = label,
                 singleLine = true,
             )
         },
@@ -1039,16 +1053,16 @@ private fun SpeechDialog(
         title = { Text(stringResource(R.string.lore_generate_speech)) },
         text = {
             Column {
-                OutlinedTextField(
+                NovaTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.lore_speech_name)) },
+                    label = stringResource(R.string.lore_speech_name),
                     singleLine = true,
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = text,
                     onValueChange = { text = it },
-                    label = { Text(stringResource(R.string.lore_speech_text)) },
+                    label = stringResource(R.string.lore_speech_text),
                     minLines = 3,
                 )
             }
@@ -1077,16 +1091,16 @@ private fun MaterialEditDialog(
         title = { Text(stringResource(R.string.lore_material_edit)) },
         text = {
             Column {
-                OutlinedTextField(
+                NovaTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.lore_field_name)) },
+                    label = stringResource(R.string.lore_field_name),
                     singleLine = true,
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.lore_material_description)) },
+                    label = stringResource(R.string.lore_material_description),
                     minLines = 2,
                 )
             }
@@ -1119,16 +1133,16 @@ private fun RemoteMaterialDialog(
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = url,
                     onValueChange = { url = it },
-                    label = { Text(stringResource(R.string.lore_material_url)) },
+                    label = stringResource(R.string.lore_material_url),
                     singleLine = true,
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.lore_field_name)) },
+                    label = stringResource(R.string.lore_field_name),
                     singleLine = true,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1176,16 +1190,12 @@ private fun ImageGenerateDialog(
                     RadioButton(selected = custom, onClick = { mode = "" })
                     Text(stringResource(R.string.lore_generate_mode_custom))
                 }
-                OutlinedTextField(
+                NovaTextField(
                     value = if (custom) prompt else instruction,
                     onValueChange = { if (custom) prompt = it else instruction = it },
-                    label = {
-                        Text(
-                            stringResource(
-                                if (custom) R.string.lore_generate_prompt else R.string.lore_generate_instruction,
-                            ),
-                        )
-                    },
+                    label = stringResource(
+                        if (custom) R.string.lore_generate_prompt else R.string.lore_generate_instruction,
+                    ),
                     minLines = 3,
                     modifier = Modifier.fillMaxWidth(),
                 )

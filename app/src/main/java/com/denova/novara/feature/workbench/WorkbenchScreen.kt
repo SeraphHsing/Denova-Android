@@ -60,6 +60,14 @@ import com.denova.novara.feature.editor.EditorViewModel
 import com.denova.novara.feature.project.ProjectDirectoryViewModel
 import com.denova.novara.feature.terminal.TerminalScreen
 import com.denova.novara.feature.terminal.TerminalViewModel
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaTextAction
+import com.denova.novara.ui.components.NovaTopBar
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 
 /**
  * 工作台页面（P4-B）：页签条 + 主副会话 + 会话内容。
@@ -118,32 +126,35 @@ fun WorkbenchScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
             .background(MaterialTheme.colorScheme.surface),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = onOpenDrawer) { Text("☰") }
-            Text(
-                stringResource(R.string.workbench_title),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 4.dp),
-            )
-            // 主区 / 副区全屏切换（WB-003）：两区各自保留页签与对话状态。
-            GroupChip(
-                label = stringResource(R.string.workbench_group_primary) + count(primaryCount),
-                selected = state.activeGroup == WorkbenchGroup.PRIMARY,
-                onClick = { viewModel.switchGroup(WorkbenchGroup.PRIMARY) },
-            )
-            GroupChip(
-                label = stringResource(R.string.workbench_group_secondary) + count(secondaryCount),
-                selected = state.activeGroup == WorkbenchGroup.SECONDARY,
-                onClick = { viewModel.switchGroup(WorkbenchGroup.SECONDARY) },
-            )
-            Box(Modifier.weight(1f))
-            // 会话历史（WB-006）：跨项目检索、分页、行内重命名 / 导出 / 删除。
-            TextButton(onClick = { historyOpen = true }) { Text(stringResource(R.string.workbench_history)) }
-            TextButton(onClick = onOpenRightDrawer) { Text("»") }
-        }
+        NovaTopBar(
+            title = stringResource(R.string.workbench_title),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                // 主区 / 副区全屏切换（WB-003）：两区各自保留页签与对话状态。
+                GroupChip(
+                    label = stringResource(R.string.workbench_group_primary) + count(primaryCount),
+                    selected = state.activeGroup == WorkbenchGroup.PRIMARY,
+                    onClick = { viewModel.switchGroup(WorkbenchGroup.PRIMARY) },
+                )
+                GroupChip(
+                    label = stringResource(R.string.workbench_group_secondary) + count(secondaryCount),
+                    selected = state.activeGroup == WorkbenchGroup.SECONDARY,
+                    onClick = { viewModel.switchGroup(WorkbenchGroup.SECONDARY) },
+                )
+                // 会话历史（WB-006）：跨项目检索、分页、行内重命名 / 导出 / 删除。
+                NovaTextAction(
+                    text = stringResource(R.string.workbench_history),
+                    onClick = { historyOpen = true },
+                )
+                NovaIconButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.drawer_end_open),
+                    onClick = onOpenRightDrawer,
+                )
+            },
+        )
 
         TabStrip(
             tabs = tabs,
@@ -277,7 +288,7 @@ private fun TabStrip(
         }
         var addMenu by remember { mutableStateOf(false) }
         Box {
-            TextButton(onClick = { addMenu = true }) { Text("＋") }
+            NovaIconButton(icon = Icons.Filled.Add, contentDescription = stringResource(R.string.action_add), onClick = { addMenu = true })
             DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.workbench_session_new)) },
@@ -346,7 +357,7 @@ private fun TabItem(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(end = 4.dp),
         )
-        TextButton(onClick = { menu = true }, modifier = Modifier.padding(0.dp)) { Text("⋮") }
+        NovaIconButton(icon = Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more), onClick = { menu = true })
         TextButton(onClick = onClose, modifier = Modifier.padding(0.dp)) { Text("×") }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             val other = if (tab.group == WorkbenchGroup.PRIMARY) {

@@ -18,7 +18,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -37,6 +36,13 @@ import com.denova.novara.core.market.MarketLogic
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.Installation
 import com.denova.novara.core.network.MarketEntry
+import androidx.compose.material.icons.Icons
+import com.denova.novara.ui.components.NovaTopBar
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 资源市场与扩展页（P4-D / MKT-001…005）。
@@ -70,24 +76,27 @@ private fun MarketContent(
     onOpenDrawer: () -> Unit,
 ) {
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.market_title), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(
-                        R.string.market_subtitle,
-                        state.entries.size,
-                        state.installations.size,
-                    ),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-            if (state.loading || state.busy) CircularProgressIndicator(Modifier.padding(6.dp))
-        }
+        NovaTopBar(
+            title = stringResource(R.string.market_title),
+            subtitle = stringResource(
+                R.string.market_subtitle,
+                state.entries.size,
+                state.installations.size,
+            ),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                if (state.loading || state.busy) {
+                    CircularProgressIndicator(
+                        Modifier
+                            .size(NovaSize.iconAction)
+                            .padding(NovaSpacing.xxs),
+                        strokeWidth = 2.dp,
+                    )
+                }
+            },
+        )
         state.error?.let {
             Text(
                 it.resolve(),
@@ -143,10 +152,10 @@ private fun TabChip(tab: MarketTab, label: Int, state: MarketUiState, viewModel:
 
 @Composable
 private fun CatalogList(state: MarketUiState, viewModel: MarketViewModel, language: String) {
-    OutlinedTextField(
+    NovaTextField(
         value = state.query,
         onValueChange = viewModel::setQuery,
-        label = { Text(stringResource(R.string.market_search)) },
+        label = stringResource(R.string.market_search),
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         singleLine = true,
     )
@@ -470,10 +479,10 @@ private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
         if (config == null) {
             Text(stringResource(R.string.market_extensions_empty), style = MaterialTheme.typography.labelSmall)
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
+                NovaTextField(
                     value = state.projectInput,
                     onValueChange = viewModel::setProjectInput,
-                    label = { Text(stringResource(R.string.market_project_id)) },
+                    label = stringResource(R.string.market_project_id),
                     modifier = Modifier.weight(1f).padding(vertical = 4.dp),
                     singleLine = true,
                 )
@@ -501,19 +510,19 @@ private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(
+                NovaTextField(
                     value = state.newDisabled,
                     onValueChange = viewModel::setNewDisabled,
-                    label = { Text(stringResource(R.string.market_add_disabled)) },
+                    label = stringResource(R.string.market_add_disabled),
                     modifier = Modifier.weight(1f).padding(vertical = 4.dp),
                     singleLine = true,
                 )
                 TextButton(onClick = { viewModel.addDisabled() }) { Text(stringResource(R.string.market_add)) }
             }
-            OutlinedTextField(
+            NovaTextField(
                 value = state.modelsText,
                 onValueChange = viewModel::setModelsText,
-                label = { Text(stringResource(R.string.market_models_json)) },
+                label = stringResource(R.string.market_models_json),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                 textStyle = MaterialTheme.typography.bodySmall,
                 minLines = 2,

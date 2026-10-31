@@ -31,7 +31,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -62,6 +61,8 @@ import com.denova.novara.ui.theme.NovaSize
 import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.ui.theme.NovaText
 import com.denova.novara.ui.theme.NovaTheme
+import com.denova.novara.ui.components.NovaTopBar
+import androidx.compose.material.icons.filled.Menu
 
 /** 一级目的地（顺序与实现状态都来自 [ActivityNav]，避免两处各写一份）。 */
 data class AppDestination(
@@ -548,10 +549,12 @@ fun PlaceholderScreen(labelRes: Int, onOpenDrawer: () -> Unit) {
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars),
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text(stringResource(labelRes), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-        }
+        NovaTopBar(
+            title = stringResource(labelRes),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+        )
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 stringResource(R.string.not_implemented, stringResource(labelRes)),

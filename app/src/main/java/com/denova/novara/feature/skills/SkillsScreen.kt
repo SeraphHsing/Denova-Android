@@ -55,6 +55,14 @@ import com.denova.novara.core.skills.SkillLibrary
 import com.denova.novara.core.skills.SkillStatusFilter
 import com.denova.novara.core.skills.key
 import kotlinx.coroutines.delay
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaTopBar
+import com.denova.novara.ui.theme.NovaText
+import com.denova.novara.ui.theme.NovaTheme
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 技能库（P4-C / SKL-001·002），对齐基线 `features/skills/SkillsView.tsx`：
@@ -100,24 +108,23 @@ fun SkillsScreen(
     Column(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding(),
     ) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.dest_skills), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.skills_count, state.snapshot.skills.size),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.outline,
+        NovaTopBar(
+            title = stringResource(R.string.dest_skills),
+            subtitle = stringResource(R.string.skills_count, state.snapshot.skills.size),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                if (state.loading) {
+                    Text(stringResource(R.string.skills_loading), style = NovaText.micro, color = NovaTheme.colors.textMuted)
+                }
+                NovaIconButton(
+                    icon = Icons.Filled.Refresh,
+                    contentDescription = stringResource(R.string.action_refresh),
+                    onClick = { viewModel.load(force = true) },
                 )
-            }
-            if (state.loading) {
-                Text(stringResource(R.string.skills_loading), style = MaterialTheme.typography.labelSmall)
-            }
-            IconButton(onClick = { viewModel.load(force = true) }) { Text("⟳") }
-        }
+            },
+        )
         HorizontalDivider()
 
         LazyColumn(
@@ -179,12 +186,12 @@ fun SkillsScreen(
 
             item(key = "filters") {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedTextField(
+                    NovaTextField(
                         value = state.query,
                         onValueChange = viewModel::setQuery,
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
-                        label = { Text(stringResource(R.string.skills_search)) },
+                        label = stringResource(R.string.skills_search),
                     )
                     Row(
                         Modifier.fillMaxWidth(),
@@ -485,11 +492,11 @@ private fun DocumentCard(
             Text(document.description, style = MaterialTheme.typography.bodySmall)
         }
 
-        OutlinedTextField(
+        NovaTextField(
             value = content,
             onValueChange = onEdit,
             modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 360.dp),
-            label = { Text(stringResource(R.string.skills_document_content)) },
+            label = stringResource(R.string.skills_document_content),
             textStyle = MaterialTheme.typography.bodySmall,
         )
 
@@ -546,11 +553,11 @@ private fun DocumentCard(
         }
 
         if (activeFile.isNotBlank()) {
-            OutlinedTextField(
+            NovaTextField(
                 value = fileContent,
                 onValueChange = onEditFile,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 360.dp),
-                label = { Text(activeFile) },
+                label = activeFile,
                 textStyle = MaterialTheme.typography.bodySmall,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -598,17 +605,17 @@ private fun CreateSkillDialog(
                         )
                     }
                 }
-                OutlinedTextField(
+                NovaTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text(stringResource(R.string.skills_create_name)) },
+                    label = stringResource(R.string.skills_create_name),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.skills_create_description)) },
+                    label = stringResource(R.string.skills_create_description),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(stringResource(R.string.skills_create_category), style = MaterialTheme.typography.labelMedium)
@@ -628,10 +635,10 @@ private fun CreateSkillDialog(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                OutlinedTextField(
+                NovaTextField(
                     value = agents,
                     onValueChange = { agents = it },
-                    label = { Text(stringResource(R.string.skills_create_agents)) },
+                    label = stringResource(R.string.skills_create_agents),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )

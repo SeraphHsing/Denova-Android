@@ -26,9 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -74,6 +72,12 @@ import com.denova.novara.core.terminal.TerminalAttr
 import com.denova.novara.core.terminal.buildRowRuns
 import com.denova.novara.core.terminal.lineAt
 import com.denova.novara.core.terminal.TerminalScreen as TerminalBuffer
+import androidx.compose.material.icons.Icons
+import com.denova.novara.ui.components.NovaTextAction
+import com.denova.novara.ui.components.NovaTopBar
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
+import com.denova.novara.ui.components.NovaButton
 
 /**
  * 终端页（G5）：项目 ID → 连接（复用 owner 的存活 PTY，否则新建）→ 渲染网格 + 发送按键。
@@ -161,14 +165,15 @@ fun TerminalScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onOpenDrawer) { Text("☰") }
-                Text(stringResource(R.string.terminal_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-                TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-                Text(state.status.resolve(), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(8.dp))
-                Text(
-                    text = "${state.cols}x${state.rows}",
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(8.dp),
+                NovaTopBar(
+                    title = stringResource(R.string.terminal_title),
+                    subtitle = "${state.status.resolve()} · ${state.cols}x${state.rows}",
+                    navigationIcon = Icons.Filled.Menu,
+                    navigationContentDescription = stringResource(R.string.drawer_open),
+                    onNavigationClick = onOpenDrawer,
+                    actions = {
+                        NovaTextAction(text = stringResource(R.string.back), onClick = onBack)
+                    },
                 )
             }
 
@@ -176,18 +181,17 @@ fun TerminalScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedTextField(
+                NovaTextField(
                     value = projectId,
                     onValueChange = { projectId = it },
-                    label = { Text(stringResource(R.string.term_project_id)) },
+                    label = stringResource(R.string.term_project_id),
                     singleLine = true,
                     enabled = !state.connected,
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
-                OutlinedButton(
+                NovaButton(
                     onClick = { viewModel.connect(projectId.trim()) },
-                    enabled = projectId.isNotBlank() && !state.connected,
-                ) { Text(if (state.connected) stringResource(R.string.common_connected) else stringResource(R.string.term_connect)) }
+                    enabled = projectId.isNotBlank() && !state.connected, text = if (state.connected) stringResource(R.string.common_connected) else stringResource(R.string.term_connect), primary = false,)
                 TextButton(onClick = { viewModel.closeAndRelease() }) { Text(stringResource(R.string.term_close_session)) }
             }
         }
@@ -292,10 +296,10 @@ fun TerminalScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedTextField(
+            NovaTextField(
                 value = input,
                 onValueChange = { input = it },
-                label = { Text(stringResource(R.string.term_input_hint)) },
+                label = stringResource(R.string.term_input_hint),
                 singleLine = true,
                 enabled = state.connected,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
@@ -308,13 +312,12 @@ fun TerminalScreen(
                 ),
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
-            OutlinedButton(
+            NovaButton(
                 onClick = {
                     viewModel.sendText("$input\r")
                     input = ""
                 },
-                enabled = state.connected,
-            ) { Text(stringResource(R.string.common_send)) }
+                enabled = state.connected, text = stringResource(R.string.common_send), primary = false,)
         }
 
         Row(
@@ -324,15 +327,15 @@ fun TerminalScreen(
                 .padding(horizontal = 12.dp, vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            OutlinedButton(onClick = { viewModel.sendKey(3) }, enabled = state.connected) { Text("Ctrl-C") }
-            OutlinedButton(onClick = { viewModel.sendKey(4) }, enabled = state.connected) { Text("Ctrl-D") }
-            OutlinedButton(onClick = { viewModel.sendKey(26) }, enabled = state.connected) { Text("Ctrl-Z") }
-            OutlinedButton(onClick = { viewModel.sendKey(9) }, enabled = state.connected) { Text("Tab") }
-            OutlinedButton(onClick = { viewModel.sendKey(27) }, enabled = state.connected) { Text("Esc") }
-            OutlinedButton(onClick = { viewModel.sendKey(27, 91, 65) }, enabled = state.connected) { Text("↑") }
-            OutlinedButton(onClick = { viewModel.sendKey(27, 91, 66) }, enabled = state.connected) { Text("↓") }
-            OutlinedButton(onClick = { viewModel.sendKey(27, 91, 68) }, enabled = state.connected) { Text("←") }
-            OutlinedButton(onClick = { viewModel.sendKey(27, 91, 67) }, enabled = state.connected) { Text("→") }
+            NovaButton(onClick = { viewModel.sendKey(3) }, enabled = state.connected, text = "Ctrl-C", primary = false,)
+            NovaButton(onClick = { viewModel.sendKey(4) }, enabled = state.connected, text = "Ctrl-D", primary = false,)
+            NovaButton(onClick = { viewModel.sendKey(26) }, enabled = state.connected, text = "Ctrl-Z", primary = false,)
+            NovaButton(onClick = { viewModel.sendKey(9) }, enabled = state.connected, text = "Tab", primary = false,)
+            NovaButton(onClick = { viewModel.sendKey(27) }, enabled = state.connected, text = "Esc", primary = false,)
+            NovaButton(onClick = { viewModel.sendKey(27, 91, 65) }, enabled = state.connected, text = "↑", primary = false,)
+            NovaButton(onClick = { viewModel.sendKey(27, 91, 66) }, enabled = state.connected, text = "↓", primary = false,)
+            NovaButton(onClick = { viewModel.sendKey(27, 91, 68) }, enabled = state.connected, text = "←", primary = false,)
+            NovaButton(onClick = { viewModel.sendKey(27, 91, 67) }, enabled = state.connected, text = "→", primary = false,)
         }
     }
 }

@@ -19,7 +19,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -46,6 +45,13 @@ import com.denova.novara.core.settings.SettingsFieldKind
 import com.denova.novara.core.settings.SettingsSchema
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.material.icons.Icons
+import com.denova.novara.ui.components.NovaTextAction
+import com.denova.novara.ui.components.NovaTopBar
+import com.denova.novara.ui.theme.NovaSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 设置页（P4-D / SET-001…014）。
@@ -83,31 +89,31 @@ private fun SettingsContent(
     LaunchedEffect(section.id) { listState.scrollToItem(0) }
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Column(Modifier.weight(1f)) {
-                Text(
-                    stringResource(R.string.settings_title),
-                    style = MaterialTheme.typography.titleMedium,
+        NovaTopBar(
+            title = stringResource(R.string.settings_title),
+            subtitle = stringResource(R.string.settings_subtitle, SettingsSchema.SECTIONS.size),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                if (state.loading || state.saving) {
+                    CircularProgressIndicator(
+                        Modifier.size(NovaSize.iconAction),
+                        strokeWidth = 2.dp,
+                    )
+                }
+                NovaTextAction(
+                    text = stringResource(R.string.save),
+                    onClick = { viewModel.save() },
+                    enabled = state.dirty && !state.saving,
                 )
-                Text(
-                    stringResource(R.string.settings_subtitle, SettingsSchema.SECTIONS.size),
-                    style = MaterialTheme.typography.labelSmall,
+                NovaTextAction(
+                    text = stringResource(R.string.settings_reload),
+                    onClick = { viewModel.reload() },
+                    enabled = !state.saving,
                 )
-            }
-            if (state.loading || state.saving) {
-                CircularProgressIndicator(Modifier.padding(8.dp))
-            }
-            TextButton(onClick = { viewModel.save() }, enabled = state.dirty && !state.saving) {
-                Text(stringResource(R.string.save))
-            }
-            TextButton(onClick = { viewModel.reload() }, enabled = !state.saving) {
-                Text(stringResource(R.string.settings_reload))
-            }
-        }
+            },
+        )
         state.error?.let {
             Text(
                 it.resolve(),
@@ -244,12 +250,12 @@ private fun SettingsFieldRow(
                 }
             }
 
-            SettingsFieldKind.JSON -> OutlinedTextField(
+            SettingsFieldKind.JSON -> NovaTextField(
                 value = draft,
                 onValueChange = onEdit,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                placeholder = { Text(inherited.ifBlank { stringResource(R.string.settings_empty) }) },
+                placeholder = inherited.ifBlank { stringResource(R.string.settings_empty) },
                 isError = error != null,
                 minLines = 4,
                 maxLines = 14,
@@ -260,7 +266,7 @@ private fun SettingsFieldRow(
                 style = MaterialTheme.typography.bodySmall,
             )
 
-            else -> OutlinedTextField(
+            else -> NovaTextField(
                 value = draft,
                 onValueChange = onEdit,
                 modifier = Modifier.fillMaxWidth(),
@@ -276,7 +282,7 @@ private fun SettingsFieldRow(
                 } else {
                     KeyboardOptions.Default
                 },
-                placeholder = { Text(inherited.ifBlank { stringResource(R.string.settings_empty) }) },
+                placeholder = inherited.ifBlank { stringResource(R.string.settings_empty) },
                 supportingText = {
                     if (error != null) {
                         Text(error.resolve())

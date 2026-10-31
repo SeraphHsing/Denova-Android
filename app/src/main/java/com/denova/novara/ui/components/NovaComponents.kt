@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -41,6 +43,12 @@ import com.denova.novara.ui.theme.NovaSize
 import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.ui.theme.NovaText
 import com.denova.novara.ui.theme.NovaTheme
+import com.denova.novara.ui.components.NovaButton
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaSearchField
+import com.denova.novara.ui.components.NovaTextAction
+import com.denova.novara.ui.components.NovaTextField
+import com.denova.novara.ui.components.NovaTopBar
 
 /**
  * 共用件（P5 VG-005…009）：只从 [com.denova.novara.ui.theme.DesignTokens] 取尺寸与颜色。
@@ -53,11 +61,13 @@ import com.denova.novara.ui.theme.NovaTheme
  *   视觉参数（圆角/描边/字号/内边距）仍照抄基线，差异登记在 09 的 VG-006 / VG-007。
  */
 
-/** 顶栏：48dp 高、左右 12dp、标题 17sp/600（窄屏压缩省略）、可选左侧导航图标与尾部动作。 */
+/** 顶栏：48dp 高、左右 12dp、标题 17sp/600（窄屏压缩省略）、可选副标题、左侧导航图标与尾部动作。 */
 @Composable
 fun NovaTopBar(
     title: String,
     modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    containerColor: Color = NovaTheme.colors.bgDeep,
     navigationIcon: ImageVector? = null,
     navigationContentDescription: String? = null,
     onNavigationClick: (() -> Unit)? = null,
@@ -68,7 +78,7 @@ fun NovaTopBar(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = NovaSize.topBar)
-            .background(colors.bgDeep)
+            .background(containerColor)
             .padding(horizontal = NovaSize.topBarPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -80,14 +90,24 @@ fun NovaTopBar(
                 modifier = Modifier.padding(end = NovaSpacing.xs),
             )
         }
-        Text(
-            title,
-            style = NovaText.drawerTitle,
-            color = colors.text,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        Column(Modifier.weight(1f)) {
+            Text(
+                title,
+                style = NovaText.drawerTitle,
+                color = colors.text,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle != null) {
+                Text(
+                    subtitle,
+                    style = NovaText.micro,
+                    color = colors.textMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xxs),
@@ -166,9 +186,15 @@ fun NovaTextField(
     placeholder: String? = null,
     enabled: Boolean = true,
     isError: Boolean = false,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
+    textStyle: TextStyle = NovaText.large,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
     leadingIcon: ImageVector? = null,
+    supportingText: (@Composable () -> Unit)? = null,
 ) {
     val colors = NovaTheme.colors
     val interaction = remember { MutableInteractionSource() }
@@ -192,15 +218,18 @@ fun NovaTextField(
             value = value,
             onValueChange = onValueChange,
             enabled = enabled,
-            singleLine = true,
-            textStyle = NovaText.large.copy(color = colors.text),
+            singleLine = singleLine,
+            minLines = minLines,
+            maxLines = if (maxLines <= 0) Int.MAX_VALUE else maxLines,
+            textStyle = textStyle.copy(color = colors.text),
             cursorBrush = SolidColor(colors.text),
             visualTransformation = visualTransformation,
             keyboardOptions = keyboardOptions,
+            keyboardActions = keyboardActions,
             interactionSource = interaction,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(NovaSize.input)
+                .heightIn(min = NovaSize.input)
                 .clip(shape)
                 .background(colors.surface)
                 .border(1.dp, borderColor, shape),
@@ -208,9 +237,9 @@ fun NovaTextField(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(NovaSize.input)
-                        .padding(horizontal = NovaSpacing.md),
-                    verticalAlignment = Alignment.CenterVertically,
+                        .heightIn(min = NovaSize.input)
+                        .padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm),
+                    verticalAlignment = if (singleLine) Alignment.CenterVertically else Alignment.Top,
                 ) {
                     if (leadingIcon != null) {
                         Icon(
@@ -222,13 +251,13 @@ fun NovaTextField(
                                 .padding(end = NovaSpacing.sm),
                         )
                     }
-                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    Box(Modifier.weight(1f), contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart) {
                         if (value.isEmpty() && placeholder != null) {
                             Text(
                                 placeholder,
-                                style = NovaText.large,
+                                style = textStyle,
                                 color = colors.textMuted,
-                                maxLines = 1,
+                                maxLines = if (singleLine) 1 else Int.MAX_VALUE,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
@@ -237,6 +266,9 @@ fun NovaTextField(
                 }
             },
         )
+        if (supportingText != null) {
+            Box(Modifier.padding(top = NovaSpacing.xs)) { supportingText() }
+        }
     }
 }
 
@@ -248,6 +280,7 @@ fun NovaButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     primary: Boolean = true,
+    bold: Boolean = false,
 ) {
     val colors = NovaTheme.colors
     val shape = RoundedCornerShape(NovaRadius.field)
@@ -266,7 +299,7 @@ fun NovaButton(
     ) {
         Text(
             text,
-            style = NovaText.buttonLabel,
+            style = if (bold) NovaText.buttonLabel.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) else NovaText.buttonLabel,
             color = content,
             maxLines = 1,
             softWrap = false,

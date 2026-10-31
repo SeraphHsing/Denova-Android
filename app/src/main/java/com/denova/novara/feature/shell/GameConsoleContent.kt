@@ -38,6 +38,7 @@ import com.denova.novara.core.network.BranchPlan
 import com.denova.novara.core.network.BranchSummary
 import com.denova.novara.core.stream.TurnAnchor
 import com.denova.novara.core.i18n.UiText
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 游戏控制台（GAM-006 / GAM-007 / GAM-008 / GAM-009）：只读状态台账 + 轮次跳转 + 分支 + 分支方案。
@@ -357,7 +358,7 @@ private fun NarrativeEditDialog(
         title = { Text(stringResource(R.string.game_turn_edit_title)) },
         text = {
             Column {
-                OutlinedTextField(
+                NovaTextField(
                     value = draft,
                     onValueChange = { draft = it },
                     modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
@@ -432,13 +433,13 @@ private fun BranchPlanSection(plan: BranchPlan?, busy: Boolean, onSave: (String)
             }
         }
         if (editing) {
-            OutlinedTextField(
+            NovaTextField(
                 value = draft,
                 onValueChange = { draft = it },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 8,
                 maxLines = 20,
-                label = { Text(stringResource(R.string.game_console_plan_markdown)) },
+                label = stringResource(R.string.game_console_plan_markdown),
             )
         } else {
             val markdown = plan?.markdown.orEmpty()

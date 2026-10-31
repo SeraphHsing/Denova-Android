@@ -35,7 +35,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -83,6 +82,8 @@ import com.denova.novara.ui.components.NovaTextAction
 import com.denova.novara.ui.components.NovaTextField
 import com.denova.novara.ui.components.NovaTopBar
 import kotlinx.coroutines.launch
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaTheme
 
 private enum class EditorMode { SOURCE, RICH, PREVIEW }
 
@@ -183,24 +184,19 @@ fun EditorScreen(
     ) {
         if (inline) {
             // 内嵌：文件由页签决定，这里只显示当前路径并提供保存（状态行沿用下面的统一提示）。
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = uiState.filePath.ifBlank { stringResource(R.string.workbench_files_unselected) },
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
+            NovaTopBar(
+                title = uiState.filePath.ifBlank { stringResource(R.string.workbench_files_unselected) },
+                containerColor = NovaTheme.colors.bg,
+                actions = {
+                NovaTextAction(
+                    text = stringResource(R.string.save),
                     onClick = { viewModel.save() },
                     enabled = uiState.loaded &&
                         uiState.saveStatus != SaveStatus.SAVING &&
                         uiState.saveStatus != SaveStatus.CONFLICT,
-                ) { Text(stringResource(R.string.save)) }
-            }
+                )
+                },
+            )
         } else {
         // VG-005/009：顶栏改用共用件（48dp 高、左右 12dp、标题 17sp/600 参与压缩、
         // 导航/右抽屉动作换成 20dp 图标）。标题必须带 weight，否则窄屏会把右侧动作整排挤出屏幕。
@@ -377,13 +373,9 @@ fun EditorScreen(
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = { viewModel.keepLocalVersion() }) {
-                        Text(stringResource(R.string.conflict_keep_local))
-                    }
+                    NovaButton(onClick = { viewModel.keepLocalVersion() }, text = stringResource(R.string.conflict_keep_local), primary = false,)
                     Spacer(Modifier.width(8.dp))
-                    OutlinedButton(onClick = { viewModel.loadExternalVersion() }) {
-                        Text(stringResource(R.string.conflict_load_external))
-                    }
+                    NovaButton(onClick = { viewModel.loadExternalVersion() }, text = stringResource(R.string.conflict_load_external), primary = false,)
                 }
             }
         }
@@ -438,7 +430,7 @@ fun EditorScreen(
             val current = if (searchIndex in matches.indices) searchIndex else -1
             Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
+                    NovaTextField(
                         value = searchQuery,
                         onValueChange = { q ->
                             searchQuery = q
@@ -452,7 +444,7 @@ fun EditorScreen(
                                 )
                             }
                         },
-                        label = { Text(stringResource(R.string.search_find)) },
+                        label = stringResource(R.string.search_find),
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -488,10 +480,10 @@ fun EditorScreen(
                     ) { Text(stringResource(R.string.search_next)) }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
+                    NovaTextField(
                         value = replaceQuery,
                         onValueChange = { replaceQuery = it },
-                        label = { Text(stringResource(R.string.search_replace_with)) },
+                        label = stringResource(R.string.search_replace_with),
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
@@ -544,9 +536,7 @@ fun EditorScreen(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(onClick = { onQuoteSelection(projectId.trim(), quote) }) {
-                    Text(stringResource(R.string.quote_selection))
-                }
+                NovaButton(onClick = { onQuoteSelection(projectId.trim(), quote) }, text = stringResource(R.string.quote_selection), primary = false,)
                 Text(
                     TextSelectionQuote.label(quote),
                     style = MaterialTheme.typography.bodySmall,
@@ -755,7 +745,7 @@ private fun EditorTabStrip(
             }
         }
         Box {
-            IconButton(onClick = { menuOpen = true }) { Text("⋮") }
+            NovaIconButton(icon = Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more), onClick = { menuOpen = true })
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.tab_move_left)) },
@@ -835,16 +825,23 @@ private fun EditorTabItem(
 
 @Composable
 private fun ModeButton(label: String, selected: Boolean, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, modifier = Modifier.padding(end = 8.dp)) {
-        Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-    }
+    NovaButton(
+        text = label,
+        onClick = onClick,
+        primary = selected,
+        modifier = Modifier.padding(end = NovaSpacing.sm),
+    )
 }
 
 @Composable
 private fun FormatButton(label: String, onClick: () -> Unit) {
-    OutlinedButton(onClick = onClick, modifier = Modifier.padding(end = 8.dp)) {
-        Text(label, style = TextStyle(fontWeight = FontWeight.Bold))
-    }
+    NovaButton(
+        text = label,
+        onClick = onClick,
+        primary = false,
+        bold = true,
+        modifier = Modifier.padding(end = NovaSpacing.sm),
+    )
 }
 
 /** 用分隔符包裹当前选区；选区为空则在分隔符中间插入光标。 */

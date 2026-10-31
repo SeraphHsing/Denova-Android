@@ -26,9 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
@@ -79,6 +77,12 @@ import com.denova.novara.core.stream.AgentPhase
 import com.denova.novara.core.stream.ApprovalOption
 import com.denova.novara.core.stream.ApprovalState
 import com.denova.novara.feature.editor.TextSelectionQuote
+import androidx.compose.material.icons.Icons
+import com.denova.novara.ui.components.NovaTextAction
+import com.denova.novara.ui.components.NovaTopBar
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
+import com.denova.novara.ui.components.NovaButton
 
 /** 审批结果态文案（AGT-003）。 */
 @Composable
@@ -228,21 +232,17 @@ private fun AgentApprovalCard(
             )
         }
         Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = { onDecide(ApprovalOption.DENY) }, enabled = !submitting) {
-                Text(stringResource(R.string.approval_deny))
-            }
+            NovaButton(onClick = { onDecide(ApprovalOption.DENY) }, enabled = !submitting, text = stringResource(R.string.approval_deny), primary = false,)
             if (AgentApprovalLogic.canAlwaysAllow(approval)) {
-                OutlinedButton(
+                NovaButton(
                     onClick = { onDecide(ApprovalOption.ALLOW_WORKSPACE) },
                     enabled = !submitting,
-                    modifier = Modifier.padding(start = 8.dp),
-                ) { Text(stringResource(R.string.approval_allow_workspace)) }
+                    modifier = Modifier.padding(start = 8.dp), text = stringResource(R.string.approval_allow_workspace), primary = false,)
             }
-            OutlinedButton(
+            NovaButton(
                 onClick = { onDecide(ApprovalOption.ALLOW_ONCE) },
                 enabled = !submitting,
-                modifier = Modifier.padding(start = 8.dp),
-            ) { Text(stringResource(R.string.approval_allow_once)) }
+                modifier = Modifier.padding(start = 8.dp), text = stringResource(R.string.approval_allow_once), primary = false,)
             TextButton(onClick = onCancel, enabled = !submitting) {
                 Text(stringResource(R.string.ask_cancel))
             }
@@ -340,20 +340,13 @@ private fun AgentAskCard(
             }
         }
         Row(modifier = Modifier.padding(top = 6.dp)) {
-            OutlinedButton(onClick = onSubmit, enabled = !submitting) {
-                Text(stringResource(if (submitting) R.string.ask_submitting else R.string.ask_submit))
-            }
-            OutlinedButton(
+            NovaButton(onClick = onSubmit, enabled = !submitting, text = stringResource(if (submitting) R.string.ask_submitting else R.string.ask_submit), primary = false,)
+            NovaButton(
                 onClick = onCancel,
                 enabled = !submitting,
-                modifier = Modifier.padding(start = 8.dp),
-            ) {
-                Text(
-                    stringResource(
+                modifier = Modifier.padding(start = 8.dp), text = stringResource(
                         if (verification != null) R.string.verify_cancel_task else R.string.ask_cancel,
-                    ),
-                )
-            }
+                    ), primary = false,)
         }
     }
 }
@@ -637,21 +630,25 @@ fun AgentScreen(
             .imePadding(),
     ) {
         if (!inline) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-                IconButton(onClick = onOpenDrawer) { Text("☰") }
-                Text(stringResource(R.string.agent_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-                TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-            }
+            NovaTopBar(
+                title = stringResource(R.string.agent_title),
+                navigationIcon = Icons.Filled.Menu,
+                navigationContentDescription = stringResource(R.string.drawer_open),
+                onNavigationClick = onOpenDrawer,
+                actions = {
+                    NovaTextAction(text = stringResource(R.string.back), onClick = onBack)
+                },
+            )
 
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                OutlinedTextField(
+                NovaTextField(
                     value = sessionId,
                     onValueChange = { sessionId = it },
-                    label = { Text("session ID") },
+                    label = "session ID",
                     singleLine = true,
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
-                OutlinedButton(onClick = { viewModel.start(sessionId.trim(), projectId) }) { Text(stringResource(R.string.common_attach)) }
+                NovaButton(onClick = { viewModel.start(sessionId.trim(), projectId) }, text = stringResource(R.string.common_attach), primary = false,)
             }
         }
 
@@ -679,26 +676,21 @@ fun AgentScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         ) {
-            OutlinedButton(
+            NovaButton(
                 onClick = { viewModel.pause() },
                 enabled = canControl && !state.commandSubmitting,
-                modifier = Modifier.padding(end = 8.dp),
-            ) { Text(stringResource(R.string.agent_pause)) }
-            OutlinedButton(
+                modifier = Modifier.padding(end = 8.dp), text = stringResource(R.string.agent_pause), primary = false,)
+            NovaButton(
                 onClick = { viewModel.abort() },
-                enabled = canControl && !state.commandSubmitting,
-            ) {
-                Text(stringResource(if (state.abortPending) R.string.agent_stopping else R.string.agent_stop))
-            }
+                enabled = canControl && !state.commandSubmitting, text = stringResource(if (state.abortPending) R.string.agent_stopping else R.string.agent_stop), primary = false,)
             // 上下文分析（AGT-012）：用量与压缩计划随时可查，不需要先把消息发出去。
-            OutlinedButton(
+            NovaButton(
                 onClick = {
                     showContextPanel = true
                     viewModel.loadContextAnalysis()
                 },
                 enabled = sessionId.isNotBlank() && !state.contextLoading,
-                modifier = Modifier.padding(start = 8.dp),
-            ) { Text(stringResource(R.string.agent_context_open)) }
+                modifier = Modifier.padding(start = 8.dp), text = stringResource(R.string.agent_context_open), primary = false,)
             val phaseLabel = when (state.runtimePhase) {
                 "suspended" -> stringResource(R.string.agent_suspended)
                 "" -> ""
@@ -726,20 +718,15 @@ fun AgentScreen(
                     modifier = Modifier.weight(1f),
                 )
                 state.recoveryActions.forEach { action ->
-                    OutlinedButton(
+                    NovaButton(
                         onClick = { viewModel.runRecoveryAction(action) },
                         enabled = !state.recoveryActionPending,
-                        modifier = Modifier.padding(start = 8.dp),
-                    ) {
-                        Text(
-                            stringResource(
+                        modifier = Modifier.padding(start = 8.dp), text = stringResource(
                                 when (action.kind) {
                                     AgentRecoveryKind.RESUME -> R.string.agent_recovery_resume
                                     else -> R.string.agent_recovery_abort
                                 },
-                            ),
-                        )
-                    }
+                            ), primary = false,)
                 }
             }
         }
@@ -1068,31 +1055,26 @@ fun AgentScreen(
             }
         }
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-            OutlinedTextField(
+            NovaTextField(
                 value = draft,
                 onValueChange = { viewModel.setComposerDraft(it) },
-                label = { Text(stringResource(R.string.agent_message)) },
+                label = stringResource(R.string.agent_message),
                 singleLine = true,
                 // 键盘「发送」键与右侧按钮等价（终端输入同样以 IME 动作提交）。
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { submitComposer() }),
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
-            OutlinedButton(
+            NovaButton(
                 onClick = submitComposer,
                 enabled = !state.sending && !state.appending &&
-                    sessionId.isNotBlank() && draft.isNotBlank(),
-            ) {
-                Text(
-                    when {
+                    sessionId.isNotBlank() && draft.isNotBlank(), text = when {
                         state.appending -> stringResource(R.string.agent_appending)
                         state.sending -> stringResource(R.string.agent_sending)
                         // 有当前操作时按钮语义是「追加」，不再开新一轮（AGT-006）。
                         state.activeOperationId.isNotBlank() -> stringResource(R.string.agent_append)
                         else -> stringResource(R.string.agent_send)
-                    },
-                )
-            }
+                    }, primary = false,)
         }
 
         if (showContextPanel) {

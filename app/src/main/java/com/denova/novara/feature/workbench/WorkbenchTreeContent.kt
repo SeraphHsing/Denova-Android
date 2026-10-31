@@ -37,6 +37,10 @@ import com.denova.novara.R
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.network.AgentChatProject
 import com.denova.novara.core.network.AgentChatSession
+import com.denova.novara.ui.components.NovaTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import com.denova.novara.ui.components.NovaIconButton
 
 /**
  * 工作台项目 / 会话树（P4-B / WB-001 / WB-002）。
@@ -335,7 +339,7 @@ private fun ProjectRow(
         }
         TextButton(onClick = onNewSession) { Text("＋", style = MaterialTheme.typography.bodyMedium) }
         Box {
-            TextButton(onClick = { menu = true }) { Text("⋮") }
+            NovaIconButton(icon = Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more), onClick = { menu = true })
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.workbench_project_rename)) }, onClick = { menu = false; onRename() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.workbench_project_move_up)) }, onClick = { menu = false; onMoveUp() })
@@ -406,10 +410,10 @@ internal fun InputDialog(
         title = { Text(title) },
         text = {
             Column(Modifier.imePadding()) {
-                OutlinedTextField(
+                NovaTextField(
                     value = value,
                     onValueChange = { value = it },
-                    label = label?.let { { Text(it) } },
+                    label = label,
                     singleLine = true,
                 )
             }

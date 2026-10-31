@@ -58,6 +58,7 @@ import com.denova.novara.ui.theme.NovaText
 import com.denova.novara.ui.theme.NovaTheme
 import com.denova.novara.ui.theme.novaDrawerShape
 import com.denova.novara.ui.theme.novaDrawerWidth
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 右项目 / 控制台抽屉（01 §3）：从右侧滑出，内容按当前页面提供——
@@ -415,10 +416,10 @@ private fun VersionListContent(
     }
     // 创建版本（VER-001）：说明可留空，服务端会写默认说明；没有变更时由服务端拒绝并给出原因。
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
+        NovaTextField(
             value = state.createText,
             onValueChange = onCreateTextChange,
-            label = { Text(stringResource(R.string.versions_create_hint)) },
+            label = stringResource(R.string.versions_create_hint),
             singleLine = true,
             modifier = Modifier.weight(1f),
         )
@@ -746,10 +747,10 @@ private fun CommentComposer(
         state.commentTarget?.anchor?.let {
             Text(it.quote, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
         }
-        OutlinedTextField(
+        NovaTextField(
             value = state.commentDraft,
             onValueChange = onChange,
-            placeholder = { Text(stringResource(R.string.changes_comment_hint)) },
+            placeholder = stringResource(R.string.changes_comment_hint),
             minLines = 2,
             modifier = Modifier.fillMaxWidth(),
         )

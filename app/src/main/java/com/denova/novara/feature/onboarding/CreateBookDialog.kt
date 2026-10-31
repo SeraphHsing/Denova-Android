@@ -21,6 +21,7 @@ import com.denova.novara.core.i18n.resolve
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.foundation.text.KeyboardOptions
 import com.denova.novara.core.onboarding.OnboardingLogic
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 建书对话框（WRI-001）：只提交基线支持的三个字段。
@@ -50,25 +51,25 @@ fun CreateBookDialog(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = title,
                     onValueChange = { title = it },
-                    label = { Text(stringResource(R.string.create_book_name)) },
+                    label = stringResource(R.string.create_book_name),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = author,
                     onValueChange = { author = it },
-                    label = { Text(stringResource(R.string.create_book_author)) },
+                    label = stringResource(R.string.create_book_author),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text(stringResource(R.string.create_book_description)) },
+                    label = stringResource(R.string.create_book_description),
                     modifier = Modifier.fillMaxWidth(),
                 )
                 if (error != null) {

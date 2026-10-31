@@ -44,7 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -99,6 +98,13 @@ import com.denova.novara.core.game.GameAttachmentLimits
 import com.denova.novara.core.image.imageLoaderFor
 import com.denova.novara.core.network.DenovaClient
 import java.util.Locale
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaTextAction
+import com.denova.novara.ui.components.NovaTopBar
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
+import com.denova.novara.ui.components.NovaButton
 
 /**
  * 游戏舞台（P4-A）：故事库驱动入口（GAM-002）→ 挂接活动流 → 投影阶段与累积叙事。
@@ -152,12 +158,20 @@ fun GameScreen(
             .windowInsetsPadding(WindowInsets.statusBars)
             .imePadding(),
     ) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Text(stringResource(R.string.game_title), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
-            TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
-            IconButton(onClick = onOpenRightDrawer) { Text("»") }
-        }
+        NovaTopBar(
+            title = stringResource(R.string.game_title),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                NovaTextAction(text = stringResource(R.string.back), onClick = onBack)
+                NovaIconButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.drawer_end_open),
+                    onClick = onOpenRightDrawer,
+                )
+            },
+        )
 
         // 故事选择行：显示当前故事与轮次，点开列表切换 / 改名 / 删除。
         // 标题用 weight(1f) + 单行省略：服务端标题可能很长（AI 生成的叙事句），
@@ -358,22 +372,21 @@ fun GameScreen(
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
             // GAM-004：Enter 只换行、点「发送」才提交（与 Web 一致）。因此不能用 singleLine，
             // 否则回车被输入框吞掉，既发不出去也换不了行。
-            OutlinedTextField(
+            NovaTextField(
                 value = input,
                 onValueChange = { input = it },
-                label = { Text(stringResource(R.string.game_player_input)) },
+                label = stringResource(R.string.game_player_input),
                 minLines = 1,
                 maxLines = 4,
                 modifier = Modifier.weight(1f).padding(end = 8.dp),
             )
-            OutlinedButton(
+            NovaButton(
                 onClick = {
                     viewModel.sendCurrent(input)
                     input = ""
                 },
                 // 服务端要求正文非空：仅附件会以 `player input is empty` 失败（2026-10-29 实测）。
-                enabled = !uiState.sending && storyId.isNotBlank() && input.isNotBlank(),
-            ) { Text(if (uiState.sending) stringResource(R.string.game_sending) else stringResource(R.string.common_send)) }
+                enabled = !uiState.sending && storyId.isNotBlank() && input.isNotBlank(), text = if (uiState.sending) stringResource(R.string.game_sending) else stringResource(R.string.common_send), primary = false,)
         }
     }
 
@@ -485,17 +498,17 @@ private fun StoryCreationDialog(
                     }
                 }
 
-                OutlinedTextField(
+                NovaTextField(
                     value = form.title,
                     onValueChange = { text -> onUpdate { it.copy(title = text) } },
-                    label = { Text(stringResource(R.string.game_create_story_title)) },
+                    label = stringResource(R.string.game_create_story_title),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = form.origin,
                     onValueChange = { text -> onUpdate { it.copy(origin = text) } },
-                    label = { Text(stringResource(R.string.game_create_origin)) },
+                    label = stringResource(R.string.game_create_origin),
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                 )
@@ -512,17 +525,17 @@ private fun StoryCreationDialog(
                 )
                 when (form.protagonistMode) {
                     "custom" -> {
-                        OutlinedTextField(
+                        NovaTextField(
                             value = form.protagonistName,
                             onValueChange = { text -> onUpdate { it.copy(protagonistName = text) } },
-                            label = { Text(stringResource(R.string.game_create_protagonist_name)) },
+                            label = stringResource(R.string.game_create_protagonist_name),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                         )
-                        OutlinedTextField(
+                        NovaTextField(
                             value = form.protagonistProfile,
                             onValueChange = { text -> onUpdate { it.copy(protagonistProfile = text) } },
-                            label = { Text(stringResource(R.string.game_create_protagonist_profile)) },
+                            label = stringResource(R.string.game_create_protagonist_profile),
                             minLines = 2,
                             modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                         )
@@ -547,18 +560,18 @@ private fun StoryCreationDialog(
                     onSelect = { mode -> onUpdate { it.copy(openingMode = mode) } },
                 )
                 when (form.openingMode) {
-                    "preset" -> OutlinedTextField(
+                    "preset" -> NovaTextField(
                         value = form.openingPresetText,
                         onValueChange = { text -> onUpdate { it.copy(openingPresetText = text) } },
-                        label = { Text(stringResource(R.string.game_create_opening_preset_text)) },
+                        label = stringResource(R.string.game_create_opening_preset_text),
                         minLines = 2,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                     )
 
-                    "custom" -> OutlinedTextField(
+                    "custom" -> NovaTextField(
                         value = form.openingCustomText,
                         onValueChange = { text -> onUpdate { it.copy(openingCustomText = text) } },
-                        label = { Text(stringResource(R.string.game_create_opening_custom_text)) },
+                        label = stringResource(R.string.game_create_opening_custom_text),
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                     )
@@ -926,17 +939,13 @@ private fun ResourceDropdown(
     val selectedName = options.firstOrNull { it.first == selectedId }?.second
         ?: selectedId.ifBlank { stringResource(R.string.game_create_none) }
     Box(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        OutlinedButton(
+        NovaButton(
+            text = "$label: $selectedName",
             onClick = { expanded = true },
             enabled = options.isNotEmpty(),
+            primary = false,
             modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(
-                text = "$label: $selectedName",
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEach { (id, name) ->
                 DropdownMenuItem(
@@ -1085,7 +1094,7 @@ private fun RenameStoryDialog(story: StorySummary, onConfirm: (String) -> Unit, 
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.game_story_rename_title)) },
         text = {
-            OutlinedTextField(
+            NovaTextField(
                 value = title,
                 // Web 入口 maxLength=80，保持同一上限。
                 onValueChange = { if (it.length <= 80) title = it },

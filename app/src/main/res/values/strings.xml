@@ -8,6 +8,10 @@
     <string name="drawer_open">Open navigation</string>
     <string name="drawer_end_open">Open side panel</string>
     <string name="editor_more_actions">More actions</string>
+    <string name="action_sort">Sort</string>
+    <string name="action_refresh">Refresh</string>
+    <string name="action_more">More</string>
+    <string name="action_add">New</string>
     <string name="dest_workbench">Workbench</string>
     <string name="dest_editor">Writing</string>
     <string name="dest_game">Story</string>

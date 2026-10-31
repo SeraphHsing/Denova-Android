@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.Modifier
+import com.denova.novara.ui.theme.NovaTheme
 
 /**
  * 应用主题入口：按 [darkTheme] 选择语义色板，把 [NovaColors] 映射成 Material3 `ColorScheme`，

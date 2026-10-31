@@ -18,7 +18,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -42,6 +41,12 @@ import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.network.AutomationInboxItem
 import com.denova.novara.core.network.AutomationTask
 import com.denova.novara.core.network.DenovaClient
+import androidx.compose.material.icons.Icons
+import com.denova.novara.ui.components.NovaTopBar
+import com.denova.novara.ui.theme.NovaSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Menu
+import com.denova.novara.ui.components.NovaTextField
 
 /**
  * 自动化页（P4-D / AUT-001…004）。
@@ -73,20 +78,21 @@ private fun AutomationsContent(
     var confirmDelete by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding()) {
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            Column(Modifier.weight(1f)) {
-                Text(stringResource(R.string.automation_title), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.automation_subtitle, state.tasks.size, state.unread),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-            if (state.loading || state.busy) CircularProgressIndicator(Modifier.padding(6.dp))
-        }
+        NovaTopBar(
+            title = stringResource(R.string.automation_title),
+            subtitle = stringResource(R.string.automation_subtitle, state.tasks.size, state.unread),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                if (state.loading || state.busy) {
+                    CircularProgressIndicator(
+                        Modifier.size(NovaSize.iconAction),
+                        strokeWidth = 2.dp,
+                    )
+                }
+            },
+        )
         // 动作行单独一行并横向可滚：窄屏（320）下按钮不重叠。
         LazyRow(
             Modifier.fillMaxWidth().padding(horizontal = 8.dp),
@@ -399,10 +405,10 @@ private fun EditorPanel(state: AutomationsUiState, viewModel: AutomationsViewMod
             )
         }
         item("prompt") {
-            OutlinedTextField(
+            NovaTextField(
                 value = draft.prompt,
                 onValueChange = viewModel::setPrompt,
-                label = { Text(stringResource(R.string.automation_field_prompt)) },
+                label = stringResource(R.string.automation_field_prompt),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
                 minLines = 3,
                 maxLines = 8,
@@ -543,10 +549,10 @@ private fun TriggersEditor(
                     style = MaterialTheme.typography.labelSmall,
                 )
 
-                "semantic" -> OutlinedTextField(
+                "semantic" -> NovaTextField(
                     value = trigger.semanticCondition,
                     onValueChange = { viewModel.setTriggerCondition(index, it) },
-                    label = { Text(stringResource(R.string.automation_trigger_condition)) },
+                    label = stringResource(R.string.automation_trigger_condition),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                 )
@@ -619,10 +625,10 @@ private fun ErrorText(text: String) {
 
 @Composable
 private fun LabeledField(label: String, value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(
+    NovaTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text(label) },
+        label = label,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         singleLine = true,
     )
@@ -636,13 +642,13 @@ private fun NumberField(
     maximum: Int,
     onChange: (Int) -> Unit,
 ) {
-    OutlinedTextField(
+    NovaTextField(
         value = value.toString(),
         onValueChange = { text ->
-            val parsed = text.filter { it.isDigit() }.toIntOrNull() ?: return@OutlinedTextField
+            val parsed = text.filter { it.isDigit() }.toIntOrNull() ?: return@NovaTextField
             onChange(parsed.coerceIn(minimum, maximum))
         },
-        label = { Text(label) },
+        label = label,
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
