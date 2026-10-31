@@ -58,9 +58,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import com.denova.novara.core.persistence.GameDraftStore
+import java.io.File
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
@@ -150,10 +155,21 @@ fun GameScreen(
     var showPicker by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<StorySummary?>(null) }
     var deleteTarget by remember { mutableStateOf<StorySummary?>(null) }
-    var input by remember { mutableStateOf("") }
 
     val currentStory = library.stories.firstOrNull { it.id == library.currentStoryId }
     val storyId = library.currentStoryId
+
+    // GAM-002：每个故事各自保留未发送的输入。此前 `remember { "" }` 会在切换故事/离开页面时丢内容，
+    // 且切回时看到的是空输入框（基线是各归各、切回逐字一致）。
+    val draftStore = remember { GameDraftStore(File(context.filesDir, "game-drafts")) }
+    val scope = rememberCoroutineScope()
+    var input by remember(storyId) { mutableStateOf(draftStore.load(storyId)) }
+    // 防抖落盘：按键不为每次输入写文件，400ms 无输入才写一次。
+    LaunchedEffect(storyId, input) {
+        if (storyId.isBlank()) return@LaunchedEffect
+        delay(400)
+        draftStore.save(storyId, input)
+    }
 
     Column(
         modifier = Modifier
@@ -387,6 +403,8 @@ fun GameScreen(
                 onClick = {
                     viewModel.sendCurrent(input)
                     input = ""
+                    // 发送成功才清草稿；失败时草稿仍在，重进页面可以接着改（GAM-002）。
+                    scope.launch { draftStore.clear(storyId) }
                 },
                 // 服务端要求正文非空：仅附件会以 `player input is empty` 失败（2026-10-29 实测）。
                 enabled = !uiState.sending && storyId.isNotBlank() && input.isNotBlank(), text = if (uiState.sending) stringResource(R.string.game_sending) else stringResource(R.string.common_send), primary = false,)
