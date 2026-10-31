@@ -61,7 +61,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.platform.LocalConfiguration
@@ -85,6 +84,7 @@ import com.denova.novara.ui.theme.NovaRadius
 import com.denova.novara.ui.theme.NovaSize
 import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.ui.theme.NovaStroke
+import com.denova.novara.ui.theme.NovaText
 import com.denova.novara.ui.theme.NovaTheme
 
 private enum class EditorMode { SOURCE, RICH, PREVIEW }
@@ -602,7 +602,7 @@ fun EditorScreen(
                     EditorPerf.markEditStart()
                     viewModel.updateContent(it.text, composing = it.composition != null, caret = it.selection.start)
                 },
-                textStyle = TextStyle(fontSize = 16.sp),
+                textStyle = NovaText.sourceEditor,
                 modifier = Modifier.fillMaxSize().padding(NovaSpacing.md).tableTabKeys(textFieldValue) {
                     applyTable(it)
                 },
@@ -615,7 +615,7 @@ fun EditorScreen(
                     viewModel.updateContent(it.text, composing = it.composition != null, caret = it.selection.start)
                 },
                 visualTransformation = MarkdownVisualTransformation(),
-                textStyle = TextStyle(fontSize = 16.sp),
+                textStyle = NovaText.editorBody,
                 modifier = Modifier.fillMaxSize().padding(NovaSpacing.md).tableTabKeys(textFieldValue) {
                     applyTable(it)
                 },

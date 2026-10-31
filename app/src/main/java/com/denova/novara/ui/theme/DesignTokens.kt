@@ -589,6 +589,18 @@ object NovaText {
         fontFamily = NovaFont.reading,
     )
 
+    /**
+     * 富文本编辑器正文：Web 390 实测 16px / 行高 30.4px（1.9×）/ 400 / 字距 `normal` / 段距 0。
+     *
+     * 与 [reading] 区分：`--nova-reading-font-size` 是阅读态的 18px，编辑器正文跟的是编辑器自身的
+     * 字号档位（`编辑工具 → 编辑器设置` 里的 Aa 档），实测为 16px。
+     */
+    val editorBody = TextStyle(
+        fontSize = 16.sp,
+        lineHeight = 30.4.sp,
+        fontFamily = NovaFont.ui,
+    )
+
     /** 源码编辑器 14px / 20px。 */
     val sourceEditor = TextStyle(
         fontSize = 14.sp,
