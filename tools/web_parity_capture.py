@@ -34,6 +34,8 @@ from playwright.sync_api import Browser, Page, sync_playwright
 DEFAULT_WIDTHS = (390, 320)
 VIEWPORT_HEIGHT = {320: 640, 390: 844, 430: 932, 768: 1024, 1023: 768}
 LANG_NAV = {"zh": "导航菜单", "en": "Navigation", None: "导航菜单"}
+# 09 §2 的五类读数：抽屉 / 顶栏与输入按钮标签（login + workspace）/ 列表（library、messages、settings）/ 编辑器排版。
+ALL_SCENES = ("login", "workspace", "editor", "library", "messages", "settings")
 
 # 只读断言与读数都在页面内执行，避免每项一个 round-trip。
 METRICS_JS = """
@@ -69,6 +71,33 @@ METRICS_JS = """
     current: el.getAttribute('aria-current') === 'page',
     ...rect(el),
   }));
+  // 列表行（09 §2「列表」类）：设置 / 资料库 / 消息中心等页面的行高、内边距与分隔线。
+  const ROW_PROPS = ['font-size', 'font-weight', 'line-height', 'padding-top', 'padding-bottom',
+    'border-bottom-width', 'border-bottom-color', 'background-color'];
+  const listRows = [...document.querySelectorAll('[role="listitem"], li, .nova-list-row, [data-list-row]')]
+    .slice(0, 60)
+    .map((el) => ({
+      text: (el.textContent || '').trim().slice(0, 40),
+      ...rect(el),
+      ...style(el, ROW_PROPS),
+    }));
+  // 编辑器排版（09 §2「编辑器」类）：正文块的字号 / 行高 / 字距 / 段距，以及代码块与表格。
+  const doc = document.querySelector('[contenteditable="true"], .ProseMirror, [data-editor-content]');
+  const docBlock = (sel) => {
+    const el = doc && doc.querySelector(sel);
+    if (!el) return null;
+    return { ...rect(el), ...style(el, [...TYPO, 'margin-top', 'margin-bottom', 'font-family']) };
+  };
+  // 通用控件读数（09 §2「输入 / 按钮 / 标签」类）：非登录页也能取到输入框与按钮的实际盒模型。
+  const controls = [...document.querySelectorAll('input, textarea, select, button, [role="switch"]')]
+    .slice(0, 60)
+    .map((el) => ({
+      tag: el.tagName.toLowerCase(),
+      label: (el.getAttribute('aria-label') || el.textContent || el.getAttribute('placeholder') || '')
+        .trim().slice(0, 24),
+      ...rect(el),
+      ...style(el, ['font-size', 'font-weight', 'border-radius', 'border-top-width', 'padding-left']),
+    }));
   return {
     url: location.pathname + location.search,
     viewport: { w: innerWidth, h: innerHeight, dpr: devicePixelRatio },
@@ -95,6 +124,20 @@ METRICS_JS = """
     navRow: row ? { ...rect(row), ...style(row, [...BOX, ...TYPO]) } : null,
     creationRow: creationRow ? { ...rect(creationRow), ...style(creationRow, BOX) } : null,
     navRows: rows,
+    listRows,
+    controls,
+    editor: doc
+      ? {
+          box: { ...rect(doc), ...style(doc, ['font-size', 'line-height', 'color', 'padding-left']) },
+          paragraph: docBlock('p'),
+          heading: docBlock('h1, h2'),
+          code: docBlock('pre'),
+          codeInline: docBlock('code'),
+          table: docBlock('table'),
+          tableCell: docBlock('td, th'),
+          blockquote: docBlock('blockquote'),
+        }
+      : null,
     bodyText: (document.body.innerText || '').slice(0, 4000),
   };
 }
@@ -137,6 +180,49 @@ def open_drawer(page: Page, lang: str | None) -> bool:
     button.click()
     page.wait_for_timeout(600)
     return page.locator('.nova-mobile-sheet[data-slot="sheet-content"]').count() > 0
+
+
+# 09 §2 需要的「列表」读数来自设置 / 资料库 / 消息中心三类页面；名称按中英文两套匹配。
+DESTINATIONS: dict[str, tuple[str, ...]] = {
+    "library": ("资料库", "Library"),
+    "messages": ("消息中心", "Messages"),
+    "settings": ("设置", "Settings"),
+}
+
+
+def open_destination(page: Page, names: tuple[str, ...]) -> bool:
+    """在已打开的抽屉里点击一级目的地（先试 aria-label，再退回文本匹配）。"""
+    for name in names:
+        for sel in (
+            f'button[aria-label="{name}"]',
+            f'[role="menuitem"]:has-text("{name}")',
+            f'button:has-text("{name}")',
+        ):
+            target = page.locator(sel).first
+            if target.count() > 0:
+                target.click()
+                page.wait_for_timeout(1500)
+                return True
+    print(f"  warn: destination {'/'.join(names)} not found")
+    return False
+
+
+def open_first_file(page: Page) -> bool:
+    """工作台 →「文件」页签 → 文件树第一项，进入编辑器后才有正文排版读数。"""
+    for sel in ('[role="tab"]:has-text("文件")', 'button:has-text("文件")'):
+        tab = page.locator(sel).first
+        if tab.count() > 0:
+            tab.click()
+            page.wait_for_timeout(1200)
+            break
+    for sel in ('[role="treeitem"]', '[data-file-path]', '[data-tree-node]'):
+        items = page.locator(sel)
+        if items.count() > 0:
+            items.first.click()
+            page.wait_for_timeout(2500)
+            return True
+    print("  warn: no file node found, editor metrics skipped")
+    return False
 
 
 def run_scene(browser: Browser, base: str, width: int, out_dir: Path, records: dict,
@@ -218,6 +304,35 @@ def run_scene(browser: Browser, base: str, width: int, out_dir: Path, records: d
                 close.click()
                 page.wait_for_timeout(500)
 
+    # 09 §2 剩余三类读数：编辑器排版、列表（资料库 / 消息中心 / 设置）。
+    # 每类用独立 page，避免 SPA 内部导航残留影响下一场景；Cookie 在同一 context 内共享。
+    def scene_page() -> Page:
+        fresh = context.new_page()
+        fresh.goto(base, wait_until="domcontentloaded", timeout=30000)
+        fresh.wait_for_selector('[data-nova-mobile-shell="true"]', timeout=25000)
+        fresh.wait_for_timeout(1500)
+        return fresh
+
+    if "editor" in scenes:
+        sp = scene_page()
+        if open_first_file(sp):
+            dump(sp, out_dir, tag(f"editor-{width}"), records)
+        sp.close()
+
+    for scene in ("library", "messages", "settings"):
+        if scene not in scenes:
+            continue
+        sp = scene_page()
+        if open_drawer(sp, lang) and open_destination(sp, DESTINATIONS[scene]):
+            dump(sp, out_dir, tag(f"{scene}-{width}"), records)
+            sp.evaluate("""() => {
+              const el = document.scrollingElement || document.querySelector('main');
+              if (el) el.scrollTop = el.scrollHeight;
+            }""")
+            sp.wait_for_timeout(500)
+            dump(sp, out_dir, tag(f"{scene}-bottom-{width}"), records)
+        sp.close()
+
     context.close()
 
 
@@ -225,7 +340,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Web 移动视口基线抓图与尺寸读数")
     parser.add_argument("--out", default="docs/evidence/web-baseline/" + "2026-10-30")
     parser.add_argument("--widths", default=",".join(str(w) for w in DEFAULT_WIDTHS))
-    parser.add_argument("--scene", default="all", choices=["all", "login", "workspace"])
+    parser.add_argument(
+        "--scene",
+        default="all",
+        choices=["all", "login", "workspace", "editor", "library", "messages", "settings"],
+    )
     parser.add_argument("--lang", default="", choices=["", "zh", "en"], help="空表示不干预（默认中文环境）")
     parser.add_argument("--scheme", default="", choices=["", "light"], help="空表示基线默认深色；light 走 data-theme=light")
     parser.add_argument("--headed", action="store_true", help="调试用：显示浏览器窗口")
@@ -237,8 +356,9 @@ def main() -> None:
     args = parser.parse_args()
 
     widths = [int(w) for w in args.widths.split(",") if w.strip()]
-    scenes = {"login", "workspace"} if args.scene == "all" else {args.scene}
-    base, _user, _password = collect_credentials(require_login="workspace" in scenes)
+    scenes = set(ALL_SCENES) if args.scene == "all" else {args.scene}
+    # 除登录页外都需要已认证外壳，凭证只在真实登录时才要求。
+    base, _user, _password = collect_credentials(require_login=bool(scenes - {"login"}))
     lang = args.lang or None
 
     out_dir = Path(args.out).resolve()
