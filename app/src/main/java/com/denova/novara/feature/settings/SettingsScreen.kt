@@ -6,7 +6,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
@@ -21,6 +23,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,7 +50,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.material.icons.Icons
 import com.denova.novara.ui.components.NovaTextAction
 import com.denova.novara.ui.components.NovaTopBar
+import com.denova.novara.ui.theme.NovaRadius
 import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaTheme
 import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.ui.theme.NovaStroke
 import androidx.compose.foundation.layout.size
@@ -189,6 +194,30 @@ private fun SettingsContent(
     }
 }
 
+/** 设置页候选项（VG-016）：整行宽 44dp、圆角 8dp、左内边距 10dp、16sp/400，选中用 `active` 底。 */
+@Composable
+private fun SettingsOptionButton(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val colors = NovaTheme.colors
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(NovaRadius.option),
+        color = if (selected) colors.active else colors.surface2,
+        contentColor = if (selected) colors.text else colors.textMuted,
+        modifier = Modifier.fillMaxWidth().height(NovaSize.button),
+    ) {
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = NovaSpacing.tab),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+        }
+    }
+}
+
 @Composable
 private fun SettingsFieldRow(
     spec: com.denova.novara.core.settings.SettingsFieldSpec,
@@ -217,38 +246,18 @@ private fun SettingsFieldRow(
             }
         }
         when (spec.kind) {
-            SettingsFieldKind.BOOL -> Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
-                FilterChip(
-                    selected = draft.isEmpty(),
-                    onClick = { onEdit("") },
-                    label = { Text(stringResource(R.string.settings_inherit)) },
-                )
-                FilterChip(
-                    selected = draft == "true",
-                    onClick = { onEdit("true") },
-                    label = { Text(stringResource(R.string.settings_on)) },
-                )
-                FilterChip(
-                    selected = draft == "false",
-                    onClick = { onEdit("false") },
-                    label = { Text(stringResource(R.string.settings_off)) },
-                )
+            // VG-016：基线候选项是「整行宽、44px 高、圆角 8px、左内边距 10px、16px/400」的垂直选项，
+            // 此前用横向 M3 FilterChip（32dp、大圆角），高度与形态都不符。
+            SettingsFieldKind.BOOL -> Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.xxs)) {
+                SettingsOptionButton(stringResource(R.string.settings_inherit), draft.isEmpty()) { onEdit("") }
+                SettingsOptionButton(stringResource(R.string.settings_on), draft == "true") { onEdit("true") }
+                SettingsOptionButton(stringResource(R.string.settings_off), draft == "false") { onEdit("false") }
             }
 
-            SettingsFieldKind.ENUM -> LazyRow(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
-                item {
-                    FilterChip(
-                        selected = draft.isEmpty(),
-                        onClick = { onEdit("") },
-                        label = { Text(stringResource(R.string.settings_inherit)) },
-                    )
-                }
-                items(spec.options) { option ->
-                    FilterChip(
-                        selected = draft == option,
-                        onClick = { onEdit(option) },
-                        label = { Text(option) },
-                    )
+            SettingsFieldKind.ENUM -> Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.xxs)) {
+                SettingsOptionButton(stringResource(R.string.settings_inherit), draft.isEmpty()) { onEdit("") }
+                spec.options.forEach { option ->
+                    SettingsOptionButton(option, draft == option) { onEdit(option) }
                 }
             }
 

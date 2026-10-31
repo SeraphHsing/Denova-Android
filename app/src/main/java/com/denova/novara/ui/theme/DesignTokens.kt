@@ -72,6 +72,9 @@ object NovaRadius {
     val field: Dp = 10.dp
     val button: Dp = 12.dp
 
+    /** 设置页枚举/布尔候选项：基线 `settings-390` 的 `controls` 圆角 8px（VG-016）。 */
+    val option: Dp = 8.dp
+
     /** `--radius-xl: calc(--radius × 1.4)`。 */
     val card: Dp = 14.dp
 

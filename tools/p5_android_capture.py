@@ -109,12 +109,16 @@ def tap_drawer_item(label: str) -> bool:
     for _ in range(2):
         adb("shell", "input", "swipe", "600", "1400", "600", "2900", "260")
         time.sleep(0.5)
-    for _ in range(6):
+    for _ in range(10):
         root = dump_root()
         point = find_tap(root, lambda node: (node.get("text") or "").strip() == label)
         if point:
             adb("shell", "input", "tap", str(point[0]), str(point[1]))
             time.sleep(1.6)
+            # 抽屉项多、行高 52dp 时点击可能落在行间空隙：抽屉没关就再点一次同坐标。
+            if find_tap(dump_root(), lambda node: (node.get("content-desc") or "") == "关闭导航菜单"):
+                adb("shell", "input", "tap", str(point[0]), str(point[1]))
+                time.sleep(1.6)
             return True
         # 目标在抽屉下方：整屏向上滚动后再找。
         adb("shell", "input", "swipe", "600", "2800", "600", "1400", "320")
