@@ -190,6 +190,15 @@ object NovaSize {
     val skillEditorMaxHeight: Dp = 360.dp
     val skillListMaxHeight: Dp = 420.dp
 
+    /** 工作台历史抽屉的列表上限。 */
+    val historyListMaxHeight: Dp = 460.dp
+
+    /** 工作台下拉/命令列表上限。 */
+    val dropdownMaxHeight: Dp = 220.dp
+
+    /** 状态圆点直径（未读 / 变更标记）。 */
+    val statusDot: Dp = 6.dp
+
     /** 文件标签最大宽度与关闭按钮盒，避免长路径把标签条撑爆（编辑器标签条）。 */
     val tabMaxWidth: Dp = 120.dp
     val tabCloseBox: Dp = 18.dp

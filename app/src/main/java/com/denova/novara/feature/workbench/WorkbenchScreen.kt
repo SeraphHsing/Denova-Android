@@ -44,6 +44,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaRadius
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.core.network.ProjectAgentGateway
@@ -189,7 +192,7 @@ fun WorkbenchScreen(
 
         state.notice?.let { notice ->
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -203,7 +206,7 @@ fun WorkbenchScreen(
         }
 
         if (activeTab == null) {
-            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().padding(NovaSpacing.xl), contentAlignment = Alignment.Center) {
                 Text(
                     stringResource(R.string.workbench_empty_tab),
                     style = MaterialTheme.typography.bodyMedium,
@@ -229,7 +232,7 @@ private fun count(value: Int): String = if (value > 0) " ($value)" else ""
 private fun GroupChip(label: String, selected: Boolean, onClick: () -> Unit) {
     TextButton(
         onClick = onClick,
-        modifier = Modifier.padding(end = 2.dp),
+        modifier = Modifier.padding(end = NovaSpacing.xxs),
     ) {
         Text(
             label,
@@ -341,13 +344,13 @@ private fun TabItem(
     var menu by remember { mutableStateOf(false) }
     Row(
         Modifier
-            .padding(horizontal = 2.dp, vertical = 2.dp)
+            .padding(horizontal = NovaSpacing.xxs, vertical = NovaSpacing.xxs)
             .background(
                 if (active) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
-                RoundedCornerShape(6.dp),
+                RoundedCornerShape(NovaRadius.xs),
             )
             .clickable(onClick = onActivate)
-            .padding(start = 8.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
+            .padding(start = NovaSpacing.sm, end = NovaSpacing.xxs, top = NovaSpacing.xs, bottom = NovaSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -355,7 +358,7 @@ private fun TabItem(
             style = MaterialTheme.typography.labelMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(end = 4.dp),
+            modifier = Modifier.padding(end = NovaSpacing.xs),
         )
         NovaIconButton(icon = Icons.Filled.MoreVert, contentDescription = stringResource(R.string.action_more), onClick = { menu = true })
         TextButton(onClick = onClose, modifier = Modifier.padding(0.dp)) { Text("×") }
@@ -571,7 +574,7 @@ private fun WorkbenchFilesHost(
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -597,15 +600,15 @@ private fun WorkbenchFilesHost(
                     stringResource(R.string.loading),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm),
                 )
                 rows.isEmpty() -> Text(
                     stringResource(R.string.workbench_files_empty),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm),
                 )
-                else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp)) {
+                else -> LazyColumn(Modifier.fillMaxWidth().heightIn(max = NovaSize.dropdownMaxHeight)) {
                     items(rows, key = { it.node.path.ifBlank { "$" } + ":" + it.depth }) { row ->
                         val indent = (row.depth * 12).dp
                         TextButton(

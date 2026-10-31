@@ -45,6 +45,9 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaRadius
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.network.AgentChatHistoryItem
 import com.denova.novara.core.network.AgentChatProject
@@ -73,9 +76,9 @@ fun WorkbenchHistorySheet(
     var menuFor by remember { mutableStateOf<String?>(null) }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(bottom = NovaSpacing.sm)) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -89,8 +92,8 @@ fun WorkbenchHistorySheet(
 
             if (state.projects.isNotEmpty()) {
                 LazyRow(
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
+                    horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
                 ) {
                     items(state.projects, key = { it.id }) { project ->
                         ProjectChip(
@@ -107,7 +110,7 @@ fun WorkbenchHistorySheet(
                 onValueChange = viewModel::onQueryChange,
                 label = stringResource(R.string.workbench_history_search),
                 singleLine = true,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.chip),
             )
 
             state.error?.let { error ->
@@ -115,7 +118,7 @@ fun WorkbenchHistorySheet(
                     error.resolve(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
                 )
             }
             state.message?.let { message ->
@@ -123,18 +126,18 @@ fun WorkbenchHistorySheet(
                     message.resolve(),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
                 )
             }
 
             HorizontalDivider()
             when {
                 state.loading && state.page.items.isEmpty() -> Box(
-                    Modifier.fillMaxWidth().padding(24.dp),
+                    Modifier.fillMaxWidth().padding(NovaSpacing.xl),
                     contentAlignment = Alignment.Center,
                 ) { Text(stringResource(R.string.loading), style = MaterialTheme.typography.bodySmall) }
                 state.page.items.isEmpty() -> Box(
-                    Modifier.fillMaxWidth().padding(24.dp),
+                    Modifier.fillMaxWidth().padding(NovaSpacing.xl),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(
@@ -143,7 +146,7 @@ fun WorkbenchHistorySheet(
                         color = MaterialTheme.colorScheme.outline,
                     )
                 }
-                else -> LazyColumn(Modifier.fillMaxWidth().sizeIn(maxHeight = 460.dp)) {
+                else -> LazyColumn(Modifier.fillMaxWidth().sizeIn(maxHeight = NovaSize.historyListMaxHeight)) {
                     items(state.page.items, key = { HistoryList.key(it) }) { item ->
                         HistoryRow(
                             item = item,
@@ -174,7 +177,7 @@ fun WorkbenchHistorySheet(
                     if (state.page.hasMore) {
                         item("load-more") {
                             Row(
-                                Modifier.fillMaxWidth().padding(8.dp),
+                                Modifier.fillMaxWidth().padding(NovaSpacing.sm),
                                 horizontalArrangement = Arrangement.Center,
                             ) {
                                 TextButton(
@@ -199,7 +202,7 @@ fun WorkbenchHistorySheet(
                             ),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.tab),
                         )
                     }
                 }
@@ -262,10 +265,10 @@ private fun ProjectChip(project: AgentChatProject, selected: Boolean, onClick: (
         Modifier
             .background(
                 if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-                RoundedCornerShape(8.dp),
+                RoundedCornerShape(NovaRadius.sm),
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = NovaSpacing.tab, vertical = NovaSpacing.chip),
     ) {
         Text(
             project.name.ifBlank { project.path.ifBlank { project.id } },
@@ -297,18 +300,18 @@ private fun HistoryRow(
     onDelete: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = 12.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             Modifier
-                .size(6.dp)
+                .size(NovaSize.statusDot)
                 .background(
                     if (item.session.running) MaterialTheme.colorScheme.primary else Color.Transparent,
                     CircleShape,
                 ),
         )
-        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+        Column(Modifier.weight(1f).padding(start = NovaSpacing.sm)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     item.session.title.ifBlank { stringResource(R.string.workbench_session_untitled) },
@@ -322,20 +325,20 @@ private fun HistoryRow(
                         stringResource(R.string.workbench_session_running),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 6.dp),
+                        modifier = Modifier.padding(start = NovaSpacing.chip),
                     )
                 }
                 Text(
                     compactTime(item.session.updatedAt.ifBlank { item.session.createdAt }),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(start = 8.dp),
+                    modifier = Modifier.padding(start = NovaSpacing.sm),
                 )
                 Text(
                     stringResource(R.string.workbench_history_message_count, item.session.messageCount),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(start = 6.dp),
+                    modifier = Modifier.padding(start = NovaSpacing.chip),
                 )
             }
             if (item.excerpt.isNotBlank()) {
@@ -345,7 +348,7 @@ private fun HistoryRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.xxs),
                 )
             }
         }

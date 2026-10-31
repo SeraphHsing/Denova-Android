@@ -34,6 +34,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaRadius
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaStroke
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.network.AgentChatProject
 import com.denova.novara.core.network.AgentChatSession
@@ -79,7 +83,7 @@ fun WorkbenchTreeContent(
 
     Column(Modifier.fillMaxSize()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm, vertical = NovaSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -115,7 +119,7 @@ fun WorkbenchTreeContent(
 
         state.notice?.let { notice ->
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 6.dp),
+                Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.tab, vertical = NovaSpacing.chip),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -132,7 +136,7 @@ fun WorkbenchTreeContent(
                 error.resolve(),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.tab, vertical = NovaSpacing.chip),
             )
         }
 
@@ -141,7 +145,7 @@ fun WorkbenchTreeContent(
                 stringResource(R.string.workbench_empty_projects),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.padding(NovaSpacing.md),
             )
         }
 
@@ -150,7 +154,7 @@ fun WorkbenchTreeContent(
                 val expanded = project.id !in state.collapsedProjects
                 val limit = expandedCounts[project.id] ?: RECENT_SESSION_LIMIT
                 val visible = project.sessions.take(limit)
-                Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 1.dp)) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.xs, vertical = NovaStroke.hairline)) {
                     ProjectRow(
                         project = project,
                         selected = project.id == state.selectedProjectId,
@@ -164,13 +168,13 @@ fun WorkbenchTreeContent(
                         onArchive = { onArchiveProject(project) },
                     )
                     if (expanded) {
-                        Column(Modifier.padding(start = 16.dp)) {
+                        Column(Modifier.padding(start = NovaSpacing.lg)) {
                             project.error?.let { message ->
                                 Text(
                                     message,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.error,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    modifier = Modifier.padding(horizontal = NovaSpacing.chip, vertical = NovaSpacing.xxs),
                                 )
                             }
                             visible.forEach { session ->
@@ -309,13 +313,13 @@ private fun ProjectRow(
             .fillMaxWidth()
             .background(
                 if (selected) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
-                RoundedCornerShape(6.dp),
+                RoundedCornerShape(NovaRadius.xs),
             )
             .clickable {
                 onSelect()
                 onToggle()
             }
-            .padding(start = 4.dp, end = 2.dp, top = 6.dp, bottom = 6.dp),
+            .padding(start = NovaSpacing.xs, end = NovaSpacing.xxs, top = NovaSpacing.chip, bottom = NovaSpacing.chip),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(if (expanded) "▾" else "▸", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
@@ -324,14 +328,14 @@ private fun ProjectRow(
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(start = 6.dp),
+            modifier = Modifier.weight(1f).padding(start = NovaSpacing.chip),
         )
         if (project.current) {
             Text(
                 stringResource(R.string.workbench_project_current),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(end = 4.dp),
+                modifier = Modifier.padding(end = NovaSpacing.xs),
             )
         }
         if (project.status == "missing") {
@@ -362,7 +366,7 @@ private fun SessionRow(
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = 5.dp, horizontal = 4.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onOpen).padding(vertical = NovaSpacing.xs, horizontal = NovaSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -373,12 +377,12 @@ private fun SessionRow(
             modifier = Modifier.weight(1f),
         )
         if (running) {
-            Box(Modifier.size(6.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
+            Box(Modifier.size(NovaSize.statusDot).background(MaterialTheme.colorScheme.primary, CircleShape))
             Text(
                 stringResource(R.string.workbench_session_running),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 4.dp),
+                modifier = Modifier.padding(start = NovaSpacing.xs),
             )
         }
         Box {
