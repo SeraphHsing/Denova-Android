@@ -163,7 +163,10 @@ private fun filterLabel(filter: MessageFilter): String = stringResource(
 
 @Composable
 private fun MessageRow(message: ProductMessage, onOpen: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm)) {
+    // 基线消息行：上下内边距各 16px、整行宽 1px 下边框（行高 105/125）。此前垂直内边距取 8dp，
+    // 且分隔线画在 16dp 内边距之内（左右各缩进 16），两处都与基线不符（2026-11-01 Web 读数）。
+    Column(Modifier.fillMaxWidth()) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.lg)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 MessageCenterLogic.typeLabel(message).resolve(),
@@ -189,7 +192,8 @@ private fun MessageRow(message: ProductMessage, onOpen: () -> Unit) {
         if (message.summary.isNotBlank()) {
             Text(message.summary, style = MaterialTheme.typography.labelSmall)
         }
-        HorizontalDivider(Modifier.padding(top = NovaSpacing.sm))
+    }
+        HorizontalDivider()
     }
 }
 
