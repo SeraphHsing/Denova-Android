@@ -23,6 +23,13 @@
 > `NovaFont`、`NovaShadow` + `NovaShadows`（`--nova-shadow` 深浅两套、抽屉 `0 10px 15px -3px`、字段聚焦外环）、
 > `NovaMotion`（`--nova-motion-*`、面板时长、`--nova-ease` / `--nova-motion-ease` 的三次贝塞尔）；
 > 半透明值的 alpha 按 `CSS 值 × 255` 写死并由 `DesignTokensTest` 锁定。
+> **2026-11-01 第五轮（散落尺寸回收，第 1 批）**：四类共用件（抽屉 / 顶栏 / 输入 / 按钮）在上一轮已全部只从
+> `DesignTokens` 取值，本轮清理共用件之外页面层残留的尺寸字面量——连接页 18 处、编辑器页 34 处全部改为
+> `NovaSpacing` / `NovaRadius` / `NovaStroke` / `NovaSize`；为保持视觉不变，新增 `NovaSpacing.tab`（标签起始 10dp）、
+> `NovaSize.tabMaxWidth` / `tabCloseBox`（120 / 18dp）、`NovaSize.menuMaxHeight`（360dp）、`NovaStroke.thick`（2dp 指示条）。
+> 抽屉壳与右抽屉只剩两处语义为「归零」的 `0.dp`（`tonalElevation`、`padding(start = 0)`），不计为散落尺寸。
+> 剩余 20 个 feature 文件仍有约 400 处字面量（`AgentScreen` 61、`GameScreen` 56、`AutomationsScreen` 41、
+> `MarketScreen` 36、`LoreScreen` 33 等），按屏逐个回收，§3 标准 1 尚未达成。
 > 仍未做的是**列表行、卡片、编辑区正文排版的尺寸字面量**（属 04 的逐屏细化，不在 VG-005…009 范围）。
 
 `04-ui-and-editor.md` 把 `DesignTokens`（颜色、圆角、间距、字号、行高、图标尺寸的唯一来源）列为硬要求。

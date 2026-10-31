@@ -29,12 +29,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
 import com.denova.novara.R
 import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.ui.components.NovaButton
 import com.denova.novara.ui.components.NovaTextField
+import com.denova.novara.ui.theme.NovaSpacing
 
 /** 默认服务器地址（隔离测试服务器；可在输入框里改）。 */
 private const val DEFAULT_SERVER = "192.168.2.102:18081"
@@ -67,7 +67,7 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
             .fillMaxSize()
             .windowInsetsPadding(WindowInsets.statusBars)
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(NovaSpacing.xl),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -94,11 +94,11 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
                     onConnect = { viewModel.connect(server) },
                     actionError = actionError,
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(NovaSpacing.lg))
                 CircularProgressIndicator()
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(NovaSpacing.sm))
                 Text(stringResource(R.string.conn_connecting, s.server.origin))
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(NovaSpacing.sm))
                 NovaButton(
                     text = stringResource(R.string.conn_retry),
                     onClick = { viewModel.retry() },
@@ -116,17 +116,17 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
                     onConnect = { viewModel.connect(server) },
                     actionError = actionError,
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(NovaSpacing.lg))
                 Column(Modifier.fillMaxWidth()) {
                     Text(
                         stringResource(R.string.conn_connection_failed),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.error,
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(NovaSpacing.xs))
                     Text(s.message.resolve(), style = MaterialTheme.typography.bodyMedium)
                 }
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(NovaSpacing.md))
                 NovaButton(
                     text = stringResource(R.string.conn_retry),
                     onClick = { viewModel.retry() },
@@ -139,16 +139,16 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
                     stringResource(R.string.conn_login_title),
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(NovaSpacing.xs))
                 Text(
                     stringResource(R.string.conn_login_desc),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(NovaSpacing.sm))
                 Text(stringResource(R.string.conn_server, s.server.origin), style = MaterialTheme.typography.bodyMedium)
                 if (s.local) {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(NovaSpacing.xs))
                     Text(stringResource(R.string.conn_local), color = MaterialTheme.colorScheme.primary)
                 }
                 // AUTH-006：登录页也要能换服务器，否则连到 B 只能靠杀进程重来。
@@ -183,14 +183,14 @@ private fun ConnectForm(
         placeholder = stringResource(R.string.conn_server_hint),
         modifier = Modifier.fillMaxWidth(),
     )
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(NovaSpacing.md))
     NovaButton(
         text = stringResource(R.string.conn_connect),
         onClick = onConnect,
         modifier = Modifier.fillMaxWidth(),
     )
     actionError?.let {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(NovaSpacing.sm))
         Text(it.resolve(), color = MaterialTheme.colorScheme.error)
     }
 }
@@ -208,7 +208,7 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: UiText?, subm
         enabled = !submitting,
         modifier = Modifier.fillMaxWidth(),
     )
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(NovaSpacing.sm))
     NovaTextField(
         value = password,
         onValueChange = { password = it },
@@ -223,14 +223,14 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: UiText?, subm
         ),
         modifier = Modifier.fillMaxWidth(),
     )
-    Spacer(Modifier.height(4.dp))
+    Spacer(Modifier.height(NovaSpacing.xs))
     // 对齐 Web 登录卡片的 rememberHint（会话保留 30 天，可在设置退出）。
     Text(
         stringResource(R.string.conn_remember_hint),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline,
     )
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(NovaSpacing.md))
     NovaButton(
         text = stringResource(if (submitting) R.string.conn_signing_in else R.string.conn_login),
         onClick = { viewModel.login(username, password) },
@@ -238,7 +238,7 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: UiText?, subm
         modifier = Modifier.fillMaxWidth(),
     )
 
-    Spacer(Modifier.height(24.dp))
+    Spacer(Modifier.height(NovaSpacing.xl))
     NovaTextField(
         value = token,
         onValueChange = { token = it },
@@ -251,7 +251,7 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: UiText?, subm
         ),
         modifier = Modifier.fillMaxWidth(),
     )
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(NovaSpacing.md))
     NovaButton(
         text = stringResource(if (submitting) R.string.conn_pairing else R.string.conn_pair),
         onClick = { viewModel.pair(token) },
@@ -260,7 +260,7 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: UiText?, subm
     )
 
     actionError?.let {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(NovaSpacing.sm))
         Text(it.resolve(), color = MaterialTheme.colorScheme.error)
     }
 }

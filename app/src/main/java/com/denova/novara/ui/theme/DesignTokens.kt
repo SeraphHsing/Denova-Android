@@ -46,6 +46,9 @@ object NovaSpacing {
     val lg: Dp = 16.dp
     val xl: Dp = 24.dp
     val xxl: Dp = 32.dp
+
+    /** 文件标签条起始内边距 10px（编辑器标签行，介于 [sm] 与 [md] 之间）。 */
+    val tab: Dp = 10.dp
 }
 
 /**
@@ -84,6 +87,9 @@ object NovaStroke {
 
     /** 字段聚焦时 `0 0 0 2px` 的外环。 */
     val focusRing: Dp = 2.dp
+
+    /** 选中指示条等 2dp 粗描边（编辑器标签下沿）。 */
+    val thick: Dp = 2.dp
 
     val iconStroke: Float = 1.8f
     val navIconStroke: Float = 1.7f
@@ -150,6 +156,13 @@ object NovaSize {
     /** Composer 文本区域最大高度 `min(25dvh, 10rem)`；游戏行动列表 `min(25dvh, 12rem)`。 */
     val composerMaxHeight: Dp = 160.dp
     val actionListMaxHeight: Dp = 192.dp
+
+    /** 弹窗内可滚动列表的最大高度（编辑器插图候选列表 360dp）。 */
+    val menuMaxHeight: Dp = 360.dp
+
+    /** 文件标签最大宽度与关闭按钮盒，避免长路径把标签条撑爆（编辑器标签条）。 */
+    val tabMaxWidth: Dp = 120.dp
+    val tabCloseBox: Dp = 18.dp
 }
 
 /** 字重：基线顶栏 / 移动标题 / 创作组入口为 600，按钮与字段 label 为 500，正文 400。 */

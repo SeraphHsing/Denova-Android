@@ -67,7 +67,6 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.denova.novara.R
@@ -82,7 +81,10 @@ import com.denova.novara.ui.components.NovaTextAction
 import com.denova.novara.ui.components.NovaTextField
 import com.denova.novara.ui.components.NovaTopBar
 import kotlinx.coroutines.launch
+import com.denova.novara.ui.theme.NovaRadius
+import com.denova.novara.ui.theme.NovaSize
 import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaStroke
 import com.denova.novara.ui.theme.NovaTheme
 
 private enum class EditorMode { SOURCE, RICH, PREVIEW }
@@ -283,7 +285,7 @@ fun EditorScreen(
         // 打开文件（NAV-010）：窄屏或大字体下并排会把输入内容压成几个字符（label 还会竖排换行），
         // 改为纵向堆叠；宽屏保持并排。
         if (compactHeader) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm)) {
                 NovaTextField(
                     value = projectId,
                     onValueChange = { projectId = it; onProjectIdChange(it) },
@@ -294,31 +296,31 @@ fun EditorScreen(
                     value = filePath,
                     onValueChange = { filePath = it },
                     label = stringResource(R.string.editor_file_path),
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = NovaSpacing.sm),
                 )
                 NovaButton(
                     text = stringResource(R.string.editor_open),
                     onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) },
                     primary = false,
-                    modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
+                    modifier = Modifier.align(Alignment.End).padding(top = NovaSpacing.sm),
                 )
             }
         } else {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm),
                 verticalAlignment = Alignment.Bottom,
             ) {
                 NovaTextField(
                     value = projectId,
                     onValueChange = { projectId = it; onProjectIdChange(it) },
                     label = stringResource(R.string.editor_project_id),
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    modifier = Modifier.weight(1f).padding(end = NovaSpacing.sm),
                 )
                 NovaTextField(
                     value = filePath,
                     onValueChange = { filePath = it },
                     label = stringResource(R.string.editor_file_path),
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    modifier = Modifier.weight(1f).padding(end = NovaSpacing.sm),
                 )
                 NovaButton(
                     text = stringResource(R.string.editor_open),
@@ -344,7 +346,7 @@ fun EditorScreen(
             SaveStatus.ERROR -> stringResource(R.string.editor_error)
         }
         if (status.isNotEmpty()) {
-            Text(status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
+            Text(status, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = NovaSpacing.md))
         }
         uiState.message?.let {
             Text(
@@ -352,29 +354,29 @@ fun EditorScreen(
                 color = if (uiState.saveStatus == SaveStatus.CONFLICT || uiState.saveStatus == SaveStatus.ERROR)
                     MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 12.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md),
             )
         }
         if (uiState.saveStatus == SaveStatus.CONFLICT) {
             // 冲突态暂停自动保存（对齐 Web `EditorPersistenceNotices`）：
             // 用户要么保留本地合并结果，要么直接加载服务器版本；两种选择都不会丢冲突材料。
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md)) {
                 Text(
                     stringResource(R.string.conflict_hint),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.sm),
                 )
                 uiState.conflict?.recoveryId?.let { id ->
                     Text(
                         stringResource(R.string.conflict_recovery, id),
                         style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(top = 2.dp),
+                        modifier = Modifier.padding(top = NovaSpacing.xxs),
                     )
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     NovaButton(onClick = { viewModel.keepLocalVersion() }, text = stringResource(R.string.conflict_keep_local), primary = false,)
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(NovaSpacing.sm))
                     NovaButton(onClick = { viewModel.loadExternalVersion() }, text = stringResource(R.string.conflict_load_external), primary = false,)
                 }
             }
@@ -388,13 +390,13 @@ fun EditorScreen(
             // 宽屏保持原版式，撤销/重做仍靠 Spacer(weight) 右对齐。
             modifier = Modifier.fillMaxWidth()
                 .then(if (compactHeader) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = NovaSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ModeButton(stringResource(R.string.editor_mode_source), mode == EditorMode.SOURCE) { mode = EditorMode.SOURCE }
             ModeButton(stringResource(R.string.editor_mode_rich), mode == EditorMode.RICH) { mode = EditorMode.RICH }
             ModeButton(stringResource(R.string.editor_mode_preview), mode == EditorMode.PREVIEW) { mode = EditorMode.PREVIEW }
-            if (compactHeader) Spacer(Modifier.width(8.dp)) else Spacer(Modifier.weight(1f))
+            if (compactHeader) Spacer(Modifier.width(NovaSpacing.sm)) else Spacer(Modifier.weight(1f))
             // 可用性来自会话历史栈；加载外部版本 / 采纳合并结果后归零。
             TextButton(onClick = { viewModel.undo() }, enabled = uiState.undoAvailable) {
                 Text(
@@ -418,7 +420,7 @@ fun EditorScreen(
         // 匹配口径对齐 Web 编辑器内实现（字面量与正则均大小写不敏感），全部替换一次性完成，
         // 因此替换后按一次「撤销」即可整体回退（走 EditorSession 的同一份历史栈）。
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(onClick = { searchOpen = !searchOpen }) {
@@ -428,7 +430,7 @@ fun EditorScreen(
         if (searchOpen) {
             val matches = EditorSearch.findAll(textFieldValue.text, searchQuery, searchRegex)
             val current = if (searchIndex in matches.indices) searchIndex else -1
-            Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     NovaTextField(
                         value = searchQuery,
@@ -452,7 +454,7 @@ fun EditorScreen(
                         // 「结果定位数量和状态对应」：查不到时显示 0/0，而不是停在旧数字。
                         if (matches.isEmpty()) "0/0" else "${current + 1}/${matches.size}",
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 6.dp),
+                        modifier = Modifier.padding(horizontal = NovaSpacing.chip),
                     )
                     TextButton(
                         onClick = {
@@ -533,20 +535,20 @@ fun EditorScreen(
         }
         if (quote != null) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 NovaButton(onClick = { onQuoteSelection(projectId.trim(), quote) }, text = stringResource(R.string.quote_selection), primary = false,)
                 Text(
                     TextSelectionQuote.label(quote),
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 8.dp),
+                    modifier = Modifier.padding(start = NovaSpacing.sm),
                 )
             }
         }
 
         if (mode == EditorMode.RICH) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs)) {
                 FormatButton("B") { textFieldValue = wrapSelection(textFieldValue, "**"); viewModel.updateContent(textFieldValue.text) }
                 FormatButton("I") { textFieldValue = wrapSelection(textFieldValue, "*"); viewModel.updateContent(textFieldValue.text) }
                 FormatButton("</>") { textFieldValue = wrapSelection(textFieldValue, "`"); viewModel.updateContent(textFieldValue.text) }
@@ -554,7 +556,7 @@ fun EditorScreen(
             }
             // 结构插入（WRI-005 标题/列表/引用、WRI-006 表格、WRI-007 图片与链接）：
             // 都是往光标处插 Markdown 模板，序列化仍以源文本为准，不引入第二套富文本模型。
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md)) {
                 FormatButton("H2") { textFieldValue = insertBlock(textFieldValue, "## 标题\n"); viewModel.updateContent(textFieldValue.text) }
                 FormatButton("•") { textFieldValue = insertBlock(textFieldValue, "- 列表项\n"); viewModel.updateContent(textFieldValue.text) }
                 FormatButton(">") { textFieldValue = insertBlock(textFieldValue, "> 引用\n"); viewModel.updateContent(textFieldValue.text) }
@@ -582,7 +584,7 @@ fun EditorScreen(
                 // 光标在表格内：行列增删与删表（WRI-006），改完立刻回到正文并触发自动保存。
                 val caretStart = textFieldValue.selection.start
                 val text = textFieldValue.text
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md)) {
                     FormatButton(stringResource(R.string.editor_fmt_row_add)) { applyTable(MarkdownTable.insertRow(text, caretStart, below = true)) }
                     FormatButton(stringResource(R.string.editor_fmt_row_del)) { applyTable(MarkdownTable.deleteRow(text, caretStart)) }
                     FormatButton(stringResource(R.string.editor_fmt_col_add)) { applyTable(MarkdownTable.insertColumn(text, caretStart, right = true)) }
@@ -601,7 +603,7 @@ fun EditorScreen(
                     viewModel.updateContent(it.text, composing = it.composition != null, caret = it.selection.start)
                 },
                 textStyle = TextStyle(fontSize = 16.sp),
-                modifier = Modifier.fillMaxSize().padding(12.dp).tableTabKeys(textFieldValue) {
+                modifier = Modifier.fillMaxSize().padding(NovaSpacing.md).tableTabKeys(textFieldValue) {
                     applyTable(it)
                 },
             )
@@ -614,7 +616,7 @@ fun EditorScreen(
                 },
                 visualTransformation = MarkdownVisualTransformation(),
                 textStyle = TextStyle(fontSize = 16.sp),
-                modifier = Modifier.fillMaxSize().padding(12.dp).tableTabKeys(textFieldValue) {
+                modifier = Modifier.fillMaxSize().padding(NovaSpacing.md).tableTabKeys(textFieldValue) {
                     applyTable(it)
                 },
             )
@@ -634,7 +636,7 @@ fun EditorScreen(
                     when {
                         imageLoading -> Text(stringResource(R.string.loading))
                         imageCandidates.isEmpty() -> Text(stringResource(R.string.editor_image_empty))
-                        else -> LazyColumn(Modifier.heightIn(max = 360.dp)) {
+                        else -> LazyColumn(Modifier.heightIn(max = NovaSize.menuMaxHeight)) {
                             items(imageCandidates, key = { it }) { path ->
                                 Text(
                                     path,
@@ -652,7 +654,7 @@ fun EditorScreen(
                                             viewModel.updateContent(textFieldValue.text)
                                             imagePicker = false
                                         }
-                                        .padding(vertical = 8.dp),
+                                        .padding(vertical = NovaSpacing.sm),
                                 )
                             }
                         }
@@ -726,7 +728,7 @@ private fun EditorTabStrip(
         modifier = Modifier
             .fillMaxWidth()
             .onGloballyPositioned { viewport = it.size.width }
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = NovaSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Row(
@@ -786,36 +788,41 @@ private fun EditorTabItem(
     }
     Column(
         modifier = Modifier
-            .padding(end = 4.dp)
-            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+            .padding(end = NovaSpacing.xs)
+            .clip(RoundedCornerShape(topStart = NovaRadius.xs, topEnd = NovaRadius.xs))
             .background(background)
             .onGloballyPositioned { onMeasure(it.positionInParent().x.toInt(), it.size.width) }
             .clickable(onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(start = 10.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.padding(
+                start = NovaSpacing.tab,
+                end = NovaSpacing.xs,
+                top = NovaSpacing.chip,
+                bottom = NovaSpacing.chip,
+            ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs),
         ) {
             Text(
                 text = label,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 fontSize = 13.sp,
-                modifier = Modifier.widthIn(max = 120.dp),
+                modifier = Modifier.widthIn(max = NovaSize.tabMaxWidth),
             )
             Text(
                 text = "×",
                 fontSize = 14.sp,
                 modifier = Modifier
-                    .size(18.dp)
+                    .size(NovaSize.tabCloseBox)
                     .clickable(onClick = onClose),
             )
         }
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(2.dp)
+                .height(NovaStroke.thick)
                 .background(
                     if (selected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
                 ),
