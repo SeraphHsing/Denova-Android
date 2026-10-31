@@ -36,6 +36,8 @@ VIEWPORT_HEIGHT = {320: 640, 390: 844, 430: 932, 768: 1024, 1023: 768}
 LANG_NAV = {"zh": "导航菜单", "en": "Navigation", None: "导航菜单"}
 # 09 §2 的五类读数：抽屉 / 顶栏与输入按钮标签（login + workspace）/ 列表（library、messages、settings）/ 编辑器排版。
 ALL_SCENES = ("login", "workspace", "editor", "library", "messages", "settings")
+# 含代码块 / 表格 / 引用块的探针章节标题片段（由 PUT /api/projects/:id/files/file 写入，见证据 README）。
+BLOCK_PROBE_CHAPTER = "排版探针块"
 
 # 只读断言与读数都在页面内执行，避免每项一个 round-trip。
 METRICS_JS = """
@@ -80,6 +82,8 @@ METRICS_JS = """
   // 列表行（09 §2「列表」类）：设置 / 资料库 / 消息中心等页面的行高、内边距与分隔线。
   // 基线多数列表是 div + data-slot 结构（不是 li），所以同时收 [data-slot=field] / card 直接子块。
   const listRows = [
+    // 消息中心等列表用 `divide-y` 容器，行元素是 <button>（无 role/data-slot），优先收集。
+    ...document.querySelectorAll('.divide-y > *'),
     ...document.querySelectorAll('[role="listitem"], li, .nova-list-row, [data-list-row]'),
     ...document.querySelectorAll('[data-slot="field"], [data-slot="item"]'),
     ...document.querySelectorAll('[data-slot="card"] > div'),
@@ -95,10 +99,14 @@ METRICS_JS = """
   // 编辑器排版（09 §2「编辑器」类）：正文块的字号 / 行高 / 字距 / 段距，以及代码块与表格。
   const doc = [...document.querySelectorAll('[contenteditable="true"], .ProseMirror, [data-editor-content]')]
     .find(visible) || null;
+  // 块级读数要带盒模型：代码块背景/圆角、引用的左边线与内边距、表格单元格 padding 都在这里。
+  const BLOCK_PROPS = [...TYPO, 'margin-top', 'margin-bottom', 'font-family', 'background-color',
+    'border-radius', 'border-left-width', 'border-left-color', 'padding-left', 'padding-right',
+    'padding-top', 'padding-bottom'];
   const docBlock = (sel) => {
     const el = doc && doc.querySelector(sel);
     if (!el) return null;
-    return { ...rect(el), ...style(el, [...TYPO, 'margin-top', 'margin-bottom', 'font-family']) };
+    return { ...rect(el), ...style(el, BLOCK_PROPS) };
   };
   // 通用控件读数（09 §2「输入 / 按钮 / 标签」类）：非登录页也能取到输入框与按钮的实际盒模型。
   const controls = [...document.querySelectorAll('input, textarea, select, button, [role="switch"]')]
@@ -144,10 +152,14 @@ METRICS_JS = """
           box: { ...rect(doc), ...style(doc, ['font-size', 'line-height', 'color', 'padding-left']) },
           paragraph: docBlock('p'),
           heading: docBlock('h1, h2'),
+          heading1: docBlock('h1'),
+          heading2: docBlock('h2'),
+          heading3: docBlock('h3'),
           code: docBlock('pre'),
-          codeInline: docBlock('code'),
+          codeInline: docBlock('p code'),
           table: docBlock('table'),
-          tableCell: docBlock('td, th'),
+          tableHead: docBlock('th'),
+          tableCell: docBlock('td'),
           blockquote: docBlock('blockquote'),
         }
       : null,
@@ -187,47 +199,87 @@ def dump(page: Page, out_dir: Path, name: str, records: dict) -> None:
 def open_drawer(page: Page, lang: str | None) -> bool:
     label = LANG_NAV.get(lang, LANG_NAV[None])
     button = page.locator(f'button[aria-label="{label}"], button[aria-label="Navigation"]').first
+    # 编辑器页面要先拉章节内容，顶栏按钮出现得比外壳晚，这里轮询而不是一次性判断。
+    for _ in range(10):
+        if button.count() > 0:
+            break
+        page.wait_for_timeout(500)
     if button.count() == 0:
         print("  warn: navigation button not found")
         return False
     button.click()
-    page.wait_for_timeout(600)
+    page.wait_for_timeout(700)
     return page.locator('.nova-mobile-sheet[data-slot="sheet-content"]').count() > 0
 
 
-# 09 §2 需要的「列表」读数来自设置 / 资料库 / 消息中心三类页面；名称按中英文两套匹配。
+# 09 §2 需要的「列表」读数来自设置 / 资料库 / 消息三类页面；名称按中英文两套匹配。
+# 注意：手机抽屉里消息入口的文案是「消息」（带未读角标），不是「消息中心」。
 DESTINATIONS: dict[str, tuple[str, ...]] = {
     "library": ("资料库", "Library"),
-    "messages": ("消息中心", "Messages"),
+    "messages": ("消息", "Messages"),
     "settings": ("设置", "Settings"),
 }
 
 
 def open_destination(page: Page, names: tuple[str, ...]) -> bool:
-    """在已打开的抽屉里点击一级目的地（先试 aria-label，再退回文本匹配）。"""
+    """在已打开的抽屉里点击一级目的地：aria-label → 抽屉内文本（允许角标）→ 通用兜底。"""
     for name in names:
-        for sel in (
-            f'button[aria-label="{name}"]',
-            f'[role="menuitem"]:has-text("{name}")',
-            f'button:has-text("{name}")',
-        ):
-            target = page.locator(sel).first
-            if target.count() > 0:
-                target.click()
-                page.wait_for_timeout(1500)
-                return True
+        by_aria = page.locator(f'button[aria-label="{name}"]').first
+        if by_aria.count() > 0:
+            by_aria.click()
+            page.wait_for_timeout(2000)
+            return True
+        # 导航项文本可能带未读角标（「消息」+「1」），也有 div[role=button] 形式，
+        # 统一在抽屉导航容器内按「去空白后相等/前缀」匹配并直接点 DOM。
+        clicked = page.evaluate(
+            """(name) => {
+              const norm = (e) => (e.textContent || '').replace(/\\s+/g, '');
+              const vis = (e) => e.getBoundingClientRect().height > 0;
+              // 快捷动作卡在基线里不是 <button>，只是一个 span + React onClick；
+              // 文本命中最内层元素后往上找可点的祖先，找不到就直接点自己让事件冒泡。
+              const leaf = [...document.querySelectorAll('span, div, a, p')]
+                .find((e) => vis(e) && norm(e) === name);
+              if (leaf) {
+                const clickable = leaf.closest('button, [role="button"], a') || leaf;
+                clickable.click();
+                return true;
+              }
+              const els = [...document.querySelectorAll('button, [role="button"], [role="menuitem"], .nova-nav-item')];
+              const hit = els.find((e) => {
+                if (!vis(e)) return false;
+                const text = norm(e);
+                const aria = (e.getAttribute('aria-label') || '').trim();
+                // 带未读角标时文本是「名称 + 数字」。
+                return aria === name || text === name || new RegExp('^' + name + '\\\\d*$').test(text);
+              });
+              if (!hit) return false;
+              hit.click();
+              return true;
+            }""",
+            name,
+        )
+        if clicked:
+            page.wait_for_timeout(2500)
+            return True
     print(f"  warn: destination {'/'.join(names)} not found")
     return False
 
 
-def open_first_file(page: Page) -> bool:
-    """工作台 →「打开文件」→ 章节/文件树第一项，进入编辑器后才有正文排版读数。"""
+def open_first_file(page: Page, prefer: str = "") -> bool:
+    """工作台 →「打开文件」→ 章节/文件树；[prefer] 命中时优先打开该章节（如含代码块/表格的探针）。"""
     for sel in ('button:has-text("打开文件")', '[role="tab"]:has-text("文件")'):
         opener = page.locator(sel).first
         if opener.count() > 0:
             opener.click()
             page.wait_for_timeout(2200)
             break
+    if prefer:
+        target = page.get_by_text(prefer, exact=False).first
+        if target.count() > 0:
+            target.click()
+            page.wait_for_timeout(3000)
+            return True
+        print(f"  warn: preferred chapter '{prefer}' not found")
     for sel in ('[role="treeitem"]', '[data-file-path]', '[data-tree-node]'):
         items = page.locator(sel)
         if items.count() > 0:
@@ -344,7 +396,8 @@ def run_scene(browser: Browser, base: str, width: int, out_dir: Path, records: d
 
     if "editor" in scenes:
         sp = scene_page()
-        if open_first_file(sp):
+        # 优先打开含代码块 / 表格 / 引用的探针章节（`chapters/ch00002-第2章-排版探针块.md`）。
+        if open_first_file(sp, prefer=BLOCK_PROBE_CHAPTER):
             dump(sp, out_dir, tag(f"editor-{width}"), records)
         sp.close()
 

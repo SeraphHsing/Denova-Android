@@ -74,12 +74,19 @@
   32px 与「触控目标 44×44 / Android 48dp」冲突，**2026-10-31 决定触控优先**：`NovaTextField` / `NovaButton`
   按 44dp 落地，圆角/描边/字号/内边距照抄基线；如将来要照抄 32px，只改 `NovaSize.input` / `NovaSize.button` 两个 token。
 - **列表**：抽屉行高 52px / 分隔线左缩进 48px 已用于抽屉；**2026-11-01 补采**设置页表单行
-  （`data-slot="field"`：`padding-top:14px`、标签 14px/20px、字段行 100.63~101.63px、末项 1px 分隔线）与
-  资料库卡片（`card-header` 92px + `card-content` 86px + 操作行 44px = 223.75px）。消息中心入口尚未采到
-  （Web 手机抽屉里是「消息」按钮 + 角标，不是「消息中心」文本，选择器需按此改）。
-- **编辑器**：**2026-11-01 补采正文段**（16px / 行高 30.4px / 字重 400 / 字距 `normal` / 段距 0 /
-  内容宽 358 左边距 16 / 色 `#f7f7f4`）。**代码块、表格、引用块、预览排版仍缺**（探针章节只有纯段落；
-  预览走 WebView，需单独口径）。
+  （`data-slot="field"`：`padding-top:14px`、标签 14px/20px、字段行 100.63~101.63px、末项 1px 分隔线）、
+  资料库卡片（`card-header` 92px + `card-content` 86px + 操作行 44px = 223.75px）与消息中心列表
+  （`.divide-y` 容器、行是 `<button>`：上下内边距各 **16px**、行高 105/125px、文字 16px/22px、1px 分隔线；
+  抽屉入口文案是「消息」+ 未读角标，不是「消息中心」）。**五类读数至此采齐。**
+- **编辑器**：正文 **16px / 行高 30.4px** / 400 / 字距 `normal` / 段距 0 / 内容宽 358 左边距 16 / 色 `#f7f7f4`。
+  块级读数已采（探针章节 `chapters/ch00002-第2章-排版探针块.md`）：`h2` 19.2px/600/24.96 + 上 7.68 下 5.76；
+  `h3` 16.8px/600/23.52；`blockquote` 左边线 **3px** `#242422` + `padding-left:16px`；`table` 上边距 12.8；
+  `th` 16px/**700**、背景 `rgba(36,36,34,.64)`、`padding:6.4px 8.8px`、边框 1px；`td` 16px/400 同内边距；
+  `pre` 背景 `#101010`、圆角 **6px**、`padding:12px 16px`、文字 `#e0e0dc` 16px/30.4px；行内 `code`
+  14.4px、圆角 **3px**、背景 `rgba(36,36,34,.75)`、`padding:2.16px 4.32px`。
+  **预览口径**：Web 手机端无 Markdown 预览模式（顶栏与 `当前标签页操作` / `编辑器设置` / `编辑工具`
+  三个菜单均无预览项），Android `MarkdownPreview` 的 WebView 以「上述编辑器排版 + 块级排版」为唯一基准，
+  仅容器能力差异可登记为允许差异。
 
 > 读数与命令见 [2026-11-01 证据说明](../evidence/web-baseline/2026-11-01/README.md)；
 > 已知差异：编辑器正文 Web 16px vs Android `NovaText.reading` 18sp（差 2sp，行高 30.4 vs 30.6），

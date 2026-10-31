@@ -34,8 +34,9 @@ DENOVA_BASE=http://192.168.2.102:18081 DENOVA_USER=... DENOVA_PASS=... \
 | `workspace-390.png` | 登录后的写作工作台首屏 |
 | `drawer-390.png` / `drawer-bottom-390.png` | 左抽屉（导航）打开态 / 滚到底 |
 | `command-panel-390.png` | 「命令」打开的命令面板 |
-| `editor-390.png` | 编辑器正文（章节「第1章 排版探针」，2 段中文正文） |
+| `editor-390.png` | 编辑器正文（章节「第2章 排版探针块」：二级/三级标题、段落、引用、GFM 表格、fenced 代码、行内代码） |
 | `library-390.png` / `library-bottom-390.png` | 资料库（卡片列表 + 工具条） |
+| `messages-390.png` / `messages-bottom-390.png` | 消息中心（左上「消息」入口打开的面板：全部/待处理/自动化/产品 + 列表） |
 | `settings-390.png` / `settings-bottom-390.png` | 设置页（`data-slot=field` 表单行） |
 | `metrics.json` | 每个场景的 computed 尺寸、`listRows`、`controls`、`editor` 块与页面文案 |
 
@@ -99,6 +100,17 @@ DENOVA_BASE=http://192.168.2.102:18081 DENOVA_USER=... DENOVA_PASS=... \
 | 卡内文字 | 16px / 22px 行高 |
 | 卡片操作按钮 | 高 44px |
 
+消息中心（抽屉「消息」→ 全屏面板，列表容器 `.divide-y`、行是 `<button>`）：
+
+| 项目 | 实测 |
+|---|---|
+| 列表行上下内边距 | **16px**（`px-2 py-4`） |
+| 列表行高 | 105px（两行文本）/ 125px（三行文本） |
+| 行内文字 | 16px / 22px 行高 |
+| 行间分隔线 | 1px（`divide-y`） |
+| 分组页签 | Tab 高 44px（容器 52px），「全部 / 待处理 / 自动化 / 产品」 |
+| 面板标题 | 16px / 500（「消息中心」） |
+
 ### 5. 编辑器排版
 
 | 项目 | 实测 | 现状 / 差异 |
@@ -111,14 +123,41 @@ DENOVA_BASE=http://192.168.2.102:18081 DENOVA_USER=... DENOVA_PASS=... \
 | 颜色 | `rgb(247,247,244)` = `#f7f7f4` | `NovaColors.Dark.text` 一致 |
 | 字体栈 | `SF Pro Text, SF Pro Display, PingFang SC, …` | `NovaFont.reading`（系统无衬线） |
 
-> 代码块、表格、引用块本轮**未采到**：探针章节只有纯段落。编辑器工具栏可插入代码块/表格，
-> 但脚本化插入需要额外交互；这三项留待下一轮补采（连同预览 WebView 单独口径）。
+块级排版（同一章节里的标题 / 引用 / 表格 / 代码块，全部 computed style）：
+
+| 块 | 实测 |
+|---|---|
+| `h2` | 19.2px / 600 / 24.96px（1.3×），`margin: 7.68px 0 5.76px` |
+| `h3` | 16.8px / 600 / 23.52px（1.4×），`margin: 5.88px 0 3.36px` |
+| `blockquote` | 左边线 **3px** `rgb(36,36,34)`，`padding-left: 16px`，文字 16px/30.4px |
+| `table` | `margin: 12.8px 0`，无背景/圆角 |
+| `th` | 16px / **700**，背景 `rgba(36,36,34,.64)`，`padding: 6.4px 8.8px`，边框 1px `rgba(36,36,34,.76)` |
+| `td` | 16px / 400，`padding: 6.4px 8.8px`，边框 1px 同上 |
+| `pre` | 背景 `rgb(16,16,16)`、圆角 **6px**、`padding: 12px 16px`、`margin: 8px 0`，文字 `#e0e0dc` 16px/30.4px（等宽字体） |
+| 行内 `code` | 14.4px、圆角 **3px**、背景 `rgba(36,36,34,.75)`、`padding: 2.16px 4.32px` |
+
+> 插入方式：不依赖编辑器工具栏，直接用后端既有 `PUT /api/projects/:id/files/file`
+> （`base_revision: "missing"` 表示新建）写入固定样本章节，保证可复现、逐字节稳定。
+
+### 5.1 预览口径（Web 手机端无独立预览）
+
+探测了编辑器顶栏与三个菜单（`当前标签页操作` / `编辑器设置` / `编辑工具`）：
+手机端**没有 Markdown 预览模式**，唯一能看到 Markdown 渲染结果的地方就是编辑器渲染态本身。
+因此 Android `MarkdownPreview`（WebView）的对齐口径定为：
+**以上表「编辑器排版 + 块级排版」为唯一基准**，预览 HTML 的正文/标题/引用/表格/代码样式必须与上表一致；
+差异只允许出现在 Web 不存在的容器能力上（如 WebView 的滚动容器、图片加载方式），并在 09 登记。
 
 ## 测试数据说明
 
 测试账号的「晏宫-十妃定九州」原为 0 章。为取编辑器排版读数，本轮通过产品自带的
 「打开文件 → 分卷章节 → + → 新建章节」创建了 **`chapters/第1章 排版探针`**（63 字，两段中文），
 该章节参与自动保存。若要清理，删除该书 `chapters/` 下对应文件即可（不影响其它作品）。
+
+第二轮又用 `PUT /api/projects/project-7b8d52726cc4e7db0c02d0a09c27e113/files/file`
+（`base_revision: "missing"`）写入 **`chapters/ch00002-第2章-排版探针块.md`**（163 字），
+内容为固定样本：`##`/`###` 标题、段落、`>` 引用、GFM 表格、```kotlin 代码块、行内代码。
+两个探针章节都只用于 P5 读数，可随时删除。
+
 采集过程中曾临时把当前作品切到 `/data/.denova/projects/1`，**已切回「晏宫-十妃定九州」并复核**。
 
 ## 与 Android 现状的差异（登记到 09）
@@ -127,4 +166,8 @@ DENOVA_BASE=http://192.168.2.102:18081 DENOVA_USER=... DENOVA_PASS=... \
 2. 抽屉阴影基线是两层（`10/15/-3` + `4/6/-4`），Android 只有 `elevation = 10dp` 一层。
 3. 设置页字段行 `padding-top:14px` 不在 `NovaSpacing` 阶梯（12/16），需决定是新增 token 还是就近取 12。
 4. 资料库卡片网格（223.75px 卡高、92/86/44 分段）尚无 token，属列表/卡片类后续对齐项。
-5. 代码块 / 表格 / 引用块读数缺失，编辑器排版类未采全。
+5. 编辑器块级排版缺 token：`pre` 的 6px 圆角 / 12×16 内边距、行内 `code` 的 3px 圆角与半透明底、
+   表格 `th` 的 700 字重与 6.4×8.8 单元格内边距、`blockquote` 的 3px 左边线，
+   `DesignTokens` 目前没有对应项（预览 CSS 重写时一并补）。
+6. 消息中心行：Web 上下各 16px、行高 105/125；Android 消息卡片未按此收敛。
+7. 预览：Web 手机端无预览模式，口径以上文「编辑器排版 + 块级排版」为准。
