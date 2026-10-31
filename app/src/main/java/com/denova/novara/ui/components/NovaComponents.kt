@@ -232,7 +232,7 @@ fun NovaTextField(
                 .heightIn(min = NovaSize.input)
                 .clip(shape)
                 .background(colors.surface)
-                .border(1.dp, borderColor, shape),
+                .border(NovaSize.hairline, borderColor, shape),
             decorationBox = { inner ->
                 Row(
                     modifier = Modifier
@@ -289,10 +289,10 @@ fun NovaButton(
     Box(
         modifier = modifier
             .height(NovaSize.button)
-            .widthIn(min = 72.dp)
+            .widthIn(min = NovaSize.buttonMinWidth)
             .clip(shape)
             .background(container)
-            .then(if (primary) Modifier else Modifier.border(1.dp, colors.borderSoft, shape))
+            .then(if (primary) Modifier else Modifier.border(NovaSize.hairline, colors.borderSoft, shape))
             .clickable(enabled = enabled, onClick = onClick)
             .alpha(if (enabled) 1f else 0.5f),
         contentAlignment = Alignment.Center,

@@ -73,6 +73,9 @@ object NovaSize {
     val button: Dp = 44.dp
     val iconButton: Dp = 40.dp
 
+    /** 次按钮最小宽度：保证「打开 / 保存」这类两字按钮不被压成两行。 */
+    val buttonMinWidth: Dp = 72.dp
+
     /** 抽屉宽度：`min(可用宽度 - 32px, 24rem=384px)`，右抽屉上限 `32rem=512px`。 */
     val drawerMaxStart: Dp = 384.dp
     val drawerMaxEnd: Dp = 512.dp
