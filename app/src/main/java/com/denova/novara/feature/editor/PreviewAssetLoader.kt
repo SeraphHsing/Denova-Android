@@ -4,10 +4,14 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import com.denova.novara.core.logging.DenovaLog
 import com.denova.novara.core.network.DenovaClient
+import com.denova.novara.ui.theme.NovaColors
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import java.io.ByteArrayInputStream
+import java.util.Locale
 
 /**
  * 预览里的图片（WRI-007）：Markdown 里的相对路径必须换算成项目资源接口
@@ -134,16 +138,82 @@ class PreviewAssetLoader(
 
         private val IMG_SRC = Regex("""<img\s+[^>]*src="([^"]*)"""")
 
-        /** 预览样式：表格可横向滚动、图片等比缩放、破图时保留 alt。 */
-        const val STYLE = """
-            body { font-family: sans-serif; padding: 16px; line-height: 1.6; }
-            .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-            table { border-collapse: collapse; }
-            th, td { border: 1px solid #ccc; padding: 6px; white-space: nowrap; }
+        /**
+         * 预览样式：按 2026-11-01 Web 编辑器渲染态实测值重写（09 §2「编辑器排版 + 块级排版」）。
+         *
+         * 手机端 Web 没有独立预览模式，唯一能看到 Markdown 渲染结果的就是编辑器本身，
+         * 因此这里照抄它的读数：正文 16px/30.4px、h2 19.2px/600、h3 16.8px/600、
+         * 引用左边线 3px + `padding-left:16px`、表格单元格 `6.4px 8.8px` + 1px 边框、
+         * `pre` 圆角 6px + `padding:12px 16px`、行内 `code` 圆角 3px。
+         *
+         * 颜色一律来自 [NovaColors]（深浅主题各一套），CSS 里只留变量名，不写死色值。
+         */
+        fun style(colors: NovaColors): String = """
+            :root {
+              --bg: ${colors.bg.toCss()};
+              --text: ${colors.text.toCss()};
+              --text-muted: ${colors.textMuted.toCss()};
+              --line: ${colors.dropBg.toCss()};
+              --line-strong: ${colors.dropBg.copy(alpha = 0.76f).toCss()};
+              --table-head: ${colors.dropBg.copy(alpha = 0.64f).toCss()};
+              --inline-code: ${colors.dropBg.copy(alpha = 0.75f).toCss()};
+              --code-bg: ${colors.codeBlockBg.toCss()};
+              --code-text: ${colors.codeText.toCss()};
+              --link: ${colors.accent.toCss()};
+            }
+            * { box-sizing: border-box; }
+            html, body { margin: 0; background: var(--bg); }
+            body {
+              padding: 16px;
+              font-family: "SF Pro Text", "PingFang SC", -apple-system, sans-serif;
+              font-size: 16px;
+              line-height: 30.4px;
+              letter-spacing: normal;
+              color: var(--text);
+              -webkit-text-size-adjust: 100%;
+              word-break: break-word;
+            }
+            p { margin: 0; }
+            h1 { font-size: 24px; line-height: 1.3; margin: 12.8px 0; font-weight: 600; }
+            h2 { font-size: 19.2px; line-height: 24.96px; margin: 7.68px 0 5.76px; font-weight: 600; }
+            h3 { font-size: 16.8px; line-height: 23.52px; margin: 5.88px 0 3.36px; font-weight: 600; }
+            h4, h5, h6 { font-size: 16px; line-height: 30.4px; margin: 5.76px 0; font-weight: 600; }
+            a { color: var(--link); }
+            ul, ol { margin: 0; padding-left: 24px; }
+            li { margin: 0; }
+            blockquote { margin: 0; padding-left: 16px; border-left: 3px solid var(--line); }
+            hr { border: 0; border-top: 1px solid var(--line); margin: 12.8px 0; }
+            .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 12.8px 0; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid var(--line-strong); padding: 6.4px 8.8px; text-align: left; }
+            th { font-weight: 700; background: var(--table-head); }
+            pre {
+              margin: 8px 0;
+              padding: 12px 16px;
+              background: var(--code-bg);
+              color: var(--code-text);
+              border-radius: 6px;
+              overflow-x: auto;
+            }
+            code { font-family: "SFMono-Regular", "Cascadia Code", ui-monospace, monospace; font-size: 14.4px; }
+            pre code { font-size: 14.4px; line-height: 27.36px; }
+            p code, li code { background: var(--inline-code); border-radius: 3px; padding: 2.16px 4.32px; }
             img { max-width: 100%; height: auto; }
-            img[alt] { color: #999; font-size: 12px; }
-            pre { background: #f5f5f5; padding: 8px; overflow-x: auto; }
-            blockquote { border-left: 3px solid #ccc; margin: 0; padding-left: 12px; color: #555; }
-        """
+            img[alt] { color: var(--text-muted); font-size: 12px; }
+        """.trimIndent()
+
+        /** Compose `Color` → CSS 颜色：不透明用 `rgb()`，带 alpha 用 `rgba()`（小数三位，固定 Locale）。 */
+        private fun Color.toCss(): String {
+            val argb = toArgb()
+            val alpha = (argb ushr 24) and 0xFF
+            val red = (argb shr 16) and 0xFF
+            val green = (argb shr 8) and 0xFF
+            val blue = argb and 0xFF
+            return if (alpha == 0xFF) {
+                "rgb($red, $green, $blue)"
+            } else {
+                String.format(Locale.US, "rgba(%d, %d, %d, %.3f)", red, green, blue, alpha / 255f)
+            }
+        }
     }
 }

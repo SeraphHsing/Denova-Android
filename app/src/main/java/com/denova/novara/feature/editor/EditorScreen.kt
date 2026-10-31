@@ -80,6 +80,7 @@ import com.denova.novara.ui.components.NovaTextAction
 import com.denova.novara.ui.components.NovaTextField
 import com.denova.novara.ui.components.NovaTopBar
 import kotlinx.coroutines.launch
+import com.denova.novara.ui.theme.NovaColors
 import com.denova.novara.ui.theme.NovaRadius
 import com.denova.novara.ui.theme.NovaSize
 import com.denova.novara.ui.theme.NovaSpacing
@@ -880,7 +881,8 @@ private fun MarkdownPreview(
     loader: PreviewAssetLoader?,
     modifier: Modifier = Modifier,
 ) {
-    val html = remember(source, loader) { buildPreviewHtml(source, loader) }
+    val colors = NovaTheme.colors
+    val html = remember(source, loader, colors) { buildPreviewHtml(source, loader, colors) }
     // base URL 用服务器 origin：data: 文档（base=null）会让 WebView 丢掉 http 子资源请求。
     val baseUrl = loader?.baseUrl
     AndroidView(
@@ -900,7 +902,11 @@ private fun MarkdownPreview(
     )
 }
 
-private fun buildPreviewHtml(markdown: String, loader: PreviewAssetLoader?): String {
+private fun buildPreviewHtml(
+    markdown: String,
+    loader: PreviewAssetLoader?,
+    colors: NovaColors,
+): String {
     val raw = MarkdownDocument.parse(markdown).toHtml()
     val body = loader?.let { it.decorate(it.rewrite(raw)) } ?: raw
     com.denova.novara.core.logging.DenovaLog.i(
@@ -911,7 +917,7 @@ private fun buildPreviewHtml(markdown: String, loader: PreviewAssetLoader?): Str
     return """
         <html><head><meta charset="utf-8">
         <style>
-        ${PreviewAssetLoader.STYLE}
+        ${PreviewAssetLoader.style(colors)}
         </style></head>
         <body>$body</body></html>
     """.trimIndent()
