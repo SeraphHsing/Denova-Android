@@ -59,8 +59,20 @@ class BookShelfViewModel(application: Application) : AndroidViewModel(applicatio
             _state.value = _state.value.copy(loading = true, error = null)
             try {
                 val resp = c.bookshelf()
-                _state.value = _state.value.copy(loading = false, books = resp.books)
-                DenovaLog.i("BookShelf", "loaded books=${resp.books.size}")
+                // 当前工作区不在 `GET /api/books` 里（它只给书架列表），初始进入时必须单独取一次，
+                // 否则抽屉下拉卡拿不到书名、书架也没有选中项（2026-11-01 真机确认）。
+                val current = runCatching { c.currentWorkspace() }.getOrNull()
+                val matched = resp.books.firstOrNull {
+                    it.projectId == current?.projectId?.takeIf { id -> id.isNotBlank() } ||
+                        it.path == current?.workspace?.takeIf { path -> path.isNotBlank() }
+                }
+                _state.value = _state.value.copy(
+                    loading = false,
+                    books = resp.books,
+                    currentProjectId = matched?.projectId ?: _state.value.currentProjectId,
+                    currentBookName = matched?.name ?: _state.value.currentBookName,
+                )
+                DenovaLog.i("BookShelf", "loaded books=${resp.books.size} current=${matched?.name ?: "unknown"}")
             } catch (e: Exception) {
                 DenovaLog.w("BookShelf", "load failed", e)
                 _state.value = _state.value.copy(loading = false, error = e.message?.let { UiText.raw(it) } ?: UiText.of(R.string.books_load_failed))

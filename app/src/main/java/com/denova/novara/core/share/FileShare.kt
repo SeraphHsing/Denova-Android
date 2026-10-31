@@ -1,5 +1,6 @@
 package com.denova.novara.core.share
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
@@ -30,15 +31,23 @@ object FileShare {
         return file
     }
 
-    /** 分享已有文件（`ACTION_SEND` + 读权限）；MIME 用后端返回的类型，缺省按二进制处理。 */
+    /**
+     * 分享已有文件（`ACTION_SEND` + 读权限）；MIME 用后端返回的类型，缺省按二进制处理。
+     *
+     * 授权必须同时落在**内层 intent 与 chooser** 上，并带 `ClipData`：只给内层加 flag 时，
+     * 系统选择器（`com.android.intentresolver`）读取内容会 `Permission Denial`，预览与分享都失败
+     * （2026-11-01 真机 logcat 确认）。
+     */
     fun share(context: Context, file: File, mimeType: String = "application/octet-stream") {
         val uri = FileProvider.getUriForFile(context, authority(context), file)
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = mimeType
             putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri(file.name, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         val chooser = Intent.createChooser(intent, null).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(chooser)

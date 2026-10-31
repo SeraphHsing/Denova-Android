@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -467,7 +468,10 @@ private fun RunsPanel(
                 Modifier
                     .width(panelWidth)
                     .fillMaxHeight()
-                    .background(NovaTheme.colors.surface),
+                    .background(NovaTheme.colors.surface)
+                    // 面板从屏幕顶端铺下来，内容必须避开状态栏与手势区：
+                    // 不加 inset 时「运行记录 / Run / 会话」整行落进状态栏，看得见却点不到（2026-11-01 真机确认）。
+                    .windowInsetsPadding(WindowInsets.systemBars),
             ) {
                 Row(
                     Modifier

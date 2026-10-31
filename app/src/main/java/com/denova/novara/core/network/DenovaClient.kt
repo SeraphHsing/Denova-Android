@@ -1790,11 +1790,10 @@ class DenovaClient(
                 if (!resp.isSuccessful) {
                     throw toException(resp.code, bytes.toString(Charsets.UTF_8))
                 }
-                val disposition = resp.header("Content-Disposition").orEmpty()
-                val filename = disposition.substringAfter("filename=", "")
-                    .trim()
-                    .trim('"')
-                    .ifBlank { "$runId.jsonl" }
+                val filename = attachmentFilename(
+                    resp.header("Content-Disposition").orEmpty(),
+                    fallback = "$runId.jsonl",
+                )
                 AgentRunExport(runId = runId, filename = filename, bytes = bytes)
             }
         }

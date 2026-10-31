@@ -304,9 +304,10 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                             // 统计入口是**条件入口**：基线只在服务端 `labs.developer_mode` 开启时出现。
-                            // 每次换页重读一次生效值，设置里打开后回到抽屉即可看到入口（GET /api/settings 很轻）。
+                            // 换页与「打开抽屉」都重读一次生效值——设置里改完开关回到抽屉要立刻看到入口，
+                            // 只按 route 重读时停在设置页再打开抽屉不会刷新（2026-11-01 真机确认）。
                             var developerMode by remember { mutableStateOf(false) }
-                            LaunchedEffect(client, currentRoute) {
+                            LaunchedEffect(client, currentRoute, drawerState.isOpen) {
                                 val c = client ?: return@LaunchedEffect
                                 val snapshot = runCatching { c.settingsSnapshot() }.getOrNull()
                                     ?: return@LaunchedEffect

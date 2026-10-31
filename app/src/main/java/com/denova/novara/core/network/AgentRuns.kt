@@ -1,5 +1,6 @@
 package com.denova.novara.core.network
 
+import java.net.URLDecoder
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -122,3 +123,27 @@ data class AgentRunExport(
     val filename: String,
     val bytes: ByteArray,
 )
+
+/**
+ * 从 `Content-Disposition` 取附件文件名。
+ *
+ * 后端同时下发 `filename="x.jsonl"` 与 RFC 5987 的 `filename*=UTF-8''x.jsonl`。旧实现直接
+ * `substringAfter("filename=")`，会把 `"; filename*=UTF-8''…` 一并当成文件名，导出的缓存文件
+ * 因此带上整段参数（2026-11-01 真机日志 `file=run-….jsonl"; filename*=UTF-8''…`）。
+ * 这里按 RFC 优先级取 `filename*`（percent-decoding 后），再做路径分隔符清洗，缺省回退。
+ */
+internal fun attachmentFilename(disposition: String, fallback: String): String {
+    if (disposition.isBlank()) return fallback
+    val extended = Regex("""filename\*\s*=\s*([^;]+)""", RegexOption.IGNORE_CASE)
+        .find(disposition)?.groupValues?.get(1)?.trim()?.trim('"')
+    val plain = Regex("""filename\s*=\s*("([^"]*)"|[^;]+)""", RegexOption.IGNORE_CASE)
+        .find(disposition)
+        ?.let { match -> match.groupValues[2].ifBlank { match.groupValues[1] } }
+        ?.trim()
+        ?.trim('"')
+    val raw = extended ?: plain ?: return fallback
+    // RFC 5987 形如 `UTF-8''run-….jsonl`；没有 charset 前缀时按原文使用。
+    val encoded = if (raw.contains("''")) raw.substringAfter("''") else raw
+    val decoded = runCatching { URLDecoder.decode(encoded, "UTF-8") }.getOrDefault(encoded)
+    return decoded.substringAfterLast('/').substringAfterLast('\\').trim().ifBlank { fallback }
+}
