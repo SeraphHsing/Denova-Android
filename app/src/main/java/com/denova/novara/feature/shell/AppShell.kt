@@ -95,6 +95,8 @@ fun AppDrawer(
     onSelectLanguage: (String) -> Unit,
     books: List<BookRecord>,
     currentProjectId: String?,
+    /** 当前工作区书名（服务端 workspace 摘要）；书架里查不到时也能显示真实书名。 */
+    currentBookName: String = "",
     onSelectBook: (BookRecord) -> Unit,
     /** debug 构建的日志入口；为 null 时不显示。放在抽屉里而不是悬浮按钮，避免遮挡底部操作。 */
     onOpenDebug: (() -> Unit)? = null,
@@ -197,6 +199,7 @@ fun AppDrawer(
                 BookContextBlock(
                     books = books,
                     currentProjectId = currentProjectId,
+                    currentBookName = currentBookName,
                     booksOpen = bookMenuOpen,
                     onToggleOpen = { bookMenuOpen = !bookMenuOpen },
                     onSelectBook = onSelectBook,
@@ -378,6 +381,7 @@ fun AppDrawer(
 private fun BookContextBlock(
     books: List<BookRecord>,
     currentProjectId: String?,
+    currentBookName: String,
     booksOpen: Boolean,
     onToggleOpen: () -> Unit,
     onSelectBook: (BookRecord) -> Unit,
@@ -387,7 +391,13 @@ private fun BookContextBlock(
     unreadMessages: Int,
 ) {
     val colors = NovaTheme.colors
+    // 选中判定：优先 project_id，其次书名（当前工作区可能不在书架里 / id 尚未回填）。
     val current = books.firstOrNull { it.projectId == currentProjectId }
+        ?: books.firstOrNull { currentBookName.isNotBlank() && it.name == currentBookName }
+    // 基线触发件显示的是 workspace 摘要里的书名，不是「书架里匹配到的书」；两者都缺才算无书。
+    val triggerLabel = current?.name
+        ?: currentBookName.takeIf { it.isNotBlank() }
+        ?: stringResource(R.string.book_empty)
     Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm)) {
         SectionLabel(stringResource(R.string.drawer_current_work))
         Row(
@@ -400,9 +410,9 @@ private fun BookContextBlock(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = current?.name ?: stringResource(R.string.book_empty),
+                text = triggerLabel,
                 style = NovaText.micro.copy(fontWeight = FontWeight.Medium),
-                color = if (current != null) colors.text else colors.textFaint,
+                color = if (triggerLabel != stringResource(R.string.book_empty)) colors.text else colors.textFaint,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -430,7 +440,7 @@ private fun BookContextBlock(
                         )
                     }
                     books.forEach { book ->
-                        val selected = book.projectId == currentProjectId
+                        val selected = current != null && book.projectId == current.projectId && book.name == current.name
                         Row(
                             Modifier
                                 .fillMaxWidth()

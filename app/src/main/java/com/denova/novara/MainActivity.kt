@@ -346,7 +346,9 @@ class MainActivity : AppCompatActivity() {
                                                 language = language,
                                                 onSelectLanguage = { settingsViewModel.setLanguage(it) },
                                                 books = bookState.books,
-                                                currentProjectId = currentProjectId.ifBlank { null },
+                                                currentProjectId = bookState.currentProjectId
+                                                    ?: currentProjectId.ifBlank { null },
+                                                currentBookName = bookState.currentBookName,
                                                 onSelectBook = { book ->
                                                     scope.launch {
                                                         // 对齐 Web onBeforeWorkspaceSwitch：先 flush 编辑器草稿
