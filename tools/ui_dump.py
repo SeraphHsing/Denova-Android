@@ -47,7 +47,10 @@ def center(bounds: str) -> tuple[int, int] | None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--clickable", action="store_true")
+    parser.add_argument("--all", action="store_true", help="连同没有文案的节点一起列出")
+    parser.add_argument("--checkable", action="store_true", help="只列可勾选控件（开关/复选框）")
     parser.add_argument("--grep", default="")
+    parser.add_argument("--y-range", default="", help="只保留中心 y 落在 min,max 区间内的节点")
     parser.add_argument("--raw", default="")
     parser.add_argument("--file", default="", help="解析已有 dump 文件，不再重新抓取")
     args = parser.parse_args()
@@ -58,6 +61,7 @@ def main() -> int:
 
     root = ET.parse(path).getroot()
     needle = args.grep.lower()
+    y_min, y_max = (int(part) for part in args.y_range.split(",")) if args.y_range else (None, None)
     printed = 0
     for node in root.iter("node"):
         text = (node.get("text") or "").strip()
@@ -65,16 +69,22 @@ def main() -> int:
         clickable = node.get("clickable") == "true"
         if args.clickable and not clickable:
             continue
+        if args.checkable and node.get("checkable") != "true":
+            continue
         if not text and not desc:
             # 图标按钮常常只有图标没有文案；列 clickable 时仍要能看见它的坐标。
-            if not (args.clickable and clickable):
+            if not (args.all or args.checkable or (args.clickable and clickable)):
                 continue
             text = f"<{node.get('class', '').rsplit('.', 1)[-1]}>"
         haystack = f"{text} {desc}".lower()
         if needle and needle not in haystack:
             continue
         point = center(node.get("bounds", ""))
+        if y_min is not None and point is not None and not (y_min <= point[1] <= y_max):
+            continue
         label = text or f"[{desc}]"
+        if node.get("checkable") == "true":
+            label = f"{label} ({'on' if node.get('checked') == 'true' else 'off'})"
         if len(label) > 60:
             label = f"{label[:57]}…"
         flags = "TAP" if clickable else "   "
