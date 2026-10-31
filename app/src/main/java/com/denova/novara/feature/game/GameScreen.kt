@@ -75,6 +75,9 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaStroke
 import com.denova.novara.core.game.StoryCreationForm
 import com.denova.novara.core.game.StoryLibrary
 import com.denova.novara.core.i18n.resolve
@@ -177,7 +180,7 @@ fun GameScreen(
         // 标题用 weight(1f) + 单行省略：服务端标题可能很长（AI 生成的叙事句），
         // 否则会把轮次/更新时间挤成竖排单字（真机复现过）。
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TextButton(
@@ -200,9 +203,9 @@ fun GameScreen(
                     maxLines = 1,
                 )
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(NovaSpacing.sm))
             if (library.loading || library.busy) {
-                CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(NovaSize.iconSm), strokeWidth = NovaStroke.thick)
             }
             IconButton(onClick = { viewModel.loadStories() }, enabled = !library.loading) {
                 Icon(Icons.Filled.Refresh, contentDescription = stringResource(R.string.common_refresh))
@@ -216,7 +219,7 @@ fun GameScreen(
                 it.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 12.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md),
             )
         }
 
@@ -236,14 +239,14 @@ fun GameScreen(
             GameActivity.REPAIRING -> stringResource(R.string.game_activity_repairing)
             GameActivity.RECOVERING -> stringResource(R.string.game_activity_recovering)
         }
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md)) {
             Text(
                 stringResource(R.string.game_status, phaseText + (if (activityText.isNotEmpty()) " · " + activityText else "") + (if (uiState.connected) " · " + stringResource(R.string.common_connected) else "")),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
         uiState.error?.let {
-            Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
+            Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = NovaSpacing.md))
         }
 
         // 0 轮故事还没有任何轮次：给出「生成开场」入口（GAM-003），否则舞台是空的一片。
@@ -251,7 +254,7 @@ fun GameScreen(
             !uiState.sending && uiState.stage.phase != GamePhase.RUNNING
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 TextButton(onClick = { viewModel.startOpening() }) {
@@ -272,8 +275,8 @@ fun GameScreen(
             hasPendingInterruption
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
+                horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (uiState.stage.phase == GamePhase.RUNNING) {
@@ -323,7 +326,7 @@ fun GameScreen(
                 it.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 12.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md),
             )
         }
 
@@ -349,8 +352,8 @@ fun GameScreen(
             uiState.stage.phase != GamePhase.SUSPENDED
         if (choicesAvailable) {
             LazyRow(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
+                horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm),
             ) {
                 items(uiState.choices) { choice ->
                     AssistChip(
@@ -360,7 +363,7 @@ fun GameScreen(
                                 choice,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 260.dp),
+                                modifier = Modifier.widthIn(max = NovaSize.gameActionMaxWidth),
                             )
                         },
                     )
@@ -369,7 +372,7 @@ fun GameScreen(
         }
 
         // 发送玩家输入（POST 实时流；先落本地命令事务再发送）
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs)) {
             // GAM-004：Enter 只换行、点「发送」才提交（与 Web 一致）。因此不能用 singleLine，
             // 否则回车被输入框吞掉，既发不出去也换不了行。
             NovaTextField(
@@ -378,7 +381,7 @@ fun GameScreen(
                 label = stringResource(R.string.game_player_input),
                 minLines = 1,
                 maxLines = 4,
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                modifier = Modifier.weight(1f).padding(end = NovaSpacing.sm),
             )
             NovaButton(
                 onClick = {
@@ -468,11 +471,11 @@ private fun StoryCreationDialog(
                 .fillMaxWidth()
                 .fillMaxHeight(0.92f)
                 .imePadding()
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = NovaSpacing.md),
             shape = MaterialTheme.shapes.large,
-            tonalElevation = 6.dp,
+            tonalElevation = NovaSize.cardElevation,
         ) {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            Column(modifier = Modifier.fillMaxSize().padding(NovaSpacing.lg)) {
                 Text(
                     stringResource(R.string.game_create_title),
                     style = MaterialTheme.typography.titleLarge,
@@ -482,18 +485,18 @@ private fun StoryCreationDialog(
                         .weight(1f)
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
-                        .padding(top = 12.dp),
+                        .padding(top = NovaSpacing.md),
                 ) {
                 if (state.loadingResources) {
                     Row(
-                        modifier = Modifier.padding(vertical = 4.dp),
+                        modifier = Modifier.padding(vertical = NovaSpacing.xs),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        CircularProgressIndicator(modifier = Modifier.size(NovaSize.iconSm), strokeWidth = NovaStroke.thick)
                         Text(
                             stringResource(R.string.game_create_loading),
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(start = 8.dp),
+                            modifier = Modifier.padding(start = NovaSpacing.sm),
                         )
                     }
                 }
@@ -503,14 +506,14 @@ private fun StoryCreationDialog(
                     onValueChange = { text -> onUpdate { it.copy(title = text) } },
                     label = stringResource(R.string.game_create_story_title),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = NovaSpacing.chip),
                 )
                 NovaTextField(
                     value = form.origin,
                     onValueChange = { text -> onUpdate { it.copy(origin = text) } },
                     label = stringResource(R.string.game_create_origin),
                     minLines = 2,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = NovaSpacing.chip),
                 )
 
                 CreationSection(stringResource(R.string.game_create_protagonist))
@@ -530,14 +533,14 @@ private fun StoryCreationDialog(
                             onValueChange = { text -> onUpdate { it.copy(protagonistName = text) } },
                             label = stringResource(R.string.game_create_protagonist_name),
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = NovaSpacing.chip),
                         )
                         NovaTextField(
                             value = form.protagonistProfile,
                             onValueChange = { text -> onUpdate { it.copy(protagonistProfile = text) } },
                             label = stringResource(R.string.game_create_protagonist_profile),
                             minLines = 2,
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = NovaSpacing.chip),
                         )
                     }
 
@@ -565,7 +568,7 @@ private fun StoryCreationDialog(
                         onValueChange = { text -> onUpdate { it.copy(openingPresetText = text) } },
                         label = stringResource(R.string.game_create_opening_preset_text),
                         minLines = 2,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = NovaSpacing.chip),
                     )
 
                     "custom" -> NovaTextField(
@@ -573,7 +576,7 @@ private fun StoryCreationDialog(
                         onValueChange = { text -> onUpdate { it.copy(openingCustomText = text) } },
                         label = stringResource(R.string.game_create_opening_custom_text),
                         minLines = 3,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = NovaSpacing.chip),
                     )
                 }
 
@@ -731,7 +734,7 @@ private fun StoryCreationDialog(
                         it.resolve(),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 6.dp),
+                        modifier = Modifier.padding(top = NovaSpacing.chip),
                     )
                 }
                 }
@@ -766,11 +769,11 @@ private fun AskCard(
 ) {
     var selected by remember(ask.id) { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
-        tonalElevation = 3.dp,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
+        tonalElevation = NovaSize.chipElevation,
         shape = MaterialTheme.shapes.medium,
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
+        Column(modifier = Modifier.padding(NovaSpacing.tab)) {
             Text(
                 when {
                     ask.isPending && ask.isToolApproval -> stringResource(R.string.approval_title)
@@ -787,7 +790,7 @@ private fun AskCard(
                 Text(
                     "${stringResource(R.string.approval_label_tool)}: ${approval?.toolName.orEmpty()}",
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.xs),
                 )
                 Text(
                     "${stringResource(R.string.approval_label_mode)}: ${approvalModeLabel(approval?.mode)}" +
@@ -800,7 +803,7 @@ private fun AskCard(
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 3,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp),
+                        modifier = Modifier.padding(top = NovaSpacing.xxs),
                     )
                 }
                 AgentApprovalLogic.reason(approval?.ruleId).takeIf { it != ApprovalReason.GENERIC }?.let { reason ->
@@ -813,7 +816,7 @@ private fun AskCard(
                 if (ask.isPending) {
                     Row(
                         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         TextButton(onClick = onCancel, enabled = !busy) {
@@ -835,7 +838,7 @@ private fun AskCard(
                     stringResource(R.string.verify_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.xs),
                 )
                 if (!verification?.tool.isNullOrBlank()) {
                     Text(verification?.tool.orEmpty(), style = MaterialTheme.typography.bodySmall)
@@ -854,11 +857,11 @@ private fun AskCard(
                 Text(
                     if (ask.isVerification) stringResource(R.string.verify_question) else question.question,
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.xs),
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
                 ) {
                     question.options.forEach { option ->
                         val localized = AgentVerificationLogic.optionLabelRes(option.id)
@@ -904,7 +907,7 @@ private fun CreationSection(title: String) {
     Text(
         title,
         style = MaterialTheme.typography.titleSmall,
-        modifier = Modifier.padding(top = 10.dp, bottom = 2.dp),
+        modifier = Modifier.padding(top = NovaSpacing.tab, bottom = NovaSpacing.xxs),
     )
 }
 
@@ -915,7 +918,7 @@ private fun ChoiceRow(options: List<Pair<String, String>>, selected: String, onS
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
     ) {
         options.forEach { (value, label) ->
             FilterChip(
@@ -938,7 +941,7 @@ private fun ResourceDropdown(
     var expanded by remember { mutableStateOf(false) }
     val selectedName = options.firstOrNull { it.first == selectedId }?.second
         ?: selectedId.ifBlank { stringResource(R.string.game_create_none) }
-    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xxs)) {
         NovaButton(
             text = "$label: $selectedName",
             onClick = { expanded = true },
@@ -970,7 +973,7 @@ private fun StepperRow(
     onChange: (Int) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -989,7 +992,7 @@ private fun StepperRow(
 @Composable
 private fun SwitchRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
@@ -1032,13 +1035,13 @@ private fun StoryPickerDialog(
                 when {
                     state.stories.isEmpty() && state.loading -> Text(stringResource(R.string.game_story_loading))
                     state.stories.isEmpty() -> Text(stringResource(R.string.game_story_empty))
-                    else -> LazyColumn(state = listState, modifier = Modifier.heightIn(max = 380.dp)) {
+                    else -> LazyColumn(state = listState, modifier = Modifier.heightIn(max = NovaSize.gameListMaxHeight)) {
                         items(state.stories, key = { it.id }) { story ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable(enabled = !state.busy) { onSelect(story.id) }
-                                    .padding(vertical = 6.dp),
+                                    .padding(vertical = NovaSpacing.chip),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
@@ -1056,7 +1059,7 @@ private fun StoryPickerDialog(
                                     )
                                 }
                                 if (story.id == state.currentStoryId) {
-                                    Text("✓", modifier = Modifier.padding(horizontal = 4.dp))
+                                    Text("✓", modifier = Modifier.padding(horizontal = NovaSpacing.xs))
                                 }
                                 TextButton(onClick = { onRename(story) }) {
                                     Text(stringResource(R.string.game_story_rename))
@@ -1073,7 +1076,7 @@ private fun StoryPickerDialog(
                         it.resolve(),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 8.dp),
+                        modifier = Modifier.padding(top = NovaSpacing.sm),
                     )
                 }
             }
@@ -1135,7 +1138,7 @@ private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifie
         Text(
             text = stringResource(R.string.game_empty_hint),
             style = MaterialTheme.typography.bodyMedium,
-            modifier = modifier.padding(12.dp),
+            modifier = modifier.padding(NovaSpacing.md),
         )
         return
     }
@@ -1180,13 +1183,13 @@ private fun NarrativePane(viewModel: GameViewModel, modifier: Modifier = Modifie
         reverseLayout = true,
         modifier = modifier
             .fillMaxWidth()
-            .padding(12.dp),
+            .padding(NovaSpacing.md),
     ) {
         itemsIndexed(blocks.asReversed()) { _, block ->
             Text(
                 text = block,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(vertical = 2.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.xxs),
             )
         }
     }
@@ -1217,7 +1220,7 @@ private fun GameMediaPanel(
 ) {
     val idle = !busy && !media.compacting && !media.removingCompaction &&
         media.generatingTurnId == null && !media.reading
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md)) {
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
@@ -1269,7 +1272,7 @@ private fun GameMediaPanel(
         }
 
         if (media.attachments.isNotEmpty()) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                 itemsIndexed(
                     items = media.attachments,
                     key = { index, item -> "att-$index-${item.name}-${item.sizeBytes}" },
@@ -1281,7 +1284,7 @@ private fun GameMediaPanel(
                                 text = "${item.name} · ${formatAttachmentSize(item.sizeBytes)} ×",
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.widthIn(max = 220.dp),
+                                modifier = Modifier.widthIn(max = NovaSize.gameChoiceMaxWidth),
                             )
                         },
                     )
@@ -1291,11 +1294,11 @@ private fun GameMediaPanel(
 
         if (media.reading) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(modifier = Modifier.size(NovaSize.iconChevron), strokeWidth = NovaStroke.thick)
                 Text(
                     stringResource(R.string.game_media_reading),
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 6.dp),
+                    modifier = Modifier.padding(start = NovaSpacing.chip),
                 )
             }
         }
@@ -1327,7 +1330,7 @@ private fun GameMediaPanel(
                 imageLoader = imageLoader,
                 contentDescription = stringResource(R.string.game_media_image_alt),
                 contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxWidth().height(180.dp).padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().height(NovaSize.gameStageHeight).padding(vertical = NovaSpacing.xs),
             )
             media.images.values.lastOrNull()?.let { image ->
                 Text(

@@ -206,6 +206,16 @@ object NovaSize {
     /** 状态圆点直径（未读 / 变更标记）。 */
     val statusDot: Dp = 6.dp
 
+    /** 游戏页：行动按钮最大宽度、选项最大宽度、列表上限与舞台区高度。 */
+    val gameActionMaxWidth: Dp = 260.dp
+    val gameChoiceMaxWidth: Dp = 220.dp
+    val gameListMaxHeight: Dp = 380.dp
+    val gameStageHeight: Dp = 180.dp
+
+    /** 卡片与 chip 表面的 tonal elevation（Material3 适配层用）。 */
+    val cardElevation: Dp = 6.dp
+    val chipElevation: Dp = 3.dp
+
     /** 文件标签最大宽度与关闭按钮盒，避免长路径把标签条撑爆（编辑器标签条）。 */
     val tabMaxWidth: Dp = 120.dp
     val tabCloseBox: Dp = 18.dp
