@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.messages.MessageCenterLogic
 import com.denova.novara.core.messages.MessageFilter
@@ -70,7 +71,7 @@ private fun MessageCenterContent(
     val active = state.active
     Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars).imePadding()) {
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm, vertical = NovaSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(
@@ -86,7 +87,7 @@ private fun MessageCenterContent(
                     style = MaterialTheme.typography.labelSmall,
                 )
             }
-            if (state.loading || state.markingAll) CircularProgressIndicator(Modifier.padding(6.dp))
+            if (state.loading || state.markingAll) CircularProgressIndicator(Modifier.padding(NovaSpacing.chip))
             if (active == null) {
                 TextButton(
                     onClick = { viewModel.markAllRead() },
@@ -99,14 +100,14 @@ private fun MessageCenterContent(
                 it.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xxs),
             )
         }
         state.notice?.let {
             Text(
                 it.resolve(),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xxs),
             )
         }
 
@@ -116,8 +117,8 @@ private fun MessageCenterContent(
         }
 
         LazyRow(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
         ) {
             items(MessageFilter.entries.toList()) { filter ->
                 FilterChip(
@@ -137,7 +138,7 @@ private fun MessageCenterContent(
                     stringResource(R.string.messages_empty_filter)
                 },
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(NovaSpacing.lg),
             )
             return@Column
         }
@@ -162,7 +163,7 @@ private fun filterLabel(filter: MessageFilter): String = stringResource(
 
 @Composable
 private fun MessageRow(message: ProductMessage, onOpen: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 MessageCenterLogic.typeLabel(message).resolve(),
@@ -181,20 +182,20 @@ private fun MessageRow(message: ProductMessage, onOpen: () -> Unit) {
             Text(
                 message.title.ifBlank { message.id },
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(start = if (message.unread) 4.dp else 0.dp).weight(1f),
+                modifier = Modifier.padding(start = if (message.unread) NovaSpacing.xs else 0.dp).weight(1f),
             )
             TextButton(onClick = onOpen) { Text(stringResource(R.string.messages_open)) }
         }
         if (message.summary.isNotBlank()) {
             Text(message.summary, style = MaterialTheme.typography.labelSmall)
         }
-        HorizontalDivider(Modifier.padding(top = 8.dp))
+        HorizontalDivider(Modifier.padding(top = NovaSpacing.sm))
     }
 }
 
 @Composable
 private fun MessageDetail(message: ProductMessage, onOpenAutomation: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(NovaSpacing.lg)) {
         Text(message.title.ifBlank { message.id }, style = MaterialTheme.typography.titleMedium)
         Text(
             MessageCenterLogic.typeLabel(message).resolve() + " · " +
@@ -203,17 +204,17 @@ private fun MessageDetail(message: ProductMessage, onOpenAutomation: (String) ->
             style = MaterialTheme.typography.labelSmall,
         )
         if (message.summary.isNotBlank()) {
-            Text(message.summary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+            Text(message.summary, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = NovaSpacing.sm))
         }
         Text(
             MessageCenterLogic.bodyText(message),
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = NovaSpacing.md),
         )
         if (message.canOpenAutomation) {
             TextButton(
                 onClick = { onOpenAutomation(message.projectId) },
-                modifier = Modifier.padding(top = 12.dp),
+                modifier = Modifier.padding(top = NovaSpacing.md),
             ) {
                 Text(
                     stringResource(
@@ -234,7 +235,7 @@ private fun MessageDetail(message: ProductMessage, onOpenAutomation: (String) ->
                     if (message.inboxId.isNotBlank()) append("  inbox ").append(message.inboxId)
                 }.trim(),
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = NovaSpacing.sm),
             )
         }
     }

@@ -53,6 +53,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import com.denova.novara.ui.components.NovaIconButton
 import com.denova.novara.ui.components.NovaTopBar
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.ui.theme.NovaText
 import com.denova.novara.ui.theme.NovaTheme
 import androidx.compose.material.icons.filled.Menu
@@ -116,13 +118,13 @@ fun PresetsScreen(
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
             state = listState,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(NovaSpacing.sm),
         ) {
             item(key = "kinds") {
                 Row(
                     Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
                 ) {
                     PresetKind.entries.forEach { kind ->
                         FilterChip(
@@ -258,7 +260,7 @@ private fun PresetRow(
     val customLabel = stringResource(R.string.presets_custom)
     val invalidLabel = stringResource(R.string.presets_invalid)
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -304,7 +306,7 @@ private fun PresetDetailCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
         HorizontalDivider()
         Text(
             resource.name.ifBlank { resource.id } + " · " + kindLabel(kind),
@@ -336,7 +338,7 @@ private fun PresetDetailCard(
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             TextButton(onClick = onEdit, enabled = !busy) { Text(stringResource(R.string.presets_edit)) }
             TextButton(onClick = onDelete, enabled = !busy) { Text(stringResource(R.string.presets_delete)) }
         }
@@ -354,7 +356,7 @@ private fun PresetEditorCard(
     onSave: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
         HorizontalDivider()
         Text(
             if (state.creating) {
@@ -390,7 +392,8 @@ private fun PresetEditorCard(
             value = state.editDetail,
             onValueChange = onDetail,
             label = stringResource(R.string.presets_detail_label),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 200.dp, max = 420.dp),
+            modifier = Modifier.fillMaxWidth()
+                        .heightIn(min = NovaSize.presetEditorMinHeight, max = NovaSize.presetEditorMaxHeight),
             textStyle = MaterialTheme.typography.bodySmall,
         )
         Text(
@@ -405,7 +408,7 @@ private fun PresetEditorCard(
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             TextButton(onClick = onSave, enabled = !state.busy) {
                 Text(stringResource(R.string.presets_save))
             }

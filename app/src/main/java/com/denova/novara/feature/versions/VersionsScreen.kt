@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.core.network.DenovaClient
 import com.denova.novara.feature.shell.VersionsContent
 import androidx.compose.material.icons.Icons
@@ -77,7 +78,7 @@ fun VersionsScreen(
         var manualProject by remember { mutableStateOf("") }
         if (projectId.isBlank()) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 NovaTextField(

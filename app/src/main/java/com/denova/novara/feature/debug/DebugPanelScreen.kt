@@ -23,6 +23,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -105,13 +107,13 @@ fun DebugPanelScreen(
                 singleLine = true,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .padding(horizontal = NovaSpacing.sm, vertical = NovaSpacing.xs),
             )
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    .padding(horizontal = NovaSpacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
             ) {
                 LogLevel.entries.forEach { level ->
                     FilterChip(
@@ -146,10 +148,10 @@ private fun AssetProbe(
     imageLoader: coil3.ImageLoader?,
     assetUrl: String?,
 ) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm, vertical = NovaSpacing.xs)) {
         Row(
             Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm),
         ) {
             NovaTextField(
                 value = assetProjectId,
@@ -168,7 +170,7 @@ private fun AssetProbe(
         }
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             NovaButton(onClick = onLoad, enabled = client != null, text = stringResource(R.string.debug_load_image), primary = false,)
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(NovaSpacing.md))
             Text(
                 when {
                     client == null -> stringResource(R.string.debug_not_connected)
@@ -183,7 +185,7 @@ private fun AssetProbe(
                 model = assetUrl,
                 contentDescription = stringResource(R.string.debug_image_preview),
                 imageLoader = imageLoader,
-                modifier = Modifier.height(160.dp).width(240.dp),
+                modifier = Modifier.height(NovaSize.debugLogHeight).width(NovaSize.debugBoxWidth),
             )
         }
     }
@@ -201,7 +203,7 @@ private fun LogEntryRow(entry: LogEntry) {
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.chip),
     ) {
         Row(Modifier.fillMaxWidth()) {
             Text(
@@ -210,7 +212,7 @@ private fun LogEntryRow(entry: LogEntry) {
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(NovaSpacing.sm))
             Text(entry.tag, color = color, style = MaterialTheme.typography.labelSmall)
             Spacer(Modifier.weight(1f))
             Text(

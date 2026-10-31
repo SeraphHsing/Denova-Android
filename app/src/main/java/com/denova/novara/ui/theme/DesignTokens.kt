@@ -166,6 +166,14 @@ object NovaSize {
     /** 游戏控制台日志区最大高度（避免长日志把整屏撑满）。 */
     val consoleLogMaxHeight: Dp = 420.dp
 
+    /** 预设编辑区高度区间（长表单不挤走底部按钮，也不无限拉长）。 */
+    val presetEditorMinHeight: Dp = 200.dp
+    val presetEditorMaxHeight: Dp = 420.dp
+
+    /** 调试面板的日志框高度与输入框宽度。 */
+    val debugLogHeight: Dp = 160.dp
+    val debugBoxWidth: Dp = 240.dp
+
     /** 文件标签最大宽度与关闭按钮盒，避免长路径把标签条撑爆（编辑器标签条）。 */
     val tabMaxWidth: Dp = 120.dp
     val tabCloseBox: Dp = 18.dp
