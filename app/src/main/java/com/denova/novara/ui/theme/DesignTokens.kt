@@ -30,6 +30,8 @@ import com.denova.novara.ui.theme.NovaText
 object NovaSpacing {
     val xxs: Dp = 2.dp
     val xs: Dp = 4.dp
+    /** 小元素之间（chip、图标与文字）的间距，基线里的 6px。 */
+    val chip: Dp = 6.dp
     val sm: Dp = 8.dp
     val md: Dp = 12.dp
     val lg: Dp = 16.dp
@@ -75,6 +77,25 @@ object NovaSize {
     val drawerMaxStart: Dp = 384.dp
     val drawerMaxEnd: Dp = 512.dp
     val drawerEdgeGap: Dp = 32.dp
+
+    /** 1px 分隔线 / 描边厚度。 */
+    val hairline: Dp = 1.dp
+
+    /** 抽屉行内边距 14px（基线 navRow `padding-left: 14px`）。 */
+    val navRowPadding: Dp = 14.dp
+
+    /** 分隔线左缩进 48px（基线行内分隔线从图标右侧开始）。 */
+    val dividerInset: Dp = 48.dp
+
+    /** 可滚动抽屉底部兜底：手势导航区可能报 0，按 240dp 留白（NAV-010 实机修复）。 */
+    val drawerBottomInset: Dp = 240.dp
+
+    /** 抽屉内容侧阴影（基线 `0 10px 15px -3px rgba(0,0,0,.1)`）。 */
+    val drawerShadow: Dp = 10.dp
+
+    /** 树形缩进：首层 12dp、每级 +16dp（右抽屉文件树）。 */
+    val treeIndent: Dp = 12.dp
+    val treeIndentStep: Dp = 16.dp
 
     /** 图标尺寸：抽屉动作 svg 20px、导航图标容器 22×24、尾部 chevron 14px。 */
     val iconChevron: Dp = 14.dp

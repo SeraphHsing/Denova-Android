@@ -51,6 +51,7 @@ import com.denova.novara.feature.chapters.ChapterRow
 import com.denova.novara.feature.chapters.ChaptersUiState
 import com.denova.novara.feature.project.ProjectDirectoryUiState
 import com.denova.novara.feature.versions.VersionsUiState
+import androidx.compose.ui.draw.shadow
 import com.denova.novara.ui.theme.NovaDrawerSide
 import com.denova.novara.ui.theme.NovaSize
 import com.denova.novara.ui.theme.NovaSpacing
@@ -89,7 +90,13 @@ fun RightDrawer(
             Surface(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(drawerWidth),
+                    .width(drawerWidth)
+                    // VG-010：基线 `.nova-mobile-sheet` 的 `0 10px 15px -3px rgba(0,0,0,.1)`。
+                    .shadow(
+                        elevation = NovaSize.drawerShadow,
+                        shape = novaDrawerShape(NovaDrawerSide.END),
+                        clip = false,
+                    ),
                 shape = novaDrawerShape(NovaDrawerSide.END),
                 color = NovaTheme.colors.bg,
                 tonalElevation = 0.dp,
@@ -162,25 +169,25 @@ fun ProjectDirectoryContent(
                 stringResource(R.string.project_directory_hint),
                 color = muted,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.loading && state.rows.isEmpty() -> Text(
                 stringResource(R.string.loading),
                 color = muted,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.error != null -> Text(
                 state.error.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.rows.isEmpty() -> Text(
                 stringResource(R.string.project_directory_empty),
                 color = muted,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 items(state.rows, key = { it.node.path }) { row ->
@@ -255,22 +262,22 @@ fun ChangesContent(
             state.projectId.isBlank() -> Text(
                 stringResource(R.string.changes_hint), color = muted,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.loading && state.groups.isEmpty() -> Text(
                 stringResource(R.string.loading), color = muted,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.error != null -> Text(
                 state.error.resolve(), color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.groups.isEmpty() -> Text(
                 stringResource(R.string.changes_empty), color = muted,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 items(state.groups, key = { it.id }) { group ->
@@ -331,7 +338,7 @@ fun VersionsContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onDismissAction() }
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = NovaSpacing.xs),
             )
         }
         state.actionError?.let { message ->
@@ -342,24 +349,24 @@ fun VersionsContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onDismissAction() }
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = NovaSpacing.xs),
             )
         }
         when {
             state.projectId.isBlank() -> Text(
                 stringResource(R.string.versions_hint), color = muted,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.loading && state.status == null -> Text(
                 stringResource(R.string.loading), color = muted,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.error != null -> Text(
                 state.error.resolve(), color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.selectedVersionId.isNotBlank() -> VersionDetailContent(
                 state = state,
@@ -415,7 +422,7 @@ private fun VersionListContent(
         )
     }
     // 创建版本（VER-001）：说明可留空，服务端会写默认说明；没有变更时由服务端拒绝并给出原因。
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
         NovaTextField(
             value = state.createText,
             onValueChange = onCreateTextChange,
@@ -434,7 +441,7 @@ private fun VersionListContent(
         Text(
             stringResource(R.string.versions_none), color = muted,
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(vertical = 8.dp),
+            modifier = Modifier.padding(vertical = NovaSpacing.sm),
         )
     } else {
         LazyColumn(Modifier.fillMaxSize()) {
@@ -443,7 +450,7 @@ private fun VersionListContent(
                     Modifier
                         .fillMaxWidth()
                         .clickable { onOpenVersion(entry.id) }
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = NovaSpacing.xs),
                 ) {
                     Text(
                         entry.message.ifBlank { entry.id.take(12) },
@@ -521,7 +528,7 @@ private fun VersionDetailContent(
         else -> LazyColumn(Modifier.fillMaxSize()) {
             state.plan?.let { plan ->
                 item(key = "restore-plan") {
-                    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs)) {
                         Text(
                             if (plan.scope == "workspace") {
                                 stringResource(R.string.versions_plan_scope_workspace)
@@ -560,7 +567,7 @@ private fun VersionDetailContent(
                     Modifier
                         .fillMaxWidth()
                         .clickable { onTogglePath(change.path) }
-                        .padding(vertical = 2.dp),
+                        .padding(vertical = NovaSpacing.xxs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Checkbox(
@@ -624,7 +631,7 @@ private fun ChangeGroupDetail(
             style = MaterialTheme.typography.labelSmall,
             color = muted,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
             if (group.reviewStatus == "pending" || group.pendingEditCount > 0) {
                 TextButton(onClick = { onReview(group.id, "accept", null) }, enabled = !busy) {
                     Text(stringResource(R.string.changes_accept))
@@ -695,7 +702,7 @@ private fun ChangeGroupDetail(
                 }
             }
             item(key = "comments") {
-                Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(Modifier.padding(top = NovaSpacing.sm), verticalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
                     Text(
                         stringResource(R.string.changes_comments, group.comments.count { !it.deleted }),
                         style = MaterialTheme.typography.labelLarge,
@@ -732,10 +739,10 @@ private fun CommentComposer(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = NovaSpacing.xs)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(NovaSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(NovaSpacing.xs),
     ) {
         val title = when {
             state.editingCommentId != null -> stringResource(R.string.changes_comment_edit_title)
@@ -757,7 +764,7 @@ private fun CommentComposer(
         state.commentError?.let {
             Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
             TextButton(onClick = onSubmit, enabled = !state.commentSubmitting && state.commentDraft.isNotBlank()) {
                 Text(stringResource(R.string.changes_comment_save))
             }
@@ -775,7 +782,7 @@ private fun CommentRow(
     onDelete: () -> Unit,
 ) {
     Column(Modifier.fillMaxWidth()) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             val author = comment.author?.takeIf { it.isNotBlank() }
             Text(
                 if (author != null) "$author：${comment.body}" else comment.body,
@@ -807,9 +814,9 @@ private fun ChangeDiffHeader(
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp)
+            .padding(top = NovaSpacing.sm)
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
-            .padding(6.dp),
+            .padding(NovaSpacing.chip),
     ) {
         Row(
             Modifier.fillMaxWidth(),
@@ -823,7 +830,7 @@ private fun ChangeDiffHeader(
                 },
                 style = MaterialTheme.typography.bodySmall,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                 Text(changesStatusText(diff.reviewStatus), style = MaterialTheme.typography.labelSmall)
                 Text(
                     "+${diff.stats.additions} -${diff.stats.deletions}",
@@ -878,7 +885,7 @@ private fun DiffLineRow(
             .fillMaxWidth()
             .background(bg)
             .let { if (clickable) it.clickable(onClick = onClick) else it }
-            .padding(horizontal = 4.dp, vertical = 1.dp),
+            .padding(horizontal = NovaSpacing.xs, vertical = NovaSize.hairline),
     )
 }
 
@@ -916,14 +923,14 @@ private fun ChangeGroupItem(
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
             .clickable { onOpen(group.id) }
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(NovaSpacing.sm),
+        verticalArrangement = Arrangement.spacedBy(NovaSpacing.xs),
     ) {
         Text(
             "${group.id.take(12)} · ${group.reviewStatus}/${group.applyState}",
             style = MaterialTheme.typography.bodySmall,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs), verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { onOpen(group.id) }, enabled = !busy) {
                 Text(stringResource(R.string.changes_open))
             }
@@ -950,7 +957,7 @@ private fun ChangeGroupItem(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
             if (group.reviewStatus == "pending") {
                 TextButton(onClick = { onReview(group.id, "accept") }, enabled = !busy) {
                     Text(stringResource(R.string.changes_accept))
@@ -990,9 +997,14 @@ private fun ProjectFileRowItem(
             Modifier
                 .fillMaxWidth()
                 .clickable(enabled = !loadingMore) { onLoadMore(dirPath) }
-                .padding(start = (12 + row.depth * 16).dp, top = 6.dp, bottom = 6.dp, end = 8.dp),
+                .padding(
+                    start = NovaSize.treeIndent + NovaSize.treeIndentStep * row.depth,
+                    top = NovaSpacing.chip,
+                    bottom = NovaSpacing.chip,
+                    end = NovaSpacing.sm,
+                ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
         ) {
             Text(
                 if (loadingMore) stringResource(R.string.project_directory_loading_more) else stringResource(R.string.project_directory_load_more),
@@ -1008,9 +1020,14 @@ private fun ProjectFileRowItem(
             .fillMaxWidth()
             .background(if (selected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent)
             .clickable { if (node.isDir) onToggle(node.path) else onOpenFile(node.path) }
-            .padding(start = (12 + row.depth * 16).dp, top = 6.dp, bottom = 6.dp, end = 8.dp),
+            .padding(
+                start = NovaSize.treeIndent + NovaSize.treeIndentStep * row.depth,
+                top = NovaSpacing.chip,
+                bottom = NovaSpacing.chip,
+                end = NovaSpacing.sm,
+            ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
     ) {
         if (node.isDir) {
             Text(
@@ -1068,19 +1085,19 @@ fun ChaptersContent(
                 stringResource(R.string.chapter_status_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.loading && state.chapters.isEmpty() -> Text(
                 stringResource(R.string.loading),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             state.chapters.isEmpty() && state.error == null -> Text(
                 stringResource(R.string.chapter_status_empty),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(vertical = 8.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.sm),
             )
             else -> LazyColumn(Modifier.fillMaxSize()) {
                 items(state.chapters, key = { it.path }) { chapter ->
@@ -1105,7 +1122,7 @@ private fun ChapterRowItem(
     onToggle: () -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f).clickable(onClick = onOpen)) {

@@ -128,7 +128,7 @@ fun AppDrawer(
         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
         WindowInsets.systemGestures.asPaddingValues().calculateBottomPadding(),
     )
-    val listBottomPadding = if (bottomInset > 240.dp) bottomInset else 240.dp
+    val listBottomPadding = if (bottomInset > NovaSize.drawerBottomInset) bottomInset else NovaSize.drawerBottomInset
     Column(
         Modifier
             .fillMaxSize()
@@ -171,7 +171,7 @@ fun AppDrawer(
         // NAV-004 / NAV-006 工具区固定在标题栏下方：
         // 搜索框原本在列表中部，键盘弹出后结果整块被盖住（真机确认），固定到顶部后结果仍在可视区。
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(stringResource(R.string.drawer_nav_section), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
@@ -186,7 +186,7 @@ fun AppDrawer(
             value = query,
             onValueChange = { query = it },
             placeholder = stringResource(R.string.drawer_search_actions),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg),
         )
         // 搜索态只留结果：书籍区与引导卡会让结果被挤出键盘可视区。
         val searching = query.isNotBlank()
@@ -202,7 +202,7 @@ fun AppDrawer(
             // 新手引导（WRI-001）：三步核心，完成或跳过就不再出现。
             if (!searching && onboardingStep != null) {
                 item {
-                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm)) {
                         Row(
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -239,7 +239,7 @@ fun AppDrawer(
                             stringResource(R.string.book_empty),
                             color = MaterialTheme.colorScheme.outline,
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                            modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
                         )
                     }
                 } else {
@@ -247,7 +247,7 @@ fun AppDrawer(
                         val book = books[index]
                         val selected = book.projectId == currentProjectId
                         TextButton(onClick = { onSelectBook(book) }, modifier = Modifier.fillMaxWidth()) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm)) {
                                 Text(
                                     book.name,
                                     color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
@@ -338,8 +338,8 @@ fun AppDrawer(
                                         }
                                         if (index != entries.lastIndex) {
                                             HorizontalDivider(
-                                                modifier = Modifier.padding(start = 48.dp),
-                                                thickness = 1.dp,
+                                                modifier = Modifier.padding(start = NovaSize.dividerInset),
+                                                thickness = NovaSize.hairline,
                                                 color = NovaTheme.colors.borderSoft,
                                             )
                                         }
@@ -356,7 +356,7 @@ fun AppDrawer(
                         stringResource(R.string.drawer_no_match),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm),
                     )
                 }
             }
@@ -370,7 +370,7 @@ fun AppDrawer(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(stringResource(R.string.language), modifier = Modifier.weight(1f))
@@ -434,7 +434,7 @@ private fun NavEntryCard(
             .clip(RoundedCornerShape(NovaRadius.group))
             .background(container)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = NovaSize.navRowPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm + NovaSpacing.xxs),
     ) {
@@ -470,7 +470,7 @@ private fun NavListItem(
             .fillMaxWidth()
             .heightIn(min = NovaSize.navRow)
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = NovaSize.navRowPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(NovaSpacing.md),
     ) {
