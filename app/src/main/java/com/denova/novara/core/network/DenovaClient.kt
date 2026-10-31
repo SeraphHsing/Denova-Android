@@ -1737,6 +1737,75 @@ class DenovaClient(
         }
     }
 
+    // ---- 统计 / 轨迹（P5 TRJ-001…003）----
+
+    /**
+     * 全局 Run 目录：`GET /api/agent-runs?limit=[&project_id=&run_id=]`。
+     *
+     * 服务端在**开发者模式关闭**时返回 404 `api.trajectory.disabled`，
+     * 由 [toException] 映射成 `DenovaApiException(code=api.trajectory.disabled)`，调用方据此显示禁用态。
+     * `projectId` 与 `runId` 必须成对出现，只给一个时服务端会忽略定向（与 Web 一致）。
+     */
+    suspend fun globalAgentRuns(
+        limit: Int = 100,
+        projectId: String? = null,
+        runId: String? = null,
+    ): AgentRunCatalog {
+        val url = apiUrl("agent-runs").newBuilder()
+            .addQueryParameter("limit", limit.coerceIn(1, 100).toString())
+            .apply {
+                if (!projectId.isNullOrBlank() && !runId.isNullOrBlank()) {
+                    addQueryParameter("project_id", projectId)
+                    addQueryParameter("run_id", runId)
+                }
+            }
+            .build()
+        return getJson(url) { json.decodeFromString(AgentRunCatalog.serializer(), it) }
+    }
+
+    /** 项目作用域 Run 目录：`GET /api/projects/:id/agent-runs?limit=`（不需要开发者模式）。 */
+    suspend fun projectAgentRuns(projectId: String, limit: Int = 100): List<AgentRunSummary> =
+        getJson(projectRunUrl(projectId, null)) {
+            json.decodeFromString(AgentRunListResponse.serializer(), it)
+        }.runs
+
+    /** 单条 Run 详情：`GET /api/projects/:id/agent-runs/:id`（有界记录 + 子 Run 摘要）。 */
+    suspend fun agentRunTrace(projectId: String, runId: String): AgentRunTrace =
+        getJson(projectRunUrl(projectId, runId)) {
+            json.decodeFromString(AgentRunTrace.serializer(), it)
+        }
+
+    /**
+     * 导出完整 JSONL：`GET /api/projects/:id/agent-runs/:id/export`。
+     *
+     * 响应是文件而不是 JSON，因此不走 `getJson`；文件名优先取 `Content-Disposition` 的 `filename=`，
+     * 缺省 `<runId>.jsonl`（与 Web 的下载命名一致）。
+     */
+    suspend fun exportAgentRunTrace(projectId: String, runId: String): AgentRunExport =
+        withContext(Dispatchers.IO) {
+            val url = projectRunUrl(projectId, runId).newBuilder().addPathSegment("export").build()
+            okHttpClient.newCall(Request.Builder().url(url).get().build()).execute().use { resp ->
+                val body = resp.body
+                val bytes = body?.bytes() ?: ByteArray(0)
+                if (!resp.isSuccessful) {
+                    throw toException(resp.code, bytes.toString(Charsets.UTF_8))
+                }
+                val disposition = resp.header("Content-Disposition").orEmpty()
+                val filename = disposition.substringAfter("filename=", "")
+                    .trim()
+                    .trim('"')
+                    .ifBlank { "$runId.jsonl" }
+                AgentRunExport(runId = runId, filename = filename, bytes = bytes)
+            }
+        }
+
+    /** `api/projects/:id/agent-runs[/:runId]`。 */
+    private fun projectRunUrl(projectId: String, runId: String?): HttpUrl =
+        apiUrl(
+            if (runId.isNullOrBlank()) "projects/$projectId/agent-runs"
+            else "projects/$projectId/agent-runs/$runId",
+        )
+
     private fun settingsUrl(projectId: String?): HttpUrl =
         apiUrl(if (projectId.isNullOrBlank()) "settings" else "projects/$projectId/settings")
 

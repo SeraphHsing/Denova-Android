@@ -15,7 +15,7 @@ class ActivityNavTest {
     fun `default order matches the web baseline`() {
         assertEquals(
             listOf(
-                "editor", "game", "agent", "workbench", "lore", "teller",
+                "editor", "game", "agent", "trajectory", "workbench", "lore", "teller",
                 "versions", "books", "skills", "agents", "automations", "market",
             ),
             ActivityNav.DEFAULT_ORDER,
@@ -81,6 +81,20 @@ class ActivityNavTest {
         assertEquals("settings", groups[2].second.single().id)
         // 工具组是其余全部（手机端不过滤 hiddenActivityIDs，入口齐全）。
         assertEquals(ActivityNav.DEFAULT_ORDER.size - 2, groups[1].second.size)
+    }
+
+    @Test
+    fun `trajectory is a conditional entry that only shows in developer mode`() {
+        val specs = ActivityNav.sort()
+        // 关：抽屉里没有统计入口，但路由表仍保留（深链/恢复可解析）。
+        assertTrue(ActivityNav.visibleSpecs(specs, developerMode = false).none { it.id == "trajectory" })
+        // 开：出现在 agent 之后（基线 writing, story, agentchat, trajectory, lore…）。
+        val visible = ActivityNav.visibleSpecs(specs, developerMode = true).map { it.id }
+        assertTrue(visible.contains("trajectory"))
+        assertEquals(visible.indexOf("agent") + 1, visible.indexOf("trajectory"))
+        // 除统计外的入口在两种模式下完全一致，过滤不能误伤常驻项。
+        val always = specs.filterNot { it.id == "trajectory" }.map { it.id }
+        assertEquals(always, ActivityNav.visibleSpecs(specs, developerMode = false).map { it.id })
     }
 
     @Test

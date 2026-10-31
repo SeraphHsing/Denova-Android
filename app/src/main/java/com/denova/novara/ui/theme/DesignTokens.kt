@@ -222,6 +222,18 @@ object NovaSize {
     /** 文件标签最大宽度与关闭按钮盒，避免长路径把标签条撑爆（编辑器标签条）。 */
     val tabMaxWidth: Dp = 120.dp
     val tabCloseBox: Dp = 18.dp
+
+    /**
+     * 统计页（trajectory）：运行记录面板宽 `min(88vw, 360px)`、时间线单行高度、
+     * 指标条高度、视图标签栏高度。基线对应 `w-[min(88vw,360px)]` 与 `h-7` / `h-8`。
+     */
+    val trajectoryPanelMax: Dp = 360.dp
+    val trajectoryMetricStrip: Dp = 28.dp
+    val trajectoryViewTabs: Dp = 32.dp
+    val trajectoryTimelineRow: Dp = 28.dp
+    val trajectoryTimelineBar: Dp = 10.dp
+    val trajectoryListHeader: Dp = 36.dp
+    val trajectoryRowMax: Dp = 96.dp
 }
 
 /** 字重：基线顶栏 / 移动标题 / 创作组入口为 600，按钮与字段 label 为 500，正文 400。 */

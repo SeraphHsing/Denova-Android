@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  FileProvider 路径白名单（TRJ-003 导出 / SYS-001 分享）。
+  只暴露 cacheDir 下的两个目录：统计导出与通用下载，均不持久化、可随时清理。
+-->
+<paths>
+    <cache-path name="trajectory_exports" path="trajectory-exports/" />
+    <cache-path name="downloads" path="downloads/" />
+</paths>

@@ -81,6 +81,10 @@ Web 是单页 SPA，无 URL 路由，靠 `workspace-store.mode`（`WorkspaceRout
 
 ### 2.12 trajectory（developer mode）
 - outcomes 列表/创建、run traces、时间线、内容账本/检查器。
+- **Android 实现（2026-11-01）**：`feature/trajectory`（列表/详情/时间线/原始视图 + `TrajectoryViewModel`）；
+  入口是**条件入口**，由服务端 `labs.developer_mode`（`GET /api/settings` 的 `effective` 层）控制，
+  关闭时不进抽屉但路由保留；端点契约见 [03 §4.3](03-api-and-state.md#43-长尾族契约85ec97c-handler)。
+  验收行 `TRJ-001…003`，真机与 Web 双端对照未执行（保持 `未开始`）。
 
 ### 2.13 plugin
 - 插件页面，`PluginPageWorkspace`，路由 `plugin:<id>/<page>`。

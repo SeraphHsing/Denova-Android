@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.ShoppingCart
@@ -27,6 +28,11 @@ data class ActivitySpec(
     val group: ActivityGroup,
     val icon: ImageVector,
     val implemented: Boolean,
+    /**
+     * 条件入口：基线里只在特定开关下出现（当前仅 `trajectory`，由服务端 `labs.developer_mode` 控制）。
+     * 抽屉按 [ActivityNav.visibleSpecs] 过滤，业务开关不写进导航表。
+     */
+    val conditional: Boolean = false,
 )
 
 /**
@@ -40,9 +46,15 @@ data class ActivitySpec(
  */
 object ActivityNav {
 
-    /** Web `DEFAULT_ACTIVITY_ORDER`（settings 不在其中，单独一组）。 */
+    /**
+     * Web `DEFAULT_ACTIVITY_ORDER`（settings 不在其中，单独一组）。
+     *
+     * `trajectory` 插在 `agent` 之后，位置与基线 `writing, story, agentchat, trajectory, lore…` 一致；
+     * Android 多出的 `workbench`（基线里 workbench 是宿主容器、不是抽屉条目）紧随其后，
+     * 按 SD-02 登记为允许差异（见 07）。
+     */
     val DEFAULT_ORDER: List<String> = listOf(
-        "editor", "game", "agent", "workbench", "lore", "teller",
+        "editor", "game", "agent", "trajectory", "workbench", "lore", "teller",
         "versions", "books", "skills", "agents", "automations", "market",
     )
 
@@ -50,6 +62,14 @@ object ActivityNav {
         ActivitySpec("editor", R.string.dest_editor, ActivityGroup.CREATION, Icons.Filled.Edit, implemented = true),
         ActivitySpec("game", R.string.dest_game, ActivityGroup.CREATION, Icons.Filled.PlayArrow, implemented = true),
         ActivitySpec("agent", R.string.dest_agent, ActivityGroup.TOOLS, Icons.Filled.Send, implemented = true),
+        ActivitySpec(
+            "trajectory",
+            R.string.dest_trajectory,
+            ActivityGroup.TOOLS,
+            Icons.Filled.Search,
+            implemented = true,
+            conditional = true,
+        ),
         ActivitySpec("workbench", R.string.dest_workbench, ActivityGroup.TOOLS, Icons.Filled.Home, implemented = true),
         ActivitySpec("lore", R.string.dest_lore, ActivityGroup.TOOLS, Icons.Filled.Star, implemented = true),
         ActivitySpec("teller", R.string.dest_teller, ActivityGroup.TOOLS, Icons.Filled.Notifications, implemented = true),
@@ -88,6 +108,14 @@ object ActivityNav {
         val index = effective.withIndex().associate { (i, id) -> id to i }
         return specs.sortedBy { index[it.id] ?: (effective.size + specs.indexOf(it)) }
     }
+
+    /**
+     * 条件入口过滤：`developerMode=false` 时去掉只在开发者模式出现的条目（基线 `trajectory`）。
+     *
+     * 过滤放在界面层而不是 [SPECS] 里，保证路由表稳定（深链/恢复时仍能解析到该 route）。
+     */
+    fun visibleSpecs(specs: List<ActivitySpec>, developerMode: Boolean): List<ActivitySpec> =
+        specs.filter { !it.conditional || developerMode }
 
     /** 分组展示：创作 → 工具 → 设置；组内保持顺序表顺序。 */
     fun grouped(items: List<ActivitySpec>): List<Pair<ActivityGroup, List<ActivitySpec>>> {

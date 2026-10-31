@@ -215,6 +215,14 @@ Content-Type: application/json
 **市场 `/api/resource-market/*`**
 - `GET /resource-market/catalog`；`POST /resource-market/catalog/refresh`（loopback-only）；失败 → 503 catalogUnavailable。
 
+**统计与轨迹 `/api/agent-runs`、`/api/projects/:id/agent-runs*`（85ec97c，2026-11-01 按 handler 核对）**
+- `GET /api/agent-runs?limit=&project_id=&run_id=` → `{runs: [GlobalAgentRunTraceSummary], issues: [{project_id, project_name, message}]}`；**开发者模式关闭时 404 `api.trajectory.disabled`**（`Handler.GlobalAgentRunTraces` → `app.GlobalAgentRunTraces` 的 `ErrDeveloperModeDisabled`）。`limit` 缺省/超界按 100；`project_id` 与 `run_id` **必须成对**，只给一个时服务端忽略定向。
+- `GET /api/projects/:id/agent-runs?limit=` → `{runs: [RunTraceSummary]}`（项目作用域，不要求开发者模式）。
+- `GET /api/projects/:id/agent-runs/:id` → `RunTrace{summary, children?, records, truncated}`；未知 id → 404。
+- `GET /api/projects/:id/agent-runs/:id/export` → `application/x-ndjson` 附件（`Content-Disposition: attachment`、`Cache-Control: no-store`），内容为完整 JSONL（详情视图有上限、导出无上限）。
+- 摘要字段以 `internal/agents/run/trace_reader.go` 的 `RunTraceSummary` 为准：`id/created_at/status/events/duration_ms/agent_kind/parent_run_id/child_runs/session_id/llm_calls/tool_calls/prompt_tokens/cached_prompt_tokens/content_captured` 等均为 `omitempty`；全局摘要额外有 `project_id/project_name/session_title/trajectory_uri`。
+- 详情 `records[].data` 是随 `type` 变化的对象（`agent_run`/`llm_call`/`tool_call`/`llm_input`/`llm_output`/`tool_output`/`agent_cycle`/`tool_decision`/`tool_execution`/`event` 等）：带 `span_id` 的记录构成 span 树（`attrs` 内含 `model/tool_name/ttft_ms/prompt_tokens/cached_prompt_tokens/completion_tokens`），`llm_input.content.messages` 是模型可见消息，`llm_output.content.message` 是本次输出。
+
 **Lore 索引与分类 `/api/projects/:id/book/lore/*`**
 - `GET /book/lore/categories` → 分类数组；`POST /book/lore/categories` body CategoryMutation → 分类数组（400 lore.categories.invalid）。
 - `GET /book/lore/index` → IndexGuide；`PUT /book/lore/index` body IndexGuideUpdate → 结果（409 revisionConflict、400 lore.index.invalid）；`POST /book/lore/index/preview` body IndexGuide → `{...IndexPreview, token_estimate}`。

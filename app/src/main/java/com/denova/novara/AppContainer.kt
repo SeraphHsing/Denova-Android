@@ -20,6 +20,7 @@ import com.denova.novara.feature.settings.SettingsViewModel
 import com.denova.novara.feature.terminal.TerminalViewModel
 import com.denova.novara.feature.chapters.ChaptersViewModel
 import com.denova.novara.feature.versions.VersionsViewModel
+import com.denova.novara.feature.trajectory.TrajectoryViewModel
 import com.denova.novara.feature.workbench.WorkbenchViewModel
 
 /**
@@ -49,6 +50,7 @@ class AppContainer(private val application: Application) {
         initializer { VersionsViewModel(application) }
         initializer { ChaptersViewModel(application) }
         initializer { WorkbenchViewModel(application) }
+        initializer { TrajectoryViewModel(application) }
         initializer { DebugPanelViewModel(application) }
         initializer { SettingsViewModel(PreferencesStore(application), AppCompatLocaleApplier) }
     }

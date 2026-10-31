@@ -105,8 +105,14 @@ import com.denova.novara.ui.theme.NovaTheme
 import com.denova.novara.ui.theme.NovaraTheme
 import com.denova.novara.ui.theme.novaDrawerShape
 import com.denova.novara.ui.theme.novaDrawerWidth
+import com.denova.novara.core.settings.SettingsEditor
+import com.denova.novara.feature.trajectory.TrajectoryScreen
+import com.denova.novara.feature.trajectory.TrajectoryViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 class MainActivity : AppCompatActivity() {
 
@@ -146,6 +152,7 @@ class MainActivity : AppCompatActivity() {
                 val versionsViewModel: VersionsViewModel = viewModel(factory = container.viewModelFactory)
     val chaptersViewModel: ChaptersViewModel = viewModel(factory = container.viewModelFactory)
                 val workbenchViewModel: WorkbenchViewModel = viewModel(factory = container.viewModelFactory)
+                val trajectoryViewModel: TrajectoryViewModel = viewModel(factory = container.viewModelFactory)
                 val debugViewModel: DebugPanelViewModel = viewModel(factory = container.viewModelFactory)
                 val messageState by messageCenterViewModel.state.collectAsState()
                 val messageUnread = messageState.unread
@@ -289,11 +296,26 @@ class MainActivity : AppCompatActivity() {
                 versionsViewModel.bindClient(client)
         chaptersViewModel.bindClient(client)
                                     workbenchViewModel.bindClient(client)
+                                    trajectoryViewModel.bindClient(client)
                                     // 工作台不切换前台书籍：只在进入页面/抽屉时读取项目树。
                                     workbenchViewModel.refresh()
                                     // 消息中心：抽屉角标与页面共用一份状态（MSG-001…003）。
                                     messageCenterViewModel.bindClient(client)
                                 }
+                            }
+                            // 统计入口是**条件入口**：基线只在服务端 `labs.developer_mode` 开启时出现。
+                            // 每次换页重读一次生效值，设置里打开后回到抽屉即可看到入口（GET /api/settings 很轻）。
+                            var developerMode by remember { mutableStateOf(false) }
+                            LaunchedEffect(client, currentRoute) {
+                                val c = client ?: return@LaunchedEffect
+                                val snapshot = runCatching { c.settingsSnapshot() }.getOrNull()
+                                    ?: return@LaunchedEffect
+                                val effective = snapshot.raw["effective"] as? JsonObject
+                                val flag = (SettingsEditor.valueAt(effective, "labs.developer_mode") as? JsonPrimitive)
+                                    ?.booleanOrNull
+                                    ?: false
+                                developerMode = flag
+                                DenovaLog.i("Trajectory", "developer mode visible=$flag route=$currentRoute")
                             }
                             ModalNavigationDrawer(
                                 drawerState = drawerState,
@@ -384,7 +406,11 @@ class MainActivity : AppCompatActivity() {
                                                         restoreState = true
                                                     }
                                                 },
-                                                activityItems = ActivityNav.sort(order = activityOrder),
+                                                // 条件入口（trajectory）只在开发者模式开启时出现；路由表仍保留全部条目。
+                                                activityItems = ActivityNav.visibleSpecs(
+                                                    ActivityNav.sort(order = activityOrder),
+                                                    developerMode,
+                                                ),
                                                 onMoveActivity = { id, delta ->
                                                     activityOrder = ActivityNav.move(activityOrder, id, delta)
                                                     DenovaLog.d("NavOrder", "move id=$id delta=$delta")
@@ -585,6 +611,12 @@ class MainActivity : AppCompatActivity() {
                                     composable("settings") {
                                         SettingsScreen(
                                             client = connectionViewModel.client,
+                                            onOpenDrawer = { openLeftDrawer() },
+                                        )
+                                    }
+                                    composable("trajectory") {
+                                        TrajectoryScreen(
+                                            viewModel = trajectoryViewModel,
                                             onOpenDrawer = { openLeftDrawer() },
                                         )
                                     }

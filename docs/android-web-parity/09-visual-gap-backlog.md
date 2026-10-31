@@ -55,7 +55,7 @@
 | VG-010 | 侧栏交替、抽屉阴影 | `Modifier.novaDrawerShadow(side)`：按 `NovaShadows.drawerLayers` 两层自绘，左 `ModalDrawerSheet` / 右 `Surface` 共用；scrim 用 `NovaColors.scrim` | 基线两层 `0 10px 15px -3px rgba(0,0,0,.1)` + `0 4px 6px -4px rgba(0,0,0,.1)` | 抽屉 | **已对齐**（2026-11-01）：`BlurMaskFilter` 与 `Modifier.shadow` 叠加在真机都不出阴影（边界 255→168 硬切），改渐变自绘后采样 138→166 平滑；`spread` 与 CSS blur 为已登记近似。证据 [p5-screens/drawer](../evidence/p5-screens/README.md) |
 | VG-011 | 「当前作品」切换卡 | 分组标签 + 书籍 `TextButton` 文本列表 + 「新建书籍」 | 单个 52px 下拉卡：图标 22px + 名称 17px + chevron | 抽屉顶部 | 待办：改成下拉卡（切换仍走 `POST /api/workspace/switch`） |
 | VG-012 | 快捷动作 | 抽屉内搜索框（只过滤导航）+ 底部「消息中心」入口 + 「排序 / ↑↓ / 恢复默认」 | 「命令」「消息」两列 44px 快捷卡，搜索是独立命令面板；排序在设置/自定义里 | 抽屉 | 待办：命令面板复用现有搜索逻辑，排序入口迁到设置页 |
-| VG-013 | 一级入口集合 | 13 项：写作 / 游戏 / 写作 Agent / 工作台 / 资料库 / 创作方案 / 版本管理 / 书籍管理 / Skills / Agents / 自动化 / 资源中心 / 设置 | 13 项：写作 / 游戏 / 工作台 / 资料库 / 创作方案 / 版本管理 / 书籍管理 / Skills / Agents / 自动化 / **统计（trajectory）** / 资源中心 / 设置 | 抽屉 | 待办：补「统计」入口（条件入口，需确认 Web 判定），「写作 Agent」是否保留待产品决定 |
+| VG-013 | 一级入口集合 | 14 项：写作 / 游戏 / 写作 Agent / **统计**（条件入口）/ 工作台 / 资料库 / 创作方案 / 版本管理 / 书籍管理 / Skills / Agents / 自动化 / 资源中心 / 设置 | 12 项常驻（writing / story / agentchat / lore / teller / versions / books / skills / agents / automations / market）+ settings，另加 `developerMode` 条件入口 trajectory | 抽屉 | **部分对齐（2026-11-01）**：已补「统计」并按服务端 `labs.developer_mode` 作条件入口（关闭时不入抽屉，路由保留）；「写作 Agent」确认保留（基线 `agentchat` 存在）。**允许差异**：「工作台」是 Android 独立一级入口（基线 workbench 是宿主容器、不是抽屉项），用户决定按下述 SD-02 保留并登记，宿主壳重构另立阶段 |
 | VG-014 | 设置页字段行内边距 | `NovaSpacing.lg`（左右 16dp）/ `NovaSpacing.md`（上 12dp） | `padding-top:14px`、左右 16px（`data-slot="field"`，见 2026-11-01 读数） | 设置页 14 个 section | **已对齐（允许差异）** 2026-11-01：按产品决定取 12dp 保持 `NovaSpacing` 阶梯，与 Web 差 2dp；左右 16dp 一致 |
 
 
