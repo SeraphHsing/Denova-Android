@@ -98,7 +98,7 @@ import com.denova.novara.feature.terminal.TerminalViewModel
 import com.denova.novara.feature.workbench.WorkbenchScreen
 import com.denova.novara.feature.workbench.WorkbenchTreeContent
 import com.denova.novara.feature.workbench.WorkbenchViewModel
-import androidx.compose.ui.draw.shadow
+import com.denova.novara.ui.components.novaDrawerShadow
 import com.denova.novara.ui.theme.NovaDrawerSide
 import com.denova.novara.ui.theme.NovaSize
 import com.denova.novara.ui.theme.NovaTheme
@@ -308,12 +308,9 @@ class MainActivity : AppCompatActivity() {
                                             modifier = Modifier.width(
                                                 novaDrawerWidth(maxWidth, NovaDrawerSide.START),
                                             )
-                                                // VG-010：内容侧阴影，对应基线 `0 10px 15px -3px rgba(0,0,0,.1)`。
-                                                .shadow(
-                                                    elevation = NovaSize.drawerShadow,
-                                                    shape = novaDrawerShape(NovaDrawerSide.START),
-                                                    clip = false,
-                                                ),
+                                                // VG-010：内容侧阴影，按基线两层 box-shadow 自绘
+                                                // （`0 10px 15px -3px` + `0 4px 6px -4px`）。
+                                                .novaDrawerShadow(NovaDrawerSide.START),
                                             drawerShape = novaDrawerShape(NovaDrawerSide.START),
                                             drawerContainerColor = NovaTheme.colors.bg,
                                             drawerContentColor = NovaTheme.colors.text,

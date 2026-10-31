@@ -221,6 +221,17 @@ object NovaShadows {
         color = Color(0x1A000000),
     )
 
+    /** 抽屉第二层：`0 4px 6px -4px rgba(0,0,0,.1)`（基线 `box-shadow` 是两层叠加）。 */
+    val drawerSecondary = NovaShadow(
+        offsetY = 4.dp,
+        blur = 6.dp,
+        spread = (-4).dp,
+        color = Color(0x1A000000),
+    )
+
+    /** 抽屉的两层阴影，按基线顺序（先大后小）自绘，见 `Modifier.novaDrawerShadow`。 */
+    val drawerLayers: List<NovaShadow> = listOf(drawer, drawerSecondary)
+
     /** 输入框聚焦外环：`0 0 0 2px color-mix(--preset-signal 20%, transparent)`。 */
     val fieldFocus = NovaShadow(
         offsetY = 0.dp,

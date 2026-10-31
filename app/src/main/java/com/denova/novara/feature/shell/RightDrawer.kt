@@ -51,7 +51,6 @@ import com.denova.novara.feature.chapters.ChapterRow
 import com.denova.novara.feature.chapters.ChaptersUiState
 import com.denova.novara.feature.project.ProjectDirectoryUiState
 import com.denova.novara.feature.versions.VersionsUiState
-import androidx.compose.ui.draw.shadow
 import com.denova.novara.ui.theme.NovaDrawerSide
 import com.denova.novara.ui.theme.NovaSize
 import com.denova.novara.ui.theme.NovaSpacing
@@ -60,6 +59,7 @@ import com.denova.novara.ui.theme.NovaTheme
 import com.denova.novara.ui.theme.novaDrawerShape
 import com.denova.novara.ui.theme.novaDrawerWidth
 import com.denova.novara.ui.components.NovaTextField
+import com.denova.novara.ui.components.novaDrawerShadow
 
 /**
  * 右项目 / 控制台抽屉（01 §3）：从右侧滑出，内容按当前页面提供——
@@ -91,12 +91,8 @@ fun RightDrawer(
                 modifier = Modifier
                     .fillMaxHeight()
                     .width(drawerWidth)
-                    // VG-010：基线 `.nova-mobile-sheet` 的 `0 10px 15px -3px rgba(0,0,0,.1)`。
-                    .shadow(
-                        elevation = NovaSize.drawerShadow,
-                        shape = novaDrawerShape(NovaDrawerSide.END),
-                        clip = false,
-                    ),
+                    // VG-010：基线 `.nova-mobile-sheet` 的两层 box-shadow，自绘还原。
+                    .novaDrawerShadow(NovaDrawerSide.END),
                 shape = novaDrawerShape(NovaDrawerSide.END),
                 color = NovaTheme.colors.bg,
                 tonalElevation = 0.dp,
