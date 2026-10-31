@@ -29,6 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaStroke
 import com.denova.novara.R
 import com.denova.novara.core.game.LedgerActor
 import com.denova.novara.core.game.LedgerField
@@ -88,7 +91,7 @@ fun GameConsoleContent(
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -111,13 +114,13 @@ fun GameConsoleContent(
                 it.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.xs, vertical = NovaSpacing.xxs),
             )
         }
 
         Row(
             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs),
         ) {
             ConsoleTab(R.string.game_console_actors, tab == 0) { tab = 0 }
             ConsoleTab(R.string.game_console_world, tab == 1) { tab = 1 }
@@ -166,7 +169,7 @@ fun GameConsoleContent(
                     }
                     // 新轮次在前，便于直接跳到最近几轮。
                     items(turnAnchors.asReversed(), key = { "turn-${it.turnId}" }) { anchor ->
-                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xxs)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     stringResource(R.string.game_console_turn_number, anchor.number),
@@ -241,7 +244,7 @@ fun GameConsoleContent(
                             stringResource(R.string.game_console_current_branch, branchId.ifBlank { "main" }),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.padding(vertical = 2.dp),
+                            modifier = Modifier.padding(vertical = NovaSpacing.xxs),
                         )
                     }
                     if (branches.isEmpty()) {
@@ -249,13 +252,13 @@ fun GameConsoleContent(
                     }
                     itemsIndexed(branches, key = { _, b -> "branch-${b.id}" }) { _, branch ->
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xxs),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .padding(end = 4.dp),
+                                    .padding(end = NovaSpacing.xs),
                             ) {
                                 Text(
                                     branch.id,
@@ -361,7 +364,7 @@ private fun NarrativeEditDialog(
                 NovaTextField(
                     value = draft,
                     onValueChange = { draft = it },
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = NovaSize.consoleLogMaxHeight),
                     minLines = 6,
                     maxLines = 16,
                 )
@@ -370,7 +373,7 @@ private fun NarrativeEditDialog(
                         it.resolve(),
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp),
+                        modifier = Modifier.padding(top = NovaSpacing.xs),
                     )
                 }
             }
@@ -405,7 +408,7 @@ private fun BranchPlanSection(plan: BranchPlan?, busy: Boolean, onSave: (String)
     var editing by remember(plan?.revision) { mutableStateOf(false) }
     var draft by remember(plan?.markdown) { mutableStateOf(plan?.markdown.orEmpty()) }
 
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 if (plan == null) {
@@ -454,7 +457,7 @@ private fun BranchPlanSection(plan: BranchPlan?, busy: Boolean, onSave: (String)
 
 @Composable
 private fun ActorBlock(actor: LedgerActor) {
-    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.chip)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 actor.name,
@@ -482,14 +485,14 @@ private fun ActorBlock(actor: LedgerActor) {
 
 @Composable
 private fun FieldLine(name: String, value: String, indent: Boolean = false) {
-    Row(modifier = Modifier.fillMaxWidth().padding(start = if (indent) 8.dp else 0.dp, top = 1.dp)) {
+    Row(modifier = Modifier.fillMaxWidth().padding(start = if (indent) NovaSpacing.sm else 0.dp, top = NovaStroke.hairline)) {
         Text(
             name,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             modifier = Modifier.weight(1f, fill = false),
         )
-        Spacer(Modifier.padding(horizontal = 4.dp))
+        Spacer(Modifier.padding(horizontal = NovaSpacing.xs))
         Text(
             value.ifBlank { "—" },
             style = MaterialTheme.typography.bodySmall,
@@ -504,7 +507,7 @@ private fun ConsoleNotice(text: String) {
         text,
         color = MaterialTheme.colorScheme.outline,
         style = MaterialTheme.typography.bodySmall,
-        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+        modifier = Modifier.padding(horizontal = NovaSpacing.xs, vertical = NovaSpacing.xxs),
     )
 }
 
@@ -515,7 +518,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.changesSection(ledger
         Text(
             stringResource(R.string.game_console_changes),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 12.dp, bottom = 2.dp),
+            modifier = Modifier.padding(top = NovaSpacing.md, bottom = NovaSpacing.xxs),
         )
     }
     ledger.changes.forEachIndexed { index, change ->
@@ -523,7 +526,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.changesSection(ledger
             Text(
                 "· $change",
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 1.dp),
+                modifier = Modifier.padding(vertical = NovaStroke.hairline),
             )
         }
     }

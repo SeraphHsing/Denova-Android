@@ -160,6 +160,12 @@ object NovaSize {
     /** 弹窗内可滚动列表的最大高度（编辑器插图候选列表 360dp）。 */
     val menuMaxHeight: Dp = 360.dp
 
+    /** 多行文本输入的最小高度（设置页长文本字段 120dp）。 */
+    val textAreaMinHeight: Dp = 120.dp
+
+    /** 游戏控制台日志区最大高度（避免长日志把整屏撑满）。 */
+    val consoleLogMaxHeight: Dp = 420.dp
+
     /** 文件标签最大宽度与关闭按钮盒，避免长路径把标签条撑爆（编辑器标签条）。 */
     val tabMaxWidth: Dp = 120.dp
     val tabCloseBox: Dp = 18.dp

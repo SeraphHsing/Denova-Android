@@ -33,7 +33,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
@@ -49,6 +48,8 @@ import androidx.compose.material.icons.Icons
 import com.denova.novara.ui.components.NovaTextAction
 import com.denova.novara.ui.components.NovaTopBar
 import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaStroke
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Menu
 import com.denova.novara.ui.components.NovaTextField
@@ -99,7 +100,7 @@ private fun SettingsContent(
                 if (state.loading || state.saving) {
                     CircularProgressIndicator(
                         Modifier.size(NovaSize.iconAction),
-                        strokeWidth = 2.dp,
+                        strokeWidth = NovaStroke.thick,
                     )
                 }
                 NovaTextAction(
@@ -119,27 +120,27 @@ private fun SettingsContent(
                 it.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xxs),
             )
         }
         state.notice?.let {
             Text(
                 it.resolve(),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xxs),
             )
         }
         if (state.conflict) {
             Text(
                 stringResource(R.string.settings_conflict_hint),
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xxs),
             )
         }
 
         LazyRow(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
         ) {
             items(SettingsSchema.SECTIONS, key = { it.id }) { item ->
                 FilterChip(
@@ -149,12 +150,12 @@ private fun SettingsContent(
                 )
             }
         }
-        HorizontalDivider(Modifier.padding(top = 4.dp))
+        HorizontalDivider(Modifier.padding(top = NovaSpacing.xs))
 
         if (state.snapshot == null && state.loading) {
             Text(
                 stringResource(R.string.settings_loading),
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(NovaSpacing.lg),
                 style = MaterialTheme.typography.bodySmall,
             )
             return@Column
@@ -166,7 +167,7 @@ private fun SettingsContent(
                 Text(
                     stringResource(R.string.settings_section_hint),
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.chip),
                 )
             }
             items(section.fields, key = { "${section.id}:${it.path}" }) { field ->
@@ -181,7 +182,7 @@ private fun SettingsContent(
                 Text(
                     stringResource(R.string.settings_layering_hint),
                     style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(NovaSpacing.lg),
                 )
             }
         }
@@ -200,7 +201,8 @@ private fun SettingsFieldRow(
     val inherited = state.inheritedText(spec.path)
     val draft = state.fieldText(spec.path)
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+    // 基线字段行 `padding-top:14px`；`NovaSpacing` 阶梯只有 12/16，按 12dp 落地（差 2dp 已登记 09）。
+    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.md)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(stringResource(spec.labelRes), style = MaterialTheme.typography.bodyMedium)
@@ -215,7 +217,7 @@ private fun SettingsFieldRow(
             }
         }
         when (spec.kind) {
-            SettingsFieldKind.BOOL -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SettingsFieldKind.BOOL -> Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                 FilterChip(
                     selected = draft.isEmpty(),
                     onClick = { onEdit("") },
@@ -233,7 +235,7 @@ private fun SettingsFieldRow(
                 )
             }
 
-            SettingsFieldKind.ENUM -> LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            SettingsFieldKind.ENUM -> LazyRow(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                 item {
                     FilterChip(
                         selected = draft.isEmpty(),
@@ -253,7 +255,7 @@ private fun SettingsFieldRow(
             SettingsFieldKind.JSON -> NovaTextField(
                 value = draft,
                 onValueChange = onEdit,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp),
+                modifier = Modifier.fillMaxWidth().heightIn(min = NovaSize.textAreaMinHeight),
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 placeholder = inherited.ifBlank { stringResource(R.string.settings_empty) },
                 isError = error != null,
