@@ -52,7 +52,7 @@
 | VG-007 | 按钮 | 30 处 `Button`/`OutlinedButton` → `NovaButton`（44dp、10dp 圆角、16sp/500、最小宽 72dp、主/次/加粗三态），含编辑器模式行与格式按钮、游戏故事选择器 | 32px 高、10px 圆角、16px/500 | 全站实体按钮 | **已对齐**（2026-10-31）。保留口径：`TextButton`（行内 ghost 文字动作）与 M3 `FilterChip`（32dp 高，与基线 chip 一致）不替换 |
 | VG-008 | 搜索框 | `NovaSearchField`（44dp、10dp 圆角、20dp 放大镜、无浮动 label）：左抽屉与右抽屉搜索 | 抽屉内搜索 40~44px、圆角 10px、左侧 20px 放大镜 | 抽屉搜索 | **已对齐**（2026-10-31） |
 | VG-009 | 编辑器顶栏动作 | 保存/终端/写作/退出为 `NovaTextAction`（44dp、15sp/600），窄屏折叠进 `MoreVert` 溢出菜单；`☰`→`Menu`、`»`→右箭头、`⋯`→`MoreVert` | 图标 + 文字（窄屏折叠为图标） | 编辑器 | **已对齐**（2026-10-31）。物化图标需 `material-icons-extended`，当前文字动作 + 图标按钮 |
-| VG-010 | 侧栏交替、抽屉阴影 | 左抽屉 `ModalDrawerSheet` 与右抽屉 `Surface` 都加 `NovaSize.drawerShadow`(10dp) 阴影、`clip = false`，scrim 用 `NovaColors.scrim` | 基线 `0 10px 15px -3px rgba(0,0,0,.1)` + 独立 scrim | 抽屉 | **已对齐**（2026-10-31）：阴影与 scrim 都用 token，真机 480dp 抽屉边缘可见过渡 |
+| VG-010 | 侧栏交替、抽屉阴影 | `Modifier.novaDrawerShadow(side)`：按 `NovaShadows.drawerLayers` 两层自绘，左 `ModalDrawerSheet` / 右 `Surface` 共用；scrim 用 `NovaColors.scrim` | 基线两层 `0 10px 15px -3px rgba(0,0,0,.1)` + `0 4px 6px -4px rgba(0,0,0,.1)` | 抽屉 | **已对齐**（2026-11-01）：`BlurMaskFilter` 与 `Modifier.shadow` 叠加在真机都不出阴影（边界 255→168 硬切），改渐变自绘后采样 138→166 平滑；`spread` 与 CSS blur 为已登记近似。证据 [p5-screens/drawer](../evidence/p5-screens/README.md) |
 | VG-011 | 「当前作品」切换卡 | 分组标签 + 书籍 `TextButton` 文本列表 + 「新建书籍」 | 单个 52px 下拉卡：图标 22px + 名称 17px + chevron | 抽屉顶部 | 待办：改成下拉卡（切换仍走 `POST /api/workspace/switch`） |
 | VG-012 | 快捷动作 | 抽屉内搜索框（只过滤导航）+ 底部「消息中心」入口 + 「排序 / ↑↓ / 恢复默认」 | 「命令」「消息」两列 44px 快捷卡，搜索是独立命令面板；排序在设置/自定义里 | 抽屉 | 待办：命令面板复用现有搜索逻辑，排序入口迁到设置页 |
 | VG-013 | 一级入口集合 | 13 项：写作 / 游戏 / 写作 Agent / 工作台 / 资料库 / 创作方案 / 版本管理 / 书籍管理 / Skills / Agents / 自动化 / 资源中心 / 设置 | 13 项：写作 / 游戏 / 工作台 / 资料库 / 创作方案 / 版本管理 / 书籍管理 / Skills / Agents / 自动化 / **统计（trajectory）** / 资源中心 / 设置 | 抽屉 | 待办：补「统计」入口（条件入口，需确认 Web 判定），「写作 Agent」是否保留待产品决定 |
@@ -95,6 +95,6 @@
 
 ## 3. 完成标准（P5 退出条件）
 
-1. `DesignTokens` 存在且被抽屉/顶栏/按钮/输入四类共用件引用；`grep -r "\.dp\b" feature/` 里不再有散落的尺寸字面量（允许 token 定义处除外）。
+1. `DesignTokens` 存在且被抽屉/顶栏/按钮/输入四类共用件引用；`grep -r "\.dp\b" feature/` 里不再有散落的尺寸字面量（允许 token 定义处除外）。**已达成（2026-11-01）**：`feature/` 下 22 个文件共 457 处字面量分批清零（7 批提交），只剩 6 处语义为「归零」的 `0.dp`（`tonalElevation`、`padding(0.dp)`、`padding(start = if (indent) … else 0.dp)`）。
 2. 每屏都有「Web 390×844 截图 / 真机 390dp 截图」成对证据，尺寸差 ≤ 1dp（字号 ≤ 1sp）。
 3. 本文第 1 节表格逐行变为 `已对齐` + 证据链接。
