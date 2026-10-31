@@ -259,6 +259,8 @@
 
 - 2026-10-31 **AUTH-004 / NAV-002 本轮未收口（均保持 `未开始`）**：AUTH-004 补了真实缺口——会话失效确认在探测期间比较请求世代：`handleSessionExpired` 入口记录 `c.generation.snapshot()`，`SessionExpiryConfirmer` 返回后若世代已变（期间退出/重新登录/换服务器）则丢弃探测结果并 `rearmUnauthorized()`，不再把新会话顶掉（此前只判断 `c !== client`，退出登录不换 client，慢探测会把刚登录的会话踢回登录页）。真机端到端三条构造路径均未命中：`--put-delay-ms` 延迟保存（正文未 dirty 时 `saveNow()` 不发请求）、`--get-delay-ms` 延迟项目读取（离开页面即随作用域取消）、改 `remote_access_password` 吊销会话 + `--status-delay-ms` 延迟确认（文件已打开时点「打开」不触发读取）。NAV-002 补了滚动夹具（服务端 API 写入 1200 小节 `nav002-long.md`，59KB，可加载），但「切页前/后同一滚动位置」的成对截图未取得：adb 点击正文会唤起输入法并把光标落到点击点、同时触发自动保存（界面停在「保存中…」）。两行的 `gap_or_decision` 已写清下一次可直接执行的构造流程。工具：`tools/g3d_slow_proxy.py` 新增 `--get-delay-ms` / `--get-delay-prefix` 与 stderr flush（便于 AUTH-004 构造与观测）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿；设备与服务器密码已恢复原状。
 
+- 2026-10-31 **AUTH-004 真机链路证据（仍未收口）**：经 `--put-delay-ms 20000 --status-delay-ms 20000` 代理复现真实时序——旧保存请求的 401 在退出登录 20s 后才到达（`Auth: session unauthorized (401)`），客户端隔 20s 出现 `session expired`，证明「401 先读 canonical status 再降级」生效；`logout drain pending=1 drained=false` 证明在途写请求靠世代作废。**未取得**「新会话有效 → 保持登录」分支：三次尝试均因 `adb shell input text` 在禁用 IME 时静默丢字符、密码框值不完整而登录失败，20s 窗口过后 401 到达时仍在登录页。证据 [partial-2026-10-31](evidence/auth-004/xiaomi-14-pro/partial-2026-10-31.md)（含下一次逐键输入的完整执行顺序）；矩阵保持 `未开始`。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |
