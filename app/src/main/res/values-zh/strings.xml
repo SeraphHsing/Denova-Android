@@ -1431,4 +1431,18 @@
     <string name="trajectory_tool_call">工具调用</string>
     <string name="trajectory_tool_result">工具结果</string>
     <string name="trajectory_tool_truncated">工具结果有长度限制，已按服务端返回截断展示。</string>
+
+    <!-- 抽屉信息架构（P5 VG-011 / VG-012，文案逐条取自 Web baseline workbench.ts / command.ts） -->
+    <string name="drawer_current_work">当前作品</string>
+    <string name="drawer_book_switch_title">切换书籍</string>
+    <string name="drawer_book_manage">管理书架</string>
+    <string name="drawer_book_empty_shelf">书架中暂无书籍</string>
+    <string name="drawer_book_switch_failed">切换书籍失败</string>
+    <string name="drawer_quick_command">命令</string>
+    <string name="drawer_quick_messages">消息</string>
+    <string name="drawer_command_title">命令面板</string>
+    <string name="drawer_command_placeholder">搜索命令...</string>
+    <string name="drawer_command_empty">未找到匹配命令</string>
+    <string name="drawer_command_close">关闭命令面板</string>
+    <string name="drawer_unread_badge">%1$d 条未读</string>
 </resources>

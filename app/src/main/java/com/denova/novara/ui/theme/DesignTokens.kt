@@ -234,6 +234,14 @@ object NovaSize {
     val trajectoryTimelineBar: Dp = 10.dp
     val trajectoryListHeader: Dp = 36.dp
     val trajectoryRowMax: Dp = 96.dp
+
+    /**
+     * 抽屉「当前作品」下拉卡与命令面板：触发件 h-8 / max-w-34vw、
+     * 书籍项 min-h-14（56px）、命令面板 w-[22rem]（352px）且不超视口 - 16dp。
+     */
+    val contextTrigger: Dp = 32.dp
+    val bookMenuRow: Dp = 56.dp
+    val commandPanel: Dp = 352.dp
 }
 
 /** 字重：基线顶栏 / 移动标题 / 创作组入口为 600，按钮与字段 label 为 500，正文 400。 */

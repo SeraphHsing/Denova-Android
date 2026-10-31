@@ -1432,4 +1432,18 @@
     <string name="trajectory_tool_call">Tool call</string>
     <string name="trajectory_tool_result">Tool result</string>
     <string name="trajectory_tool_truncated">The tool result was truncated by the server.</string>
+
+    <!-- 抽屉信息架构（P5 VG-011 / VG-012，文案取自 Web baseline workbench.ts / command.ts） -->
+    <string name="drawer_current_work">Current work</string>
+    <string name="drawer_book_switch_title">Switch book</string>
+    <string name="drawer_book_manage">Manage bookshelf</string>
+    <string name="drawer_book_empty_shelf">No books on the shelf</string>
+    <string name="drawer_book_switch_failed">Failed to switch book</string>
+    <string name="drawer_quick_command">Commands</string>
+    <string name="drawer_quick_messages">Messages</string>
+    <string name="drawer_command_title">Command palette</string>
+    <string name="drawer_command_placeholder">Search commands…</string>
+    <string name="drawer_command_empty">No matching command</string>
+    <string name="drawer_command_close">Close command palette</string>
+    <string name="drawer_unread_badge">%1$d unread</string>
 </resources>

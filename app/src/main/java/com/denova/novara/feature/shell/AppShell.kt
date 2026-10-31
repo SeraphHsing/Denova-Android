@@ -28,7 +28,13 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -107,15 +114,23 @@ fun AppDrawer(
     /** 标题栏左侧返回箭头（基线 `[data-mobile-drawer-header]` 的关闭动作）；为 null 时不显示。 */
     onClose: (() -> Unit)? = null,
 ) {
-    // 排序模式与搜索词都是抽屉内的临时界面状态，不参与业务状态。
+    // 下拉卡、命令面板与排序模式都是抽屉内的临时界面状态，不参与业务状态。
+    var bookMenuOpen by remember { mutableStateOf(false) }
+    var commandOpen by remember { mutableStateOf(false) }
+    var commandQuery by remember { mutableStateOf("") }
     var reorderMode by remember { mutableStateOf(false) }
-    var query by remember { mutableStateOf("") }
-    // 选中结果后先收键盘再导航：否则键盘会盖住目标页首屏，且焦点留在已关闭的抽屉里（NAV-006）。
+    // 导航分组始终展示全部入口；过滤只发生在命令面板里（基线 `command.openButton`）。
+    val grouped = ActivityNav.grouped(activityItems)
+    // 选中结果后先收键盘再导航：否则键盘会盖住目标页首屏，且焦点留在已关闭的面板里（NAV-006）。
     val focusManager = LocalFocusManager.current
-    // 过滤与分组在组合作用域里算：`filter` 是 inline，lambda 内可以调 `stringResource`；
-    // 匹配规则在 ActivityNav.matches 里（纯函数，JVM 覆盖 trim / 大小写 / 空词）。
-    val visible = activityItems.filter { ActivityNav.matches(query, stringResource(it.labelRes)) }
-    val grouped = ActivityNav.grouped(visible)
+    // 抽屉与命令面板共用同一个「打开目的地」出口，保证选中即收起面板并清搜索词。
+    val openDestination: (AppDestination) -> Unit = { destination ->
+        focusManager.clearFocus()
+        commandQuery = ""
+        commandOpen = false
+        bookMenuOpen = false
+        onNavigate(destination)
+    }
     // 标题固定，其余内容全部放进同一个 LazyColumn。
     // 之前是「固定底栏 + 中间 Column(weight + verticalScroll)」：横屏时可视高度只剩百来像素，
     // 中间的滚动列被压到几乎为零，导航分组整块不渲染（2026-10-27 真机 + 语义树确认）。
@@ -129,6 +144,7 @@ fun AppDrawer(
         WindowInsets.systemGestures.asPaddingValues().calculateBottomPadding(),
     )
     val listBottomPadding = if (bottomInset > NovaSize.drawerBottomInset) bottomInset else NovaSize.drawerBottomInset
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -168,39 +184,30 @@ fun AppDrawer(
                 modifier = Modifier.padding(start = if (onClose != null) NovaSpacing.sm else 0.dp),
             )
         }
-        // NAV-004 / NAV-006 工具区固定在标题栏下方：
-        // 搜索框原本在列表中部，键盘弹出后结果整块被盖住（真机确认），固定到顶部后结果仍在可视区。
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(stringResource(R.string.drawer_nav_section), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f))
-            TextButton(onClick = { reorderMode = !reorderMode }) {
-                Text(stringResource(if (reorderMode) R.string.drawer_sort_done else R.string.drawer_sort))
-            }
-            if (reorderMode) {
-                TextButton(onClick = onResetActivityOrder) { Text(stringResource(R.string.drawer_sort_reset)) }
-            }
-        }
-        NovaSearchField(
-            value = query,
-            onValueChange = { query = it },
-            placeholder = stringResource(R.string.drawer_search_actions),
-            modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg),
-        )
-        // 搜索态只留结果：书籍区与引导卡会让结果被挤出键盘可视区。
-        val searching = query.isNotBlank()
-        // 搜索词变化后回到列表顶部：搜索时列表项变少，保留旧滚动位置会停在中间，
-        // 清空搜索后看起来像「书籍区和创作组消失」（真机确认）。
+        // VG-011 / VG-012：抽屉顶部只有「当前作品」下拉卡与「命令 / 消息」两列快捷卡。
+        // 基线 `workspace-mobile-layout.tsx` 的 navigationTools 正是这三块，移动端抽屉没有搜索框与排序按钮；
+        // 搜索与排序迁到「命令面板」（桌面侧栏 customization 面板在移动端的等价入口，已登记 09）。
         val listState = rememberLazyListState()
-        LaunchedEffect(query) { listState.scrollToItem(0) }
         LazyColumn(
             Modifier.weight(1f),
             state = listState,
             contentPadding = PaddingValues(bottom = listBottomPadding),
         ) {
+            item(key = "book-context") {
+                BookContextBlock(
+                    books = books,
+                    currentProjectId = currentProjectId,
+                    booksOpen = bookMenuOpen,
+                    onToggleOpen = { bookMenuOpen = !bookMenuOpen },
+                    onSelectBook = onSelectBook,
+                    onCreateBook = onCreateBook,
+                    onOpenCommand = { commandOpen = true },
+                    onOpenMessages = onOpenMessages,
+                    unreadMessages = unreadMessages,
+                )
+            }
             // 新手引导（WRI-001）：三步核心，完成或跳过就不再出现。
-            if (!searching && onboardingStep != null) {
+            if (onboardingStep != null) {
                 item {
                     Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm)) {
                         Row(
@@ -226,56 +233,11 @@ fun AppDrawer(
                 }
             }
 
-            if (!searching) {
-                // 当前书籍切换（P3 链路起点）：选择后作为编辑器 / 项目目录的工作区。
-                item {
-                    Box(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs)) {
-                        SectionLabel(stringResource(R.string.current_book))
-                    }
-                }
-                if (books.isEmpty()) {
-                    item {
-                        Text(
-                            stringResource(R.string.book_empty),
-                            color = MaterialTheme.colorScheme.outline,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
-                        )
-                    }
-                } else {
-                    items(books.size) { index ->
-                        val book = books[index]
-                        val selected = book.projectId == currentProjectId
-                        TextButton(onClick = { onSelectBook(book) }, modifier = Modifier.fillMaxWidth()) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm)) {
-                                Text(
-                                    book.name,
-                                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                )
-                                if (selected) Text("✓", color = MaterialTheme.colorScheme.primary)
-                            }
-                        }
-                    }
-                }
-                // 建书入口常驻：引导卡只在新手期出现，跳过后仍要能新建书籍（对齐 Web 书籍管理入口）。
-                item {
-                    TextButton(onClick = onCreateBook, modifier = Modifier.fillMaxWidth()) {
-                        Text(stringResource(R.string.drawer_new_book), style = MaterialTheme.typography.bodyMedium)
-                    }
-                    HorizontalDivider()
-                }
-            }
+            // 书籍切换已改为顶部下拉卡（VG-011），此处不再重复列表。
 
             // 一级导航（VG-002…004，取值见 docs/evidence/web-baseline/2026-10-30/metrics.json）：
             // 创作组是两列 58dp 入口卡（选中用 primary 反色），工具/设置组是整组卡片，行高 52dp、
             // 组圆角 18dp、行间 1px 分隔线左缩进 48dp、尾部 chevron 14dp。
-            val openDestination: (AppDestination) -> Unit = { destination ->
-                focusManager.clearFocus()
-                // 命令面板语义：选中即清空搜索词，避免下次打开仍被过滤（NAV-006）。
-                query = ""
-                onNavigate(destination)
-            }
             grouped.forEach { (group, groupSpecs) ->
                 val entries = groupSpecs.mapNotNull { spec ->
                     destinationOf(spec.id)?.let { destination -> spec to destination }
@@ -329,12 +291,7 @@ fun AppDrawer(
                                             enabled = spec.implemented,
                                             onClick = { openDestination(destination) },
                                         ) {
-                                            if (reorderMode && group != ActivityGroup.SETTINGS) {
-                                                TextButton(onClick = { onMoveActivity(spec.id, -1) }) { Text("↑") }
-                                                TextButton(onClick = { onMoveActivity(spec.id, 1) }) { Text("↓") }
-                                            } else {
-                                                NavRowTrailing(spec = spec, selected = spec.id == currentRoute)
-                                            }
+                                            NavRowTrailing(spec = spec, selected = spec.id == currentRoute)
                                         }
                                         if (index != entries.lastIndex) {
                                             HorizontalDivider(
@@ -350,17 +307,6 @@ fun AppDrawer(
                     }
                 }
             }
-            if (visible.isEmpty()) {
-                item {
-                    Text(
-                        stringResource(R.string.drawer_no_match),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm),
-                    )
-                }
-            }
-
             item {
                 HorizontalDivider()
                 TextButton(onClick = onToggleDarkTheme, modifier = Modifier.fillMaxWidth()) {
@@ -393,6 +339,351 @@ fun AppDrawer(
                     HorizontalDivider()
                     TextButton(onClick = onOpenDebug, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.drawer_debug))
+                    }
+                }
+            }
+        }
+    }
+        if (commandOpen) {
+            CommandPalette(
+                items = activityItems,
+                currentRoute = currentRoute,
+                query = commandQuery,
+                onQueryChange = { commandQuery = it },
+                onNavigate = openDestination,
+                reorderMode = reorderMode,
+                onToggleReorder = { reorderMode = !reorderMode },
+                onMove = onMoveActivity,
+                onReset = onResetActivityOrder,
+                onClose = {
+                    commandQuery = ""
+                    commandOpen = false
+                    reorderMode = false
+                },
+            )
+        }
+    }
+}
+
+/**
+ * 「当前作品」下拉卡 + 「命令 / 消息」两列快捷卡（VG-011 / VG-012）。
+ *
+ * 基线 `WorkbenchShell.tsx` 的 `mobileNavigationTools`：section 标签「当前作品」→
+ * `BookSwitcher compact`（h-8、max-w-34vw、11px、名称 + chevron）→ 两列 44px 快捷卡
+ * （命令 = 打开命令面板，消息 = 消息中心 + 未读角标）。
+ *
+ * 移动端差异（登记 09）：基线用 `DropdownMenu` 浮层，抽屉内改为内联展开，避免浮层被抽屉裁剪。
+ */
+@Composable
+private fun BookContextBlock(
+    books: List<BookRecord>,
+    currentProjectId: String?,
+    booksOpen: Boolean,
+    onToggleOpen: () -> Unit,
+    onSelectBook: (BookRecord) -> Unit,
+    onCreateBook: () -> Unit,
+    onOpenCommand: () -> Unit,
+    onOpenMessages: (() -> Unit)?,
+    unreadMessages: Int,
+) {
+    val colors = NovaTheme.colors
+    val current = books.firstOrNull { it.projectId == currentProjectId }
+    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm)) {
+        SectionLabel(stringResource(R.string.drawer_current_work))
+        Row(
+            Modifier
+                .fillMaxWidth(CONTEXT_TRIGGER_WIDTH_FRACTION)
+                .height(NovaSize.contextTrigger)
+                .background(colors.surface, RoundedCornerShape(NovaRadius.field))
+                .clickable(onClick = onToggleOpen)
+                .padding(horizontal = NovaSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = current?.name ?: stringResource(R.string.book_empty),
+                style = NovaText.micro.copy(fontWeight = FontWeight.Medium),
+                color = if (current != null) colors.text else colors.textFaint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                imageVector = if (booksOpen) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                contentDescription = stringResource(R.string.drawer_book_switch_title),
+                tint = colors.textFaint,
+                modifier = Modifier.size(NovaSize.iconChevron),
+            )
+        }
+        if (booksOpen) {
+            Surface(
+                shape = RoundedCornerShape(NovaRadius.card),
+                color = colors.surface2,
+                modifier = Modifier.padding(top = NovaSpacing.xs),
+            ) {
+                Column {
+                    if (books.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.drawer_book_empty_shelf),
+                            style = NovaText.micro,
+                            color = colors.textFaint,
+                            modifier = Modifier.padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.md),
+                        )
+                    }
+                    books.forEach { book ->
+                        val selected = book.projectId == currentProjectId
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = NovaSize.bookMenuRow)
+                                .clickable {
+                                    onToggleOpen()
+                                    if (!selected) onSelectBook(book)
+                                }
+                                .padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = book.name,
+                                style = NovaText.micro.copy(
+                                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                                ),
+                                color = colors.text,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (selected) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = null,
+                                    tint = colors.textMuted,
+                                    modifier = Modifier.size(NovaSize.iconSm),
+                                )
+                            }
+                        }
+                        HorizontalDivider(thickness = NovaSize.hairline, color = colors.borderSoft)
+                    }
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = NovaSize.touchTarget)
+                            .clickable {
+                                onToggleOpen()
+                                onCreateBook()
+                            }
+                            .padding(horizontal = NovaSpacing.md),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.drawer_book_manage),
+                            style = NovaText.micro,
+                            color = colors.textMuted,
+                        )
+                    }
+                }
+            }
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(top = NovaSpacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm),
+        ) {
+            QuickActionCard(
+                label = stringResource(R.string.drawer_quick_command),
+                icon = Icons.Filled.Search,
+                modifier = Modifier.weight(1f),
+                onClick = onOpenCommand,
+            )
+            QuickActionCard(
+                label = stringResource(R.string.drawer_quick_messages),
+                icon = Icons.Filled.Notifications,
+                badge = unreadMessages,
+                modifier = Modifier.weight(1f),
+                onClick = { onOpenMessages?.invoke() },
+                enabled = onOpenMessages != null,
+            )
+        }
+    }
+}
+
+/** 快捷动作卡：44dp 高、surface 背景、10dp 圆角，图标 20dp + 文案居中（基线两列 `grid-cols-2`）。 */
+@Composable
+private fun QuickActionCard(
+    label: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    badge: Int = 0,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    val colors = NovaTheme.colors
+    Row(
+        modifier
+            .height(NovaSize.touchTarget)
+            .background(colors.surface, RoundedCornerShape(NovaRadius.field))
+            .clickable(enabled = enabled, onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (enabled) colors.textMuted else colors.textFaint,
+            modifier = Modifier.size(NovaSize.iconAction),
+        )
+        Text(
+            text = if (badge > 0) "$label · $badge" else label,
+            style = NovaText.micro,
+            color = if (enabled) colors.text else colors.textFaint,
+            maxLines = 1,
+            modifier = Modifier.padding(start = NovaSpacing.xs),
+        )
+    }
+}
+
+/**
+ * 命令面板（VG-012）：抽屉里的搜索与排序入口。
+ *
+ * 基线 `command.ts`：标题「命令面板」、占位「搜索命令...」、空态「未找到匹配命令」；
+ * 移动抽屉本身不带搜索框与排序按钮，二者都收进这里（桌面侧栏的 customization 面板在移动端的等价物）。
+ */
+@Composable
+private fun CommandPalette(
+    items: List<ActivitySpec>,
+    currentRoute: String?,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onNavigate: (AppDestination) -> Unit,
+    reorderMode: Boolean,
+    onToggleReorder: () -> Unit,
+    onMove: (String, Int) -> Unit,
+    onReset: () -> Unit,
+    onClose: () -> Unit,
+) {
+    val colors = NovaTheme.colors
+    val matched = items.filter { ActivityNav.matches(query, stringResource(it.labelRes)) }
+    Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(colors.scrim)
+                .clickable(onClick = onClose),
+        )
+        Surface(
+            shape = RoundedCornerShape(NovaRadius.card),
+            color = colors.surface2,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .imePadding()
+                .padding(horizontal = NovaSpacing.sm)
+                .widthIn(max = NovaSize.commandPanel)
+                .pointerInput(Unit) { detectTapGestures { } },
+        ) {
+            Column(Modifier.padding(NovaSpacing.md)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = stringResource(R.string.drawer_command_title),
+                        style = NovaText.compact.copy(fontWeight = FontWeight.SemiBold),
+                        color = colors.text,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = if (reorderMode) {
+                            stringResource(R.string.drawer_sort_done)
+                        } else {
+                            stringResource(R.string.drawer_sort)
+                        },
+                        style = NovaText.micro,
+                        color = colors.textMuted,
+                        modifier = Modifier
+                            .clickable(onClick = onToggleReorder)
+                            .padding(horizontal = NovaSpacing.xs),
+                    )
+                    Text(
+                        text = "✕",
+                        style = NovaText.micro,
+                        color = colors.textFaint,
+                        modifier = Modifier
+                            .clickable(onClick = onClose)
+                            .padding(horizontal = NovaSpacing.xs),
+                    )
+                }
+                NovaSearchField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    placeholder = stringResource(R.string.drawer_command_placeholder),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = NovaSpacing.sm),
+                )
+                if (reorderMode) {
+                    Text(
+                        text = stringResource(R.string.drawer_sort_reset),
+                        style = NovaText.micro,
+                        color = colors.accent,
+                        modifier = Modifier
+                            .clickable(onClick = onReset)
+                            .padding(vertical = NovaSpacing.sm),
+                    )
+                }
+                LazyColumn(Modifier.heightIn(max = NovaSize.panelMaxHeight)) {
+                    if (matched.isEmpty()) {
+                        item(key = "command-empty") {
+                            Text(
+                                text = stringResource(R.string.drawer_command_empty),
+                                style = NovaText.micro,
+                                color = colors.textFaint,
+                                modifier = Modifier.padding(vertical = NovaSpacing.lg),
+                            )
+                        }
+                    }
+                    items(matched, key = { it.id }) { spec ->
+                        val destination = destinationOf(spec.id)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = NovaSize.navRow)
+                                .clickable(enabled = destination != null) {
+                                    destination?.let(onNavigate)
+                                },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = spec.icon,
+                                contentDescription = null,
+                                tint = if (spec.id == currentRoute) colors.text else colors.textMuted,
+                                modifier = Modifier.size(NovaSize.iconAction),
+                            )
+                            Text(
+                                text = stringResource(spec.labelRes),
+                                style = NovaText.body,
+                                color = if (spec.id == currentRoute) colors.text else colors.textMuted,
+                                maxLines = 1,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = NovaSpacing.sm),
+                            )
+                            if (reorderMode) {
+                                Text(
+                                    text = "↑",
+                                    style = NovaText.compact,
+                                    color = colors.textMuted,
+                                    modifier = Modifier
+                                        .clickable { onMove(spec.id, -1) }
+                                        .padding(horizontal = NovaSpacing.sm),
+                                )
+                                Text(
+                                    text = "↓",
+                                    style = NovaText.compact,
+                                    color = colors.textMuted,
+                                    modifier = Modifier
+                                        .clickable { onMove(spec.id, 1) }
+                                        .padding(horizontal = NovaSpacing.sm),
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -563,3 +854,6 @@ fun PlaceholderScreen(labelRes: Int, onOpenDrawer: () -> Unit) {
         }
     }
 }
+
+/** 基线 WorkbenchContextSwitcherTrigger 的 compact 宽度上限：max-w-[34vw]。 */
+private const val CONTEXT_TRIGGER_WIDTH_FRACTION = 0.34f
