@@ -38,14 +38,22 @@ HOP_BY_HOP = {
     "content-length",
 }
 
-CONFIG = {"target": "", "put_delay_ms": 0, "status_delay_ms": 0}
+CONFIG = {
+    "target": "",
+    "put_delay_ms": 0,
+    "status_delay_ms": 0,
+    "get_delay_ms": 0,
+    "get_delay_prefix": "/api/projects/",
+}
 
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt: str, *args) -> None:
+        # flush：验证时用 tail 跟踪日志，缓冲会让人误判「请求没发出」。
         sys.stderr.write("[proxy] " + (fmt % args) + "\n")
+        sys.stderr.flush()
 
     def _relay(self) -> None:
         length = int(self.headers.get("Content-Length") or 0)
@@ -61,6 +69,17 @@ class Handler(BaseHTTPRequestHandler):
         # AUTH-004：把连接状态探测拖慢，用于构造「迟到 status / 迟到 401」的时间窗口。
         if is_status and CONFIG["status_delay_ms"]:
             delay = CONFIG["status_delay_ms"] / 1000.0
+            self.log_message("delaying %s %s by %.1fs", self.command, path, delay)
+            time.sleep(delay)
+        # AUTH-004 迟到 401：把项目读取请求拖到「退出 + 重新登录」之后再转发。
+        # 服务端在会话已吊销后才处理该请求，于是它返回 401，而客户端此时已是新会话。
+        is_delayed_get = (
+            self.command == "GET"
+            and CONFIG["get_delay_ms"]
+            and path.startswith(CONFIG["get_delay_prefix"])
+        )
+        if is_delayed_get:
+            delay = CONFIG["get_delay_ms"] / 1000.0
             self.log_message("delaying %s %s by %.1fs", self.command, path, delay)
             time.sleep(delay)
         url = CONFIG["target"].rstrip("/") + path
@@ -95,12 +114,17 @@ def main() -> None:
     ap.add_argument("--target", default="http://192.168.2.102:18081")
     ap.add_argument("--put-delay-ms", type=int, default=3000)
     ap.add_argument("--status-delay-ms", type=int, default=0)
+    ap.add_argument("--get-delay-ms", type=int, default=0,
+                    help="延迟匹配前缀的 GET（AUTH-004 迟到 401 构造）")
+    ap.add_argument("--get-delay-prefix", default="/api/projects/")
     args = ap.parse_args()
 
     host, _, port = args.listen.rpartition(":")
     CONFIG["target"] = args.target
     CONFIG["put_delay_ms"] = args.put_delay_ms
     CONFIG["status_delay_ms"] = args.status_delay_ms
+    CONFIG["get_delay_ms"] = args.get_delay_ms
+    CONFIG["get_delay_prefix"] = args.get_delay_prefix
     server = ThreadingHTTPServer((host or "0.0.0.0", int(port)), Handler)
     print(
         f"proxy listening on {args.listen} -> {args.target} "

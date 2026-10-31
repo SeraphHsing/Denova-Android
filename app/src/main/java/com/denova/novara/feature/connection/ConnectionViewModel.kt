@@ -146,6 +146,9 @@ class ConnectionViewModel(
      */
     private fun handleSessionExpired(c: DenovaClient, key: ServerKey) {
         if (c !== client) return
+        // 探测开始时记下世代：若探测在途期间用户完成了一次退出 + 重新登录，
+        // 探测结果（未认证）属于旧会话，不能再把新会话顶掉（AUTH-004）。
+        val gen = c.generation.snapshot()
         viewModelScope.launch {
             val confirmer = SessionExpiryConfirmer {
                 runCatching {
@@ -159,7 +162,14 @@ class ConnectionViewModel(
                 }
             }
             if (c !== client) return@launch
-            if (!confirmer.isExpired()) {
+            val expired = confirmer.isExpired()
+            if (!c.generation.isCurrent(gen)) {
+                // 探测期间已发生登录 / 退出 / 换服务器：本次确认结果作废。
+                c.rearmUnauthorized()
+                DenovaLog.i("Connection", "stale 401 confirmation ignored gen=$gen")
+                return@launch
+            }
+            if (!expired) {
                 c.resetUnauthorizedFlag()
                 DenovaLog.i("Connection", "late 401 ignored, session still valid")
                 return@launch

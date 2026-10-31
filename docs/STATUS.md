@@ -257,6 +257,8 @@
 
 - 2026-10-31 **P5 收口：VG-005…009 全部对齐**（真机 390dp）：①14 处页面顶栏换成 `NovaTopBar`（编辑器/工作台/游戏/终端/设置/资料库/书籍/Skills/Agents/自动化/创作方案/版本管理/资源中心/Agent 舞台/占位页）；②`☰ » ⋯ ⋮ ⟳ ⇅ ＋` 20 处文本字符图标全部换成 `material-icons-core` 矢量图标；③74 处 `OutlinedTextField` → `NovaTextField`（扩展多行 `minLines`/`maxLines`、`textStyle`、`supportingText`、`keyboardActions`、前置图标）；④30 处 `Button`/`OutlinedButton` → `NovaButton`（含编辑器模式行/格式按钮、游戏故事选择器；新增 `bold` 与 `containerColor` 变体）。转换后逐项编译并修完 7 处脚本误伤。口径：`TextButton`（行内 ghost 文字动作）与 M3 `FilterChip`（32dp 高，与基线 chip 一致）保留，写入 09。证据 [pages](evidence/p5-tokens/xiaomi-14-pro/pages.md)（5 张截图 + 覆盖数量 + 读数）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
 
+- 2026-10-31 **AUTH-004 / NAV-002 本轮未收口（均保持 `未开始`）**：AUTH-004 补了真实缺口——会话失效确认在探测期间比较请求世代：`handleSessionExpired` 入口记录 `c.generation.snapshot()`，`SessionExpiryConfirmer` 返回后若世代已变（期间退出/重新登录/换服务器）则丢弃探测结果并 `rearmUnauthorized()`，不再把新会话顶掉（此前只判断 `c !== client`，退出登录不换 client，慢探测会把刚登录的会话踢回登录页）。真机端到端三条构造路径均未命中：`--put-delay-ms` 延迟保存（正文未 dirty 时 `saveNow()` 不发请求）、`--get-delay-ms` 延迟项目读取（离开页面即随作用域取消）、改 `remote_access_password` 吊销会话 + `--status-delay-ms` 延迟确认（文件已打开时点「打开」不触发读取）。NAV-002 补了滚动夹具（服务端 API 写入 1200 小节 `nav002-long.md`，59KB，可加载），但「切页前/后同一滚动位置」的成对截图未取得：adb 点击正文会唤起输入法并把光标落到点击点、同时触发自动保存（界面停在「保存中…」）。两行的 `gap_or_decision` 已写清下一次可直接执行的构造流程。工具：`tools/g3d_slow_proxy.py` 新增 `--get-delay-ms` / `--get-delay-prefix` 与 stderr flush（便于 AUTH-004 构造与观测）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿；设备与服务器密码已恢复原状。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |
