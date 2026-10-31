@@ -171,3 +171,40 @@ DENOVA_BASE=http://192.168.2.102:18081 DENOVA_USER=... DENOVA_PASS=... \
    `DesignTokens` 目前没有对应项（预览 CSS 重写时一并补）。
 6. 消息中心行：Web 上下各 16px、行高 105/125；Android 消息卡片未按此收敛。
 7. 预览：Web 手机端无预览模式，口径以上文「编辑器排版 + 块级排版」为准。
+
+## 2026-11-01 补采：390×844 全场景读数（`--widths 390 --scene all`）
+
+采集命令（凭证经环境变量注入，不落盘）：`python tools/web_parity_capture.py --channel chrome --widths 390 --scene all`。
+画面：`login / workspace / drawer / drawer-bottom / command-panel / editor / library / library-bottom / messages / messages-bottom / settings / settings-bottom`。
+
+### 设置页（`settings-390`）
+
+| 元素 | 读数 |
+|---|---|
+| 顶栏动作按钮 | 44×44、圆角 10px、左内边距 0、字号 16px/500，顶栏内垂直居中（y=1.5） |
+| 表单行 `data-slot="field"` | x=28、w=334、padding-top/bottom **14px**、label 14px/400、line-height 20px、无下边框；行高由内容撑开（100.63 / 101.63） |
+| 选项按钮（枚举/布尔候选项） | **44px 高**、圆角 **8px**、左内边距 **10px**、字号 16px/400、w=326 |
+
+### 资料库（`library-390`）
+
+| 元素 | 读数 |
+|---|---|
+| 卡片 | x=16、w=358、h=**223.75**（`card-header` 92 + 内容 86 + 操作行 44） |
+| card-header | h=**92**、字号 16px/400、line-height 22px |
+
+### 消息中心（`messages-390`）
+
+| 元素 | 读数 |
+|---|---|
+| 行容器 | x=13、w=365、padding-top/bottom **16px**、下边框 1px、行高 105（单行）/125（双行） |
+| 文字 | 16px/400、line-height 22px |
+
+### 与 Android 的比对状态
+
+| 项 | 结论 |
+|---|---|
+| 设置页表单行内边距 | 已登记差异：Android 12dp vs Web 14px（VG-014，产品决定保 `NovaSpacing` 阶梯） |
+| 设置页选项按钮形态 | **已确认差异（VG-016）**：Web 44px/圆角 8/左 10；Android 用 M3 `FilterChip`（32dp、M3 大圆角） |
+| 资料库卡片与 card-header | Web 读数已就位；**Android 侧逐项核对未执行**（需核 `feature/lore/LoreScreen.kt` 的卡片头高与内边距） |
+| 消息中心行 | Web 读数已就位；**Android 侧逐项核对未执行**（需核 `feature/messages/MessageCenterScreen.kt` 的行内边距 16 与分隔线） |
+
