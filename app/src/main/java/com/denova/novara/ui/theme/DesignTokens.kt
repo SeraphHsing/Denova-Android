@@ -239,6 +239,14 @@ object NovaText {
     val navLabel = TextStyle(fontSize = 15.sp, lineHeight = 22.sp)
     val navEntryLabel = navLabel.copy(fontWeight = FontWeight.SemiBold)
 
+    /** 字段 label 与按钮文字：Web 登录页 16px/500（`metrics.json` → `login.fields` / `login.submit`）。 */
+    val fieldLabel = TextStyle(
+        fontSize = 16.sp,
+        lineHeight = 22.sp,
+        fontWeight = FontWeight.Medium,
+    )
+    val buttonLabel = fieldLabel
+
     /** 分组标签：12px/500，基线 `--nova-ui-micro-font-size`。 */
     val sectionLabel = TextStyle(
         fontSize = 12.sp,

@@ -13,10 +13,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -35,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import com.denova.novara.R
 import com.denova.novara.core.i18n.UiText
 import com.denova.novara.core.i18n.resolve
+import com.denova.novara.ui.components.NovaButton
+import com.denova.novara.ui.components.NovaTextField
 
 /** 默认服务器地址（隔离测试服务器；可在输入框里改）。 */
 private const val DEFAULT_SERVER = "192.168.2.102:18081"
@@ -99,9 +99,11 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
                 Spacer(Modifier.height(8.dp))
                 Text(stringResource(R.string.conn_connecting, s.server.origin))
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = { viewModel.retry() }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.conn_retry))
-                }
+                NovaButton(
+                    text = stringResource(R.string.conn_retry),
+                    onClick = { viewModel.retry() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             is ConnectionUiState.Failed -> {
@@ -125,9 +127,11 @@ fun ConnectionScreen(viewModel: ConnectionViewModel) {
                     Text(s.message.resolve(), style = MaterialTheme.typography.bodyMedium)
                 }
                 Spacer(Modifier.height(12.dp))
-                Button(onClick = { viewModel.retry() }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(R.string.conn_retry))
-                }
+                NovaButton(
+                    text = stringResource(R.string.conn_retry),
+                    onClick = { viewModel.retry() },
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
 
             is ConnectionUiState.Unauthenticated -> {
@@ -172,18 +176,19 @@ private fun ConnectForm(
     onConnect: () -> Unit,
     actionError: UiText?,
 ) {
-    OutlinedTextField(
+    NovaTextField(
         value = value,
         onValueChange = onChange,
-        label = { Text(stringResource(R.string.conn_server_address)) },
-        placeholder = { Text(stringResource(R.string.conn_server_hint)) },
-        singleLine = true,
+        label = stringResource(R.string.conn_server_address),
+        placeholder = stringResource(R.string.conn_server_hint),
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(12.dp))
-    Button(onClick = onConnect, modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.conn_connect))
-    }
+    NovaButton(
+        text = stringResource(R.string.conn_connect),
+        onClick = onConnect,
+        modifier = Modifier.fillMaxWidth(),
+    )
     actionError?.let {
         Spacer(Modifier.height(8.dp))
         Text(it.resolve(), color = MaterialTheme.colorScheme.error)
@@ -196,20 +201,18 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: UiText?, subm
     var password by remember { mutableStateOf("") }
     var token by remember { mutableStateOf("") }
 
-    OutlinedTextField(
+    NovaTextField(
         value = username,
         onValueChange = { username = it },
-        label = { Text(stringResource(R.string.conn_username)) },
-        singleLine = true,
+        label = stringResource(R.string.conn_username),
         enabled = !submitting,
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(8.dp))
-    OutlinedTextField(
+    NovaTextField(
         value = password,
         onValueChange = { password = it },
-        label = { Text(stringResource(R.string.conn_password)) },
-        singleLine = true,
+        label = stringResource(R.string.conn_password),
         enabled = !submitting,
         visualTransformation = PasswordVisualTransformation(),
         // 密码字段必须声明为 Password 类型并关闭自动纠错/联想：
@@ -228,20 +231,18 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: UiText?, subm
         color = MaterialTheme.colorScheme.outline,
     )
     Spacer(Modifier.height(12.dp))
-    Button(
+    NovaButton(
+        text = stringResource(if (submitting) R.string.conn_signing_in else R.string.conn_login),
         onClick = { viewModel.login(username, password) },
         enabled = !submitting && username.isNotBlank() && password.isNotEmpty(),
         modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(stringResource(if (submitting) R.string.conn_signing_in else R.string.conn_login))
-    }
+    )
 
     Spacer(Modifier.height(24.dp))
-    OutlinedTextField(
+    NovaTextField(
         value = token,
         onValueChange = { token = it },
-        label = { Text(stringResource(R.string.conn_pair_token)) },
-        singleLine = true,
+        label = stringResource(R.string.conn_pair_token),
         enabled = !submitting,
         // 配对 token 是凭证，同样不能进输入法词库
         keyboardOptions = KeyboardOptions(
@@ -251,13 +252,12 @@ private fun AuthForms(viewModel: ConnectionViewModel, actionError: UiText?, subm
         modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(12.dp))
-    Button(
+    NovaButton(
+        text = stringResource(if (submitting) R.string.conn_pairing else R.string.conn_pair),
         onClick = { viewModel.pair(token) },
         enabled = !submitting && token.isNotBlank(),
         modifier = Modifier.fillMaxWidth(),
-    ) {
-        Text(stringResource(if (submitting) R.string.conn_pairing else R.string.conn_pair))
-    }
+    )
 
     actionError?.let {
         Spacer(Modifier.height(8.dp))

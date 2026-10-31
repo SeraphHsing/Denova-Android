@@ -9,8 +9,11 @@
 > **2026-10-31 进展**：token 层已落地——`app/src/main/java/com/denova/novara/ui/theme/DesignTokens.kt`
 > 按基线 `web/src/index.css` 的 `--nova-*`（颜色）与 `web/src/mobile.css`（尺寸）逐项抄写，
 > `NovaraTheme` 负责映射成 `ColorScheme` / `Typography` / `Shapes` 并通过 `NovaTheme.colors` 提供；
-> 抽屉、右抽屉已换成 token 并真机同屏比对（见 [P5 token 证据](../evidence/p5-tokens/xiaomi-14-pro/result.md)）。
-> 仍未做的是**其余页面里散落的尺寸字面量**（顶栏 / 输入 / 按钮 / 列表 / 编辑器逐屏替换），见下表状态列。
+> 抽屉、右抽屉已换成 token（[证据 1](../evidence/p5-tokens/xiaomi-14-pro/result.md)）。
+> 共用件 `ui/components/NovaComponents.kt`（`NovaTopBar` / `NovaIconButton` / `NovaTextAction` /
+> `NovaTextField` / `NovaButton` / `NovaSearchField`）已落地并接入连接页、编辑器顶栏与打开文件区、
+> 抽屉搜索（[证据 2](../evidence/p5-tokens/xiaomi-14-pro/components.md)）。
+> 仍未做的是**其余 14 处页面顶栏、编辑器模式行、各页表单/list 的尺寸字面量**，见下表状态列。
 
 `04-ui-and-editor.md` 把 `DesignTokens`（颜色、圆角、间距、字号、行高、图标尺寸的唯一来源）列为硬要求。
 落地前的状况是色值手挑、尺寸散落在各 Composable 的 `dp` 字面量里，导致抽屉宽度、行高、圆角、顶栏高度、按钮高度
@@ -27,11 +30,11 @@
 | VG-002 | 抽屉标题栏 | 56dp、17sp/600、字距 −0.425sp、左右 12dp、左侧 20dp 返回箭头、无分隔线 | 标题栏 56px，标题 18px/600（实测 17px），右侧动作 20px 图标 | 左抽屉、右抽屉 | **已对齐**（2026-10-31）；右侧动作图标仍待补 |
 | VG-003 | 抽屉导航行高 | 52dp（工具/设置组）/ 58dp（创作组入口） | 52px 行高，写作/游戏入口 58px | 抽屉全部导航行 | **已对齐**（2026-10-31）：实测行距 196px@590dpi = 53.1dp（52 + 1px 分隔线） |
 | VG-004 | 抽屉内容侧圆角 | 24dp（左抽屉圆右侧、右抽屉圆左侧） | 内容侧 24px / 18px（按断点） | 左抽屉、右抽屉 | **已对齐**（2026-10-31） |
-| VG-005 | 顶栏高度与动作 | 48dp 行高，动作是文字 `TextButton`（保存/终端/写作/退出），图标用 `☰ » ⋯` 文本字符 | 顶栏 52~58px，动作为 20px 线性图标 | 编辑器、工作台、游戏等所有页顶栏 | 待办：新增共用 `NovaTopBar`（token 高度 + 20dp 图标） |
-| VG-006 | 输入框 | `OutlinedTextField`：56dp 高、1dp 描边、浮动 label、16dp 圆角 | 48px 高、1px 描边、label 在框内固定位置、圆角 8~12px（登录页实测 32px 高） | 连接页、编辑器项目 ID/文件路径、搜索框 | 待办：共用 `NovaTextField`；高度与触控目标的取舍见 web-baseline README 第 6 条 |
-| VG-007 | 按钮 | `Button`/`TextButton`：40dp 行高、20dp 圆角（胶囊） | 44~48px 高、10~12px 圆角、字号 15px | 全站 | 待办：共用 `NovaButton` |
-| VG-008 | 搜索框 | 抽屉内 `OutlinedTextField`（56dp 高、全宽） | 抽屉内搜索 40~44px 高、圆角 10px、左侧 20px 放大镜图标 | 抽屉搜索 | 待办（随 `NovaTextField` 一起） |
-| VG-009 | 编辑器顶栏动作 | 文字按钮（「保存 / 终端 / 写作 / 退出」）+ 溢出菜单 | 图标 + 文字（窄屏折叠为图标） | 编辑器 | 待办（随 `NovaTopBar`） |
+| VG-005 | 顶栏高度与动作 | 编辑器已换 `NovaTopBar`：48dp 高、左右 12dp、标题 17sp/600、`☰`→`Menu`、`»`→箭头、`⋯`→`MoreVert`（20dp）；**其余 14 处页面顶栏仍是 `Row + Text("☰")`** | 顶栏 48px，动作为 20px 线性图标 | 编辑器已对齐；工作台/游戏/终端/设置/资料库/书籍/Skills/Agents/自动化/创作方案/版本/资源中心/Agent/占位页待办 | 部分对齐（2026-10-31）：剩余页按同一签名替换 |
+| VG-006 | 输入框 | 已换 `NovaTextField`：44dp 高、10dp 圆角、1dp 描边、label 在框外上方 16sp/500（连接页 4 个字段 + 编辑器项目 ID/文件路径） | 32px 高、1px 描边、圆角 10px、字号 16px、label 16px/500 | 已覆盖连接页与编辑器打开文件区；**未覆盖**：编辑器查找/替换框、工作台文件树面板、设置页等表单 | 大部分对齐（含高度 +12dp 的触控偏离，见下） |
+| VG-007 | 按钮 | `NovaButton`：44dp 高、10dp 圆角、16sp/500、最小宽 72dp（连接页 4 个按钮 + 编辑器「打开」）；**模式行（源码/富文本/预览）与工作台内嵌顶栏仍是 M3 胶囊** | 32px 高、10px 圆角、16px/500 | 剩余：编辑器模式行、各页 secondary 动作 | 部分对齐（2026-10-31） |
+| VG-008 | 搜索框 | 抽屉内换成 `NovaSearchField`（44dp 高、10dp 圆角、20dp 放大镜、无浮动 label） | 抽屉内搜索 40~44px 高、圆角 10px、左侧 20px 放大镜图标 | 抽屉搜索；右抽屉/资料库搜索待确认 | 已对齐（2026-10-31） |
+| VG-009 | 编辑器顶栏动作 | 保存/终端/写作/退出改为 `NovaTextAction`（44dp 触控、15sp/600），窄屏仍折叠进 `MoreVert` 溢出菜单 | 图标 + 文字（窄屏折叠为图标） | 编辑器 | 已对齐（2026-10-31）；物化图标需 `material-icons-extended`，当前用文字动作 |
 | VG-010 | 侧栏交替、抽屉阴影 | scrim 已用 token（`scrim`），抽屉 `Surface` 仍无阴影、tonalElevation 0 | 基线有独立 scrim 透明度与 `box-shadow` | 抽屉 | **部分对齐**（2026-10-31）：缺 `box-shadow` 一层 |
 | VG-011 | 「当前作品」切换卡 | 分组标签 + 书籍 `TextButton` 文本列表 + 「新建书籍」 | 单个 52px 下拉卡：图标 22px + 名称 17px + chevron | 抽屉顶部 | 待办：改成下拉卡（切换仍走 `POST /api/workspace/switch`） |
 | VG-012 | 快捷动作 | 抽屉内搜索框（只过滤导航）+ 底部「消息中心」入口 + 「排序 / ↑↓ / 恢复默认」 | 「命令」「消息」两列 44px 快捷卡，搜索是独立命令面板；排序在设置/自定义里 | 抽屉 | 待办：命令面板复用现有搜索逻辑，排序入口迁到设置页 |
@@ -45,8 +48,9 @@
 
 - **抽屉**：已采齐（宽度、标题栏高、行高、圆角、图标尺寸、分组标签），读数已写入第 1 节并与真机对齐。
 - **顶栏**：已采（48px、左右 padding 12px、动作图标 20px、标题 17px/600），尚未在 Android 侧落地，见 VG-005。
-- **输入框 / 按钮 / 标签**：已采到登录页（输入框 32px 高、圆角 10px、描边 1px；按钮 32px 高、16px/500），
-  与「常规触控目标 44×44」冲突，取舍待产品决定后再落 `NovaTextField` / `NovaButton`。
+- **输入框 / 按钮 / 标签**：已采到登录页（输入框 32px 高、圆角 10px、描边 1px；按钮 32px 高、16px/500）。
+  32px 与「触控目标 44×44 / Android 48dp」冲突，**2026-10-31 决定触控优先**：`NovaTextField` / `NovaButton`
+  按 44dp 落地，圆角/描边/字号/内边距照抄基线；如将来要照抄 32px，只改 `NovaSize.input` / `NovaSize.button` 两个 token。
 - **列表**：行高 52px、分隔线左缩进 48px 已用于抽屉；其余列表（设置、资料库、消息中心）待逐屏采。
 - **编辑器**：正文 16px / 行高 1.7、代码块、表格、预览排版待采（预览走 WebView，需单独口径）。
 

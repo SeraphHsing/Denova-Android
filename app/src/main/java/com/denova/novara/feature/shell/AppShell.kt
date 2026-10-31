@@ -29,12 +29,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -57,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import com.denova.novara.R
 import com.denova.novara.core.network.BookRecord
 import com.denova.novara.core.onboarding.OnboardingLogic
+import com.denova.novara.ui.components.NovaSearchField
 import com.denova.novara.core.onboarding.OnboardingStep
 import com.denova.novara.ui.theme.NovaRadius
 import com.denova.novara.ui.theme.NovaSize
@@ -182,12 +181,10 @@ fun AppDrawer(
                 TextButton(onClick = onResetActivityOrder) { Text(stringResource(R.string.drawer_sort_reset)) }
             }
         }
-        OutlinedTextField(
+        NovaSearchField(
             value = query,
             onValueChange = { query = it },
-            singleLine = true,
-            label = { Text(stringResource(R.string.drawer_search_actions)) },
-            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+            placeholder = stringResource(R.string.drawer_search_actions),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         )
         // 搜索态只留结果：书籍区与引导卡会让结果被挤出键盘可视区。

@@ -26,6 +26,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -73,6 +77,11 @@ import com.denova.novara.core.editor.MarkdownDocument
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.editor.MarkdownTable
 import com.denova.novara.core.network.TextSelectionRef
+import com.denova.novara.ui.components.NovaButton
+import com.denova.novara.ui.components.NovaIconButton
+import com.denova.novara.ui.components.NovaTextAction
+import com.denova.novara.ui.components.NovaTextField
+import com.denova.novara.ui.components.NovaTopBar
 import kotlinx.coroutines.launch
 
 private enum class EditorMode { SOURCE, RICH, PREVIEW }
@@ -193,64 +202,78 @@ fun EditorScreen(
                 ) { Text(stringResource(R.string.save)) }
             }
         } else {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-            IconButton(onClick = onOpenDrawer) { Text("☰") }
-            // 标题参与压缩（NAV-010）：不设 weight 时窄屏会把后面的动作整排挤出屏幕，
-            // 320dp 下「终端 / 写作 / 退出」直接消失且点不到。
-            Text(
-                stringResource(R.string.editor_title),
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
-            )
-            // 手动保存（WRI-011）：未打开 / 保存中 / 冲突未解决时禁用；冲突走「已解决，保存」。
-            TextButton(
-                onClick = { viewModel.save() },
-                enabled = uiState.loaded &&
-                    uiState.saveStatus != SaveStatus.SAVING &&
-                    uiState.saveStatus != SaveStatus.CONFLICT,
-            ) { Text(stringResource(R.string.save)) }
-            if (compactHeader) {
-                // 窄屏把终端 / 写作 / 退出收进溢出菜单，保证关键动作始终可达。
-                var moreOpen by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { moreOpen = true }) { Text("⋯") }
-                    DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.terminal_title)) },
-                            onClick = {
-                                moreOpen = false
-                                onOpenTerminal(projectId.trim())
-                            },
+        // VG-005/009：顶栏改用共用件（48dp 高、左右 12dp、标题 17sp/600 参与压缩、
+        // 导航/右抽屉动作换成 20dp 图标）。标题必须带 weight，否则窄屏会把右侧动作整排挤出屏幕。
+        NovaTopBar(
+            title = stringResource(R.string.editor_title),
+            navigationIcon = Icons.Filled.Menu,
+            navigationContentDescription = stringResource(R.string.drawer_open),
+            onNavigationClick = onOpenDrawer,
+            actions = {
+                // 手动保存（WRI-011）：未打开 / 保存中 / 冲突未解决时禁用；冲突走「已解决，保存」。
+                NovaTextAction(
+                    text = stringResource(R.string.save),
+                    onClick = { viewModel.save() },
+                    enabled = uiState.loaded &&
+                        uiState.saveStatus != SaveStatus.SAVING &&
+                        uiState.saveStatus != SaveStatus.CONFLICT,
+                )
+                if (compactHeader) {
+                    // 窄屏把终端 / 写作 / 退出收进溢出菜单，保证关键动作始终可达。
+                    var moreOpen by remember { mutableStateOf(false) }
+                    Box {
+                        NovaIconButton(
+                            icon = Icons.Filled.MoreVert,
+                            contentDescription = stringResource(R.string.editor_more_actions),
+                            onClick = { moreOpen = true },
                         )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.writing)) },
-                            enabled = projectId.isNotBlank(),
-                            onClick = {
-                                moreOpen = false
-                                onOpenAgent(projectId.trim(), filePath.trim())
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.logout)) },
-                            onClick = {
-                                moreOpen = false
-                                onLogout()
-                            },
-                        )
+                        DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.terminal_title)) },
+                                onClick = {
+                                    moreOpen = false
+                                    onOpenTerminal(projectId.trim())
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.writing)) },
+                                enabled = projectId.isNotBlank(),
+                                onClick = {
+                                    moreOpen = false
+                                    onOpenAgent(projectId.trim(), filePath.trim())
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.logout)) },
+                                onClick = {
+                                    moreOpen = false
+                                    onLogout()
+                                },
+                            )
+                        }
                     }
+                } else {
+                    NovaTextAction(
+                        text = stringResource(R.string.terminal_title),
+                        onClick = { onOpenTerminal(projectId.trim()) },
+                    )
+                    NovaTextAction(
+                        text = stringResource(R.string.writing),
+                        onClick = { onOpenAgent(projectId.trim(), filePath.trim()) },
+                        enabled = projectId.isNotBlank(),
+                    )
+                    NovaTextAction(
+                        text = stringResource(R.string.logout),
+                        onClick = onLogout,
+                    )
                 }
-            } else {
-                TextButton(onClick = { onOpenTerminal(projectId.trim()) }) { Text(stringResource(R.string.terminal_title)) }
-                TextButton(
-                    onClick = { onOpenAgent(projectId.trim(), filePath.trim()) },
-                    enabled = projectId.isNotBlank(),
-                ) { Text(stringResource(R.string.writing)) }
-                TextButton(onClick = onLogout) { Text(stringResource(R.string.logout)) }
-            }
-            IconButton(onClick = onOpenRightDrawer) { Text("»") }
-        }
+                NovaIconButton(
+                    icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = stringResource(R.string.drawer_end_open),
+                    onClick = onOpenRightDrawer,
+                )
+            },
+        )
 
         // 文件标签（WRI-003）：顺序与激活项由 ViewModel 持有，选中标签自动滚入可见区。
         EditorTabStrip(
@@ -264,43 +287,48 @@ fun EditorScreen(
         // 打开文件（NAV-010）：窄屏或大字体下并排会把输入内容压成几个字符（label 还会竖排换行），
         // 改为纵向堆叠；宽屏保持并排。
         if (compactHeader) {
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                OutlinedTextField(
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+                NovaTextField(
                     value = projectId,
                     onValueChange = { projectId = it; onProjectIdChange(it) },
-                    label = { Text(stringResource(R.string.editor_project_id)) },
-                    singleLine = true,
+                    label = stringResource(R.string.editor_project_id),
                     modifier = Modifier.fillMaxWidth(),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = filePath,
                     onValueChange = { filePath = it },
-                    label = { Text(stringResource(R.string.editor_file_path)) },
-                    singleLine = true,
+                    label = stringResource(R.string.editor_file_path),
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 )
-                OutlinedButton(
+                NovaButton(
+                    text = stringResource(R.string.editor_open),
                     onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) },
+                    primary = false,
                     modifier = Modifier.align(Alignment.End).padding(top = 8.dp),
-                ) { Text(stringResource(R.string.editor_open)) }
+                )
             }
         } else {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
-                OutlinedTextField(
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.Bottom,
+            ) {
+                NovaTextField(
                     value = projectId,
                     onValueChange = { projectId = it; onProjectIdChange(it) },
-                    label = { Text(stringResource(R.string.editor_project_id)) },
-                    singleLine = true,
+                    label = stringResource(R.string.editor_project_id),
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
-                OutlinedTextField(
+                NovaTextField(
                     value = filePath,
                     onValueChange = { filePath = it },
-                    label = { Text(stringResource(R.string.editor_file_path)) },
-                    singleLine = true,
+                    label = stringResource(R.string.editor_file_path),
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
-                OutlinedButton(onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) }) { Text(stringResource(R.string.editor_open)) }
+                NovaButton(
+                    text = stringResource(R.string.editor_open),
+                    onClick = { viewModel.openFile(projectId.trim(), filePath.trim()) },
+                    primary = false,
+                )
             }
         }
         }
