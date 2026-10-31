@@ -3,7 +3,8 @@
     <string name="app_name">Novara</string>
 
     <!-- 抽屉 / 导航 -->
-    <string name="drawer_title">Novara</string>
+    <string name="drawer_title">Navigation</string>
+    <string name="drawer_close">Close navigation</string>
     <string name="dest_workbench">Workbench</string>
     <string name="dest_editor">Writing</string>
     <string name="dest_game">Story</string>
@@ -412,7 +413,7 @@
     <string name="dest_placeholder">WIP</string>
     <string name="dest_current">Current</string>
     <string name="group_creation">Creation</string>
-    <string name="group_tools">Tools</string>
+    <string name="group_tools">Tools &amp; resources</string>
     <string name="search_find">Find</string>
     <string name="search_replace_with">Replace with</string>
     <string name="search_replace">Replace</string>

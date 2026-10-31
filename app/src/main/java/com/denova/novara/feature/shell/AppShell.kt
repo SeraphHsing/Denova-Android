@@ -1,5 +1,6 @@
 package com.denova.novara.feature.shell
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,25 +10,32 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemGestures
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -39,13 +47,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
 import com.denova.novara.core.network.BookRecord
 import com.denova.novara.core.onboarding.OnboardingLogic
 import com.denova.novara.core.onboarding.OnboardingStep
+import com.denova.novara.ui.theme.NovaRadius
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaText
+import com.denova.novara.ui.theme.NovaTheme
 
 /** 一级目的地（顺序与实现状态都来自 [ActivityNav]，避免两处各写一份）。 */
 data class AppDestination(
@@ -87,6 +104,8 @@ fun AppDrawer(
     activityItems: List<ActivitySpec> = ActivityNav.sort(),
     onMoveActivity: (id: String, delta: Int) -> Unit = { _, _ -> },
     onResetActivityOrder: () -> Unit = {},
+    /** 标题栏左侧返回箭头（基线 `[data-mobile-drawer-header]` 的关闭动作）；为 null 时不显示。 */
+    onClose: (() -> Unit)? = null,
 ) {
     // 排序模式与搜索词都是抽屉内的临时界面状态，不参与业务状态。
     var reorderMode by remember { mutableStateOf(false) }
@@ -118,12 +137,37 @@ fun AppDrawer(
             // 按 IME insets 让内容上移，结果行始终可点。
             .imePadding(),
     ) {
-        Text(
-            stringResource(R.string.drawer_title),
-            style = MaterialTheme.typography.titleLarge,
-            modifier = Modifier.padding(16.dp),
-        )
-        HorizontalDivider()
+        // VG-002：标题栏固定 56dp、左右 12dp、17sp/600，基线 `[data-mobile-drawer-header]` 无分隔线。
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .heightIn(min = NovaSize.drawerHeader)
+                .padding(horizontal = NovaSize.drawerHeaderPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onClose != null) {
+                Box(
+                    Modifier
+                        .size(NovaSize.touchTarget)
+                        .clip(RoundedCornerShape(NovaRadius.field))
+                        .clickable(onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                        contentDescription = stringResource(R.string.drawer_close),
+                        tint = NovaTheme.colors.text,
+                        modifier = Modifier.size(NovaSize.iconAction),
+                    )
+                }
+            }
+            Text(
+                stringResource(R.string.drawer_title),
+                style = NovaText.drawerTitle,
+                color = NovaTheme.colors.text,
+                modifier = Modifier.padding(start = if (onClose != null) NovaSpacing.sm else 0.dp),
+            )
+        }
         // NAV-004 / NAV-006 工具区固定在标题栏下方：
         // 搜索框原本在列表中部，键盘弹出后结果整块被盖住（真机确认），固定到顶部后结果仍在可视区。
         Row(
@@ -187,12 +231,9 @@ fun AppDrawer(
             if (!searching) {
                 // 当前书籍切换（P3 链路起点）：选择后作为编辑器 / 项目目录的工作区。
                 item {
-                    Text(
-                        stringResource(R.string.current_book),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
+                    Box(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs)) {
+                        SectionLabel(stringResource(R.string.current_book))
+                    }
                 }
                 if (books.isEmpty()) {
                     item {
@@ -228,83 +269,85 @@ fun AppDrawer(
                 }
             }
 
-            // 一级导航：分组（创作 / 工具 / 设置）+ 图标 + 尾部状态（当前 ✓ / 其余 ›）。
-            grouped.forEach { (group, specs) ->
-                // 设置组按基线不带分组标题。
-                if (group != ActivityGroup.SETTINGS) {
-                    item(key = "group-${group.name}") {
-                        Text(
-                            when (group) {
-                                ActivityGroup.CREATION -> stringResource(R.string.group_creation)
-                                else -> stringResource(R.string.group_tools)
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                        )
-                    }
+            // 一级导航（VG-002…004，取值见 docs/evidence/web-baseline/2026-10-30/metrics.json）：
+            // 创作组是两列 58dp 入口卡（选中用 primary 反色），工具/设置组是整组卡片，行高 52dp、
+            // 组圆角 18dp、行间 1px 分隔线左缩进 48dp、尾部 chevron 14dp。
+            val openDestination: (AppDestination) -> Unit = { destination ->
+                focusManager.clearFocus()
+                // 命令面板语义：选中即清空搜索词，避免下次打开仍被过滤（NAV-006）。
+                query = ""
+                onNavigate(destination)
+            }
+            grouped.forEach { (group, groupSpecs) ->
+                val entries = groupSpecs.mapNotNull { spec ->
+                    destinationOf(spec.id)?.let { destination -> spec to destination }
                 }
-                items(specs.size, key = { index -> "nav-${specs[index].id}" }) { index ->
-                    val spec = specs[index]
-                    val destination = destinationOf(spec.id)
-                    val selected = spec.id == currentRoute
-                    if (destination == null) return@items
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        TextButton(
-                            onClick = {
-                                focusManager.clearFocus()
-                                // 命令面板语义：选中即清空搜索词，避免下次打开仍被过滤（NAV-006）。
-                                query = ""
-                                onNavigate(destination)
-                            },
-                            enabled = spec.implemented,
-                            modifier = Modifier.weight(1f),
+                if (entries.isEmpty()) return@forEach
+                if (group == ActivityGroup.CREATION) {
+                    item(key = "group-creation") {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
                         ) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Icon(
-                                    spec.icon,
-                                    contentDescription = null,
-                                    tint = if (selected) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                )
-                                Text(
-                                    stringResource(spec.labelRes),
-                                    modifier = Modifier.weight(1f),
-                                    color = if (selected) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurface
-                                    },
-                                )
-                                when {
-                                    // 未实现：只标 WIP，不给可点击的视觉暗示（不给 ›，也没有跳转）。
-                                    !spec.implemented -> Text(
-                                        stringResource(R.string.dest_placeholder),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.outline,
-                                    )
-                                    selected -> Icon(
-                                        Icons.Filled.Check,
-                                        contentDescription = stringResource(R.string.dest_current),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
-                                    else -> Icon(
-                                        Icons.Filled.KeyboardArrowRight,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.outline,
+                            SectionLabel(stringResource(R.string.group_creation))
+                            Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm + NovaSpacing.xxs)) {
+                                entries.forEach { (spec, destination) ->
+                                    NavEntryCard(
+                                        label = stringResource(spec.labelRes),
+                                        icon = spec.icon,
+                                        selected = spec.id == currentRoute,
+                                        enabled = spec.implemented,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { openDestination(destination) },
                                     )
                                 }
                             }
                         }
-                        if (reorderMode && group != ActivityGroup.SETTINGS) {
-                            TextButton(onClick = { onMoveActivity(spec.id, -1) }) { Text("↑") }
-                            TextButton(onClick = { onMoveActivity(spec.id, 1) }) { Text("↓") }
+                    }
+                } else {
+                    item(key = "group-${group.name}") {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
+                        ) {
+                            // 设置组按基线不带分组标题。
+                            if (group != ActivityGroup.SETTINGS) {
+                                SectionLabel(stringResource(R.string.group_tools))
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(NovaRadius.group),
+                                color = NovaTheme.colors.surface,
+                            ) {
+                                Column {
+                                    entries.forEachIndexed { index, entry ->
+                                        val spec = entry.first
+                                        val destination = entry.second
+                                        NavListItem(
+                                            label = stringResource(spec.labelRes),
+                                            icon = spec.icon,
+                                            selected = spec.id == currentRoute,
+                                            enabled = spec.implemented,
+                                            onClick = { openDestination(destination) },
+                                        ) {
+                                            if (reorderMode && group != ActivityGroup.SETTINGS) {
+                                                TextButton(onClick = { onMoveActivity(spec.id, -1) }) { Text("↑") }
+                                                TextButton(onClick = { onMoveActivity(spec.id, 1) }) { Text("↓") }
+                                            } else {
+                                                NavRowTrailing(spec = spec, selected = spec.id == currentRoute)
+                                            }
+                                        }
+                                        if (index != entries.lastIndex) {
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(start = 48.dp),
+                                                thickness = 1.dp,
+                                                color = NovaTheme.colors.borderSoft,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -356,6 +399,131 @@ fun AppDrawer(
                 }
             }
         }
+    }
+}
+
+/** 分组标签：12sp/500、左缩进 12dp、下边距 8dp（基线 `.nova-mobile-section-label`）。 */
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        style = NovaText.sectionLabel,
+        color = NovaTheme.colors.textMuted,
+        modifier = Modifier.padding(start = NovaSpacing.md, bottom = NovaSpacing.sm),
+    )
+}
+
+/** 创作组入口卡：58dp 高、18dp 圆角、选中时 primary 反色（基线 `[data-mobile-nav-group="creation"]`）。 */
+@Composable
+private fun NavEntryCard(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    val colors = NovaTheme.colors
+    val container = if (selected) colors.primary else colors.surface
+    val content = when {
+        !enabled -> colors.textFaint
+        selected -> colors.onPrimary
+        else -> colors.text
+    }
+    Row(
+        modifier
+            .height(NovaSize.navEntryRow)
+            .clip(RoundedCornerShape(NovaRadius.group))
+            .background(container)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm + NovaSpacing.xxs),
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = content,
+            modifier = Modifier.size(NovaSize.iconAction),
+        )
+        Text(
+            label,
+            style = NovaText.navEntryLabel,
+            color = content,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** 工具组行：52dp 高、图标容器 22×24、左内边距 14dp（基线 `.nova-mobile-nav-row`）。 */
+@Composable
+private fun NavListItem(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    trailing: @Composable () -> Unit,
+) {
+    val colors = NovaTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .heightIn(min = NovaSize.navRow)
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.md),
+    ) {
+        Box(
+            Modifier
+                .width(NovaSize.iconNavBoxWidth)
+                .height(NovaSize.iconNavBoxHeight),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (selected) colors.text else colors.textMuted,
+                modifier = Modifier.size(NovaSize.iconAction),
+            )
+        }
+        Text(
+            label,
+            modifier = Modifier.weight(1f),
+            style = NovaText.navLabel,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (enabled) colors.text else colors.textFaint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        trailing()
+    }
+}
+
+/** 行尾状态：未实现标「未实现」，当前项打勾，其余显示 14dp chevron。 */
+@Composable
+private fun NavRowTrailing(spec: ActivitySpec, selected: Boolean) {
+    when {
+        // 未实现：只标 WIP，不给可点击的视觉暗示（不给 ›，也没有跳转）。
+        !spec.implemented -> Text(
+            stringResource(R.string.dest_placeholder),
+            style = NovaText.sectionLabel,
+            color = NovaTheme.colors.textFaint,
+        )
+        selected -> Icon(
+            Icons.Filled.Check,
+            contentDescription = stringResource(R.string.dest_current),
+            tint = NovaTheme.colors.text,
+            modifier = Modifier.size(NovaSize.iconAction),
+        )
+        else -> Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = NovaTheme.colors.textFaint,
+            modifier = Modifier.size(NovaSize.iconChevron),
+        )
     }
 }
 

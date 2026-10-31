@@ -1,7 +1,7 @@
 # 项目状态
 
-**更新日期：** 2026-10-29  
-**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六关卡已按 [05 §3.1 证据台账](android-web-parity/05-roadmap.md#31-p1-证据台账2026-10-24-核对) 逐条核对并**于 2026-10-24 退出**：G5 / G4 / G2 判据齐备，G3 核心判据（并发合并读回、草稿事务提交前后终止进程）通过，G1 通过（降级：HTTPS/WSS 环境受限、迟到 401 留待 P3），G6 通过（范围受限 SD-01）；未满足项 9 条（环境受限 2、留待 P3 7）已全部定性，无悬空缺口（P3 回补：G3-b/c/d 已于 2026-10-25 全部补测通过，G3 关卡无留项，留待 P3 降为 2 条：G1-d 迟到 401 与 G6-b 权限分层）。复刻矩阵 118 条中已回写 **86 条 `已完成`**、其余 **32 条 `未开始`**（口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；逐条状态以 [parity-matrix.csv](android-web-parity/parity-matrix.csv) 为准；2026-10-27 按严格口径回退游戏 10 条，见下「P4-A 矩阵严格口径校正」）；**P2 工程基础已落地，P3（写作链路）已收官，P4-A（游戏）功能切片实现完成但矩阵 0/17 通过（缺 Web 端双端对照，待 P5），P4-B（工作台）已收口，P4-C（共通资源）已收口**：书籍管理（BOK-001…003）、资料库（LOR-001…004）、创作方案（PLN-001·002）、Skills（SKL-001·002）、Agents（DEF-001·002）共 15 条已按 Android 真机证据回写（Web 端同场景对照随 P5，与 BOK/WB 行同口径）；**P4-D（设置与运维）已收口**：设置 14 个 section（SET-001…014）、自动化（AUT-001…004）、消息中心（MSG-001…003）、资源市场与扩展（MKT-001…005）共 26 条真机回写，NAV-001 补到 13/13 并回写；**P1 台账 G6-b（权限分层）随本轮通过**，留待条目只剩 G1-d。  
+**更新日期：** 2026-10-31  
+**阶段：** P0 已完成并退出（GitHub Actions CI 全绿：testDebugUnitTest / lintDebug / assembleDebug + APK 工件）。P1 六关卡已按 [05 §3.1 证据台账](android-web-parity/05-roadmap.md#31-p1-证据台账2026-10-24-核对) 逐条核对并**于 2026-10-24 退出**：G5 / G4 / G2 判据齐备，G3 核心判据（并发合并读回、草稿事务提交前后终止进程）通过，G1 通过（降级：HTTPS/WSS 环境受限、迟到 401 留待 P3），G6 通过（范围受限 SD-01）；未满足项 9 条（环境受限 2、留待 P3 7）已全部定性，无悬空缺口（P3 回补：G3-b/c/d 已于 2026-10-25 全部补测通过，G3 关卡无留项，留待 P3 降为 2 条：G1-d 迟到 401 与 G6-b 权限分层）。复刻矩阵 118 条中已回写 **95 条 `已完成`**、其余 **23 条 `未开始`**（口径见 [01 §8](android-web-parity/01-product-and-parity.md#8-全量完成标准)；逐条状态以 [parity-matrix.csv](android-web-parity/parity-matrix.csv) 为准；2026-10-27 按严格口径回退游戏 10 条，见下「P4-A 矩阵严格口径校正」）；**P2 工程基础已落地，P3（写作链路）已收官，P4-A（游戏）功能切片实现完成但矩阵 0/17 通过（缺 Web 端双端对照，待 P5），P4-B（工作台）已收口，P4-C（共通资源）已收口**：书籍管理（BOK-001…003）、资料库（LOR-001…004）、创作方案（PLN-001·002）、Skills（SKL-001·002）、Agents（DEF-001·002）共 15 条已按 Android 真机证据回写（Web 端同场景对照随 P5，与 BOK/WB 行同口径）；**P4-D（设置与运维）已收口**：设置 14 个 section（SET-001…014）、自动化（AUT-001…004）、消息中心（MSG-001…003）、资源市场与扩展（MKT-001…005）共 26 条真机回写，NAV-001 补到 13/13 并回写；**P1 台账 G6-b（权限分层）随本轮通过**，留待条目只剩 G1-d。  
 **产品实现状态：** P1 原型链路可用（连接认证 / 编辑器 / 游戏流 / 写作流 / 终端）；目标形态的公共界面（单 Activity 导航、左右抽屉、DesignTokens、主题与中英文）和业务页面尚未实现。
 
 ## 当前基线
@@ -251,6 +251,8 @@
 
 - 2026-10-30 代码审查修复（AUTH-006 / NAV-002 / NAV-010 收尾）：新增 `core/persistence/DraftKey` 作为草稿身份的单点构造，`EditorSession` 与 `FileSaveCoordinator` 共用（审查发现协调器原先自己拼 `projectId\0path`，会让「保存失败留下的草稿」以无作用域 key 落盘、再被其它服务器通过 legacy 回退迁移走，隔离实际失效）；`open` 在新 key 命中时清掉残留旧 key；`bindClient` 先 `cancelInFlight()` 再换 session（旧 client 的防抖 PUT 不再继续）；`ServerKey.host` 归一为小写。`AgentScreen` 的「首次贴底」改为「已在顶部才贴底」，否则切页返回会立刻覆盖恢复的滚动位置；`lastContentLen` 初值取当前正文长度避免误判流式增长。编辑器 `compactHeader` 阈值 400→440dp（英文文案更长），模式行只在窄屏才横向滚动（宽屏保持撤销/重做右对齐），撤销/重做加 `overflow = Ellipsis`。`EditorSessionTest` 增到 7 例（含保存路径写新 key、新 key 优先清旧 key、B 不留迁移产物）。复测：A 上断网保存失败的草稿在切走并换服务器再切回后完好；B 侧同文件对照因当前书籍上下文不一致未能构造（如实登记在 AUTH-006 `gap_or_decision` 与证据文件）。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
 
+- 2026-10-31 **P5 第一步：`DesignTokens` 落地 + 抽屉对齐**（真机 390/320dp，深浅两色）：新增 `ui/theme/DesignTokens.kt`——`NovaColors`（基线 `--nova-*` 与 `--primary` 换算成 sRGB，深浅两套）、`NovaSpacing` / `NovaRadius` / `NovaSize` / `NovaText`（字号行高阶梯）、`novaDrawerWidth` / `novaDrawerShape`；`NovaraTheme` 用 token 生成 `ColorScheme` / `Typography` / `Shapes` 并以 `LocalNovaColors` 提供 `NovaTheme.colors`，删除原先手挑的 `Color.kt`。抽屉与右抽屉改用 token：宽度 `min(可用宽度 − 32dp, 384dp/512dp)`、内容侧 24dp 圆角、标题栏 56dp + 17sp/600 + 左侧 20dp 返回箭头、分组标签 12sp/500、创作组两列 58dp 入口卡（选中 `primary` 反色）、工具/设置组整组卡片 52dp 行高 + 1px 分隔线（左缩进 48dp）+ 14dp chevron；抽屉标题与工具组标签对齐基线文案（导航菜单 / 工具与资料）。真机同屏读数：390dp 抽屉 358dp、320dp 288dp、相邻行中心距 196px@590dpi = 53.1dp（52 + 1px 分隔线），与 Web 358/288/52 一致；证据 [p5-tokens](evidence/p5-tokens/xiaomi-14-pro/result.md)（3 张截图 + 逐项差值）。**未做**：顶栏 / 输入框 / 按钮共用件（VG-005…009）、抽屉 IA（当前作品下拉卡、命令/消息快捷动作、统计入口，VG-011…013）、抽屉 `box-shadow`（VG-010）；均已写进 [09](android-web-parity/09-visual-gap-backlog.md) 状态列。`testDebugUnitTest / lintDebug / assembleDebug` 全绿。
+
 ## 已完成（退出条件满足）
 
 | 项目 | 结论 | 证据 / 遗留 |
@@ -292,7 +294,7 @@
 4. **P3 需回补的 P1 台账条目：** 只剩 G1-d 迟到 401 端到端（阻塞点：当前 UI 在 Checking 期间地址与连接按钮不可用，构造不出「登录在途时 status 返回」，需先补可并发的入口，工具 `tools/g3d_slow_proxy.py --status-delay-ms` 已就绪）。G2-c 全节点与 G4-d 跨包升级安装已于 2026-10-26 补测通过，G3 关卡（G3-b/c/d）已于 2026-10-25 全部补齐，**G6-b 权限分层已于 2026-10-29 随 P4-D 通过**（设置分层 + 远程/本机分层两层证据）。补齐并验收后再更新对应矩阵行。
 5. **遗留（不阻塞阶段推进）：** 其余未回写的首批场景（见矩阵 `未开始` 行）仍需按 [01 §4](android-web-parity/01-product-and-parity.md#4-每个页面必须展开的状态) 逐字段展开；P0-02 数据快照与复现步骤待补。
 6. **P4 之后的功能验收轮（2026-10-30，已收口）**：NAV-003/008（边缘手势）、NAV-004/006/009（抽屉交互）、NAV-010（自适应）、AUTH-001/007（连接页四态）、AUTH-006（服务器作用域隔离）共 9 条真机回写；NAV-002 只缺「长内容滚动位置」的逐屏对照，按严格口径保持 `未开始`（实现已就绪）；AUTH-004 仍缺可并发入口（阻塞点已写明在该行 `gap_or_decision`）。
-7. **下一步：P5（逐屏 1:1 视觉对齐）**，输入是 [09 视觉与交互差异清单](android-web-parity/09-visual-gap-backlog.md)：先落 `ui/theme/DesignTokens.kt`（颜色/圆角/间距/字号/行高/图标尺寸的唯一来源），再把抽屉、顶栏、按钮、输入四类共用件换成 token 并逐屏比对（Web 390×844 真实截图 vs 真机 390dp 截图），同时补 GAM-001…017 的双端对照与 SYS-001…004。
+7. **P5（逐屏 1:1 视觉对齐）进行中**，输入是 [09 视觉与交互差异清单](android-web-parity/09-visual-gap-backlog.md)：`DesignTokens` 已落地、抽屉与右抽屉已对齐（2026-10-31，VG-001…004）。下一步顺序建议：①`ui/components` 下新增 `NovaTopBar` / `NovaTextField` / `NovaButton`（只从 token 取值），逐屏替换顶栏与表单（VG-005…009；输入框 32px vs 44dp 触控目标需先定口径）；②抽屉信息架构对齐（当前作品下拉卡、命令/消息快捷动作、统计入口，VG-011…013）；③补齐各屏「Web 390×844 截图 / 真机 390dp 截图」成对证据；④GAM-001…017 的双端对照与 SYS-001…004。
 
 ## 状态记录规则
 

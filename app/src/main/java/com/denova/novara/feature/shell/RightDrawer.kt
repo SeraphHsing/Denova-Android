@@ -7,11 +7,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -49,6 +51,13 @@ import com.denova.novara.feature.chapters.ChapterRow
 import com.denova.novara.feature.chapters.ChaptersUiState
 import com.denova.novara.feature.project.ProjectDirectoryUiState
 import com.denova.novara.feature.versions.VersionsUiState
+import com.denova.novara.ui.theme.NovaDrawerSide
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaText
+import com.denova.novara.ui.theme.NovaTheme
+import com.denova.novara.ui.theme.novaDrawerShape
+import com.denova.novara.ui.theme.novaDrawerWidth
 
 /**
  * 右项目 / 控制台抽屉（01 §3）：从右侧滑出，内容按当前页面提供——
@@ -60,11 +69,14 @@ fun RightDrawer(
     onDismiss: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    Box(Modifier.fillMaxSize()) {
+    // VG-001/004/010：右抽屉宽度 = min(可用宽度 - 32dp, 512dp)，内容侧（左侧）24dp 圆角，
+    // 背景用基线 `--nova-bg`、scrim 单独一层；标题栏固定 56dp（与左抽屉同一份 token）。
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val drawerWidth = novaDrawerWidth(maxWidth, NovaDrawerSide.END)
         Box(
             Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.4f))
+                .background(NovaTheme.colors.scrim)
                 .clickable(onClick = onDismiss),
         )
         AnimatedVisibility(
@@ -76,13 +88,28 @@ fun RightDrawer(
             Surface(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(320.dp),
-                tonalElevation = 3.dp,
+                    .width(drawerWidth),
+                shape = novaDrawerShape(NovaDrawerSide.END),
+                color = NovaTheme.colors.bg,
+                tonalElevation = 0.dp,
             ) {
-                Column(Modifier.fillMaxSize().padding(16.dp)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium)
-                    HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                    content()
+                Column(Modifier.fillMaxSize()) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = NovaSize.drawerHeader)
+                            .padding(horizontal = NovaSize.drawerHeaderPadding),
+                        contentAlignment = Alignment.CenterStart,
+                    ) {
+                        Text(title, style = NovaText.drawerTitle, color = NovaTheme.colors.text)
+                    }
+                    Column(
+                        Modifier
+                            .weight(1f)
+                            .padding(NovaSpacing.lg),
+                    ) {
+                        content()
+                    }
                 }
             }
         }

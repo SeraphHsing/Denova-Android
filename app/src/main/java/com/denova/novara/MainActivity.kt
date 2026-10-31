@@ -9,6 +9,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.systemGestureExclusion
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -98,7 +99,12 @@ import com.denova.novara.feature.terminal.TerminalViewModel
 import com.denova.novara.feature.workbench.WorkbenchScreen
 import com.denova.novara.feature.workbench.WorkbenchTreeContent
 import com.denova.novara.feature.workbench.WorkbenchViewModel
+import com.denova.novara.ui.theme.NovaDrawerSide
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaTheme
 import com.denova.novara.ui.theme.NovaraTheme
+import com.denova.novara.ui.theme.novaDrawerShape
+import com.denova.novara.ui.theme.novaDrawerWidth
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -228,7 +234,7 @@ class MainActivity : AppCompatActivity() {
                 val swipeModifier = if (state is ConnectionUiState.Authenticated) {
                     Modifier.drawerEdgeSwipe(
                         openSide = openSide,
-                        headerHeight = 56.dp + statusBarTop,
+                        headerHeight = NovaSize.drawerHeader + statusBarTop,
                         onOpen = { side ->
                             when (side) {
                                 DrawerSide.LEFT -> openLeftDrawer()
@@ -295,85 +301,98 @@ class MainActivity : AppCompatActivity() {
                                 // 会抢走页面横向控件并让垂直阅读误开抽屉（NAV-008 按基线改由 drawerEdgeSwipe 判定）。
                                 gesturesEnabled = false,
                                 drawerContent = {
-                                    ModalDrawerSheet {
-                                        AppDrawer(
-                                            currentRoute = currentRoute,
-                                            darkTheme = darkTheme,
-                                            onToggleDarkTheme = { settingsViewModel.toggleDarkTheme() },
-                                            language = language,
-                                            onSelectLanguage = { settingsViewModel.setLanguage(it) },
-                                            books = bookState.books,
-                                            currentProjectId = currentProjectId.ifBlank { null },
-                                            onSelectBook = { book ->
-                                                scope.launch {
-                                                    // 对齐 Web onBeforeWorkspaceSwitch：先 flush 编辑器草稿
-                                                    if (!editorViewModel.flush()) {
-                                                        DenovaLog.w("BookShelf", "flush failed, abort switch")
-                                                        return@launch
+                                    // VG-001/004：宽度 = min(可用宽度 - 32dp, 384dp)，内容侧 24dp 圆角，
+                                    // 与基线 `.nova-mobile-sheet` 的 `calc(100% - 2rem) / max-width: 24rem` 一致。
+                                    BoxWithConstraints {
+                                        ModalDrawerSheet(
+                                            modifier = Modifier.width(
+                                                novaDrawerWidth(maxWidth, NovaDrawerSide.START),
+                                            ),
+                                            drawerShape = novaDrawerShape(NovaDrawerSide.START),
+                                            drawerContainerColor = NovaTheme.colors.bg,
+                                            drawerContentColor = NovaTheme.colors.text,
+                                            drawerTonalElevation = 0.dp,
+                                        ) {
+                                            AppDrawer(
+                                                onClose = { closeLeftDrawer() },
+                                                currentRoute = currentRoute,
+                                                darkTheme = darkTheme,
+                                                onToggleDarkTheme = { settingsViewModel.toggleDarkTheme() },
+                                                language = language,
+                                                onSelectLanguage = { settingsViewModel.setLanguage(it) },
+                                                books = bookState.books,
+                                                currentProjectId = currentProjectId.ifBlank { null },
+                                                onSelectBook = { book ->
+                                                    scope.launch {
+                                                        // 对齐 Web onBeforeWorkspaceSwitch：先 flush 编辑器草稿
+                                                        if (!editorViewModel.flush()) {
+                                                            DenovaLog.w("BookShelf", "flush failed, abort switch")
+                                                            return@launch
+                                                        }
+                                                        // 服务端切换成功后才更新客户端当前项目
+                                                        if (bookShelfViewModel.switch(book)) {
+                                                            currentProjectId = book.projectId
+                                                            // 每个项目各自一份文件标签桶（WRI-003）。
+                                                            editorViewModel.setProject(book.projectId)
+                                                            leftDrawerOpen = false
+                                                            drawerState.close()
+                                                        }
                                                     }
-                                                    // 服务端切换成功后才更新客户端当前项目
-                                                    if (bookShelfViewModel.switch(book)) {
-                                                        currentProjectId = book.projectId
-                                                        // 每个项目各自一份文件标签桶（WRI-003）。
-                                                        editorViewModel.setProject(book.projectId)
-                                                        leftDrawerOpen = false
-                                                        drawerState.close()
+                                                },
+                                                onOpenDebug = if (BuildConfig.DEBUG) {
+                                                    // 抽屉入口先关闭抽屉再打开面板，避免面板被抽屉遮住。
+                                                    {
+                                                        closeLeftDrawer()
+                                                        showDebug = true
                                                     }
-                                                }
-                                            },
-                                            onOpenDebug = if (BuildConfig.DEBUG) {
-                                                // 抽屉入口先关闭抽屉再打开面板，避免面板被抽屉遮住。
-                                                {
+                                                } else {
+                                                    null
+                                                },
+                                                onOpenMessages = {
                                                     closeLeftDrawer()
-                                                    showDebug = true
-                                                }
-                                            } else {
-                                                null
-                                            },
-                                            onOpenMessages = {
-                                                closeLeftDrawer()
-                                                navController.navigate("messages") {
-                                                    launchSingleTop = true
-                                                }
-                                            },
-                                            unreadMessages = messageUnread,
-                                            // WRI-001：没有书先引导建书；刚建完进入「填第一章请求」步。
-                                            onboardingStep = when {
-                                                bookState.books.isEmpty() -> OnboardingStep.BOOK
-                                                bookState.justCreatedName.isNotEmpty() -> OnboardingStep.AGENT
-                                                else -> null
-                                            },
-                                            onSkipOnboarding = { bookShelfViewModel.clearJustCreated() },
-                                            onCreateBook = {
-                                                closeLeftDrawer()
-                                                showCreateBook = true
-                                            },
-                                            onFillFirstPrompt = {
-                                                val book = bookState.justCreatedName
-                                                bookShelfViewModel.clearJustCreated()
-                                                closeLeftDrawer()
-                                                val encoded = android.net.Uri.encode(OnboardingLogic.firstChapterPrompt(book).resolve(applicationContext))
-                                                navController.navigate("agent?projectId=$currentProjectId&filePath=&prompt=$encoded")
-                                            },
-                                            onNavigate = { destination ->
-                                                closeLeftDrawer()
-                                                navController.navigate(destination.route) {
-                                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                                    launchSingleTop = true
-                                                    restoreState = true
-                                                }
-                                            },
-                                            activityItems = ActivityNav.sort(order = activityOrder),
-                                            onMoveActivity = { id, delta ->
-                                                activityOrder = ActivityNav.move(activityOrder, id, delta)
-                                                DenovaLog.d("NavOrder", "move id=$id delta=$delta")
-                                                scope.launch { navPrefs.setActivityOrder(activityOrder) }
-                                            },
-                                            onResetActivityOrder = {
-                                                activityOrder = ActivityNav.DEFAULT_ORDER
-                                                scope.launch { navPrefs.setActivityOrder(ActivityNav.DEFAULT_ORDER) }
-                                            },
-                                        )
+                                                    navController.navigate("messages") {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                unreadMessages = messageUnread,
+                                                // WRI-001：没有书先引导建书；刚建完进入「填第一章请求」步。
+                                                onboardingStep = when {
+                                                    bookState.books.isEmpty() -> OnboardingStep.BOOK
+                                                    bookState.justCreatedName.isNotEmpty() -> OnboardingStep.AGENT
+                                                    else -> null
+                                                },
+                                                onSkipOnboarding = { bookShelfViewModel.clearJustCreated() },
+                                                onCreateBook = {
+                                                    closeLeftDrawer()
+                                                    showCreateBook = true
+                                                },
+                                                onFillFirstPrompt = {
+                                                    val book = bookState.justCreatedName
+                                                    bookShelfViewModel.clearJustCreated()
+                                                    closeLeftDrawer()
+                                                    val encoded = android.net.Uri.encode(OnboardingLogic.firstChapterPrompt(book).resolve(applicationContext))
+                                                    navController.navigate("agent?projectId=$currentProjectId&filePath=&prompt=$encoded")
+                                                },
+                                                onNavigate = { destination ->
+                                                    closeLeftDrawer()
+                                                    navController.navigate(destination.route) {
+                                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                                        launchSingleTop = true
+                                                        restoreState = true
+                                                    }
+                                                },
+                                                activityItems = ActivityNav.sort(order = activityOrder),
+                                                onMoveActivity = { id, delta ->
+                                                    activityOrder = ActivityNav.move(activityOrder, id, delta)
+                                                    DenovaLog.d("NavOrder", "move id=$id delta=$delta")
+                                                    scope.launch { navPrefs.setActivityOrder(activityOrder) }
+                                                },
+                                                onResetActivityOrder = {
+                                                    activityOrder = ActivityNav.DEFAULT_ORDER
+                                                    scope.launch { navPrefs.setActivityOrder(ActivityNav.DEFAULT_ORDER) }
+                                                },
+                                            )
+                                        }
                                     }
                                 },
                             ) {
