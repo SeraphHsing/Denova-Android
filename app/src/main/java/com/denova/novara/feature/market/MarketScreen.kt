@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaStroke
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.market.MarketLogic
 import com.denova.novara.core.network.DenovaClient
@@ -92,7 +93,7 @@ private fun MarketContent(
                         Modifier
                             .size(NovaSize.iconAction)
                             .padding(NovaSpacing.xxs),
-                        strokeWidth = 2.dp,
+                        strokeWidth = NovaStroke.thick,
                     )
                 }
             },
@@ -102,18 +103,18 @@ private fun MarketContent(
                 it.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xxs),
             )
         }
         state.notice?.let {
             Text(
                 it.resolve(),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xxs),
             )
         }
 
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm), horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             TabChip(MarketTab.CATALOG, R.string.market_tab_catalog, state, viewModel)
             TabChip(MarketTab.INSTALLED, R.string.market_tab_installed, state, viewModel)
             TabChip(MarketTab.RUNTIME, R.string.market_tab_runtime, state, viewModel)
@@ -156,12 +157,12 @@ private fun CatalogList(state: MarketUiState, viewModel: MarketViewModel, langua
         value = state.query,
         onValueChange = viewModel::setQuery,
         label = stringResource(R.string.market_search),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
         singleLine = true,
     )
     Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg),
+        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -181,7 +182,7 @@ private fun CatalogList(state: MarketUiState, viewModel: MarketViewModel, langua
         Text(
             stringResource(R.string.market_empty),
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(NovaSpacing.lg),
         )
         return
     }
@@ -191,7 +192,7 @@ private fun CatalogList(state: MarketUiState, viewModel: MarketViewModel, langua
                 Text(
                     stringResource(R.string.market_group, kind, entries.size),
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = NovaSpacing.lg, end = NovaSpacing.lg, top = NovaSpacing.md, bottom = NovaSpacing.xs),
                 )
             }
             items(entries, key = { "$kind:${it.id}" }) { entry ->
@@ -203,7 +204,7 @@ private fun CatalogList(state: MarketUiState, viewModel: MarketViewModel, langua
 
 @Composable
 private fun MarketEntryRow(entry: MarketEntry, language: String, onOpen: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(
@@ -219,14 +220,14 @@ private fun MarketEntryRow(entry: MarketEntry, language: String, onOpen: () -> U
             }
             TextButton(onClick = onOpen) { Text(stringResource(R.string.market_open)) }
         }
-        HorizontalDivider(Modifier.padding(top = 8.dp))
+        HorizontalDivider(Modifier.padding(top = NovaSpacing.sm))
     }
 }
 
 @Composable
 private fun CatalogDetail(state: MarketUiState, viewModel: MarketViewModel, language: String) {
     val entry = state.selectedEntry ?: return
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(NovaSpacing.lg)) {
         Text(
             MarketLogic.localized(entry.name, language).ifBlank { entry.id },
             style = MaterialTheme.typography.titleMedium,
@@ -238,7 +239,7 @@ private fun CatalogDetail(state: MarketUiState, viewModel: MarketViewModel, lang
             style = MaterialTheme.typography.labelSmall,
         )
         if (entry.tags.isNotEmpty()) {
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs), modifier = Modifier.padding(vertical = NovaSpacing.chip)) {
                 items(entry.tags) { tag ->
                     Text("#$tag", style = MaterialTheme.typography.labelSmall)
                 }
@@ -247,14 +248,14 @@ private fun CatalogDetail(state: MarketUiState, viewModel: MarketViewModel, lang
         Text(
             MarketLogic.localized(entry.description, language),
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(top = 8.dp),
+            modifier = Modifier.padding(top = NovaSpacing.sm),
         )
         val usage = MarketLogic.localized(entry.usage, language)
         if (usage.isNotBlank()) {
             Text(
                 stringResource(R.string.market_usage) + ": " + usage,
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(top = 8.dp),
+                modifier = Modifier.padding(top = NovaSpacing.sm),
             )
         }
         if (entry.author.isNotBlank()) {
@@ -267,9 +268,9 @@ private fun CatalogDetail(state: MarketUiState, viewModel: MarketViewModel, lang
             stringResource(R.string.market_local_only),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.error,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = NovaSpacing.md),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             // 安装 / 预览属本机限定动作：远程客户端不提供入口（MKT-003 的「禁用」表现）。
             TextButton(onClick = {}, enabled = false) { Text(stringResource(R.string.market_install)) }
             TextButton(onClick = { viewModel.clearEntry() }) { Text(stringResource(R.string.back)) }
@@ -283,7 +284,7 @@ private fun InstalledList(state: MarketUiState, viewModel: MarketViewModel) {
         Text(
             stringResource(R.string.market_installed_empty),
             style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(NovaSpacing.lg),
         )
         return
     }
@@ -293,7 +294,7 @@ private fun InstalledList(state: MarketUiState, viewModel: MarketViewModel) {
                 Text(
                     stringResource(R.string.market_project, project.takeLast(8), list.size),
                     style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = NovaSpacing.lg, end = NovaSpacing.lg, top = NovaSpacing.md, bottom = NovaSpacing.xs),
                 )
             }
             items(list, key = { it.installationId }) { installation ->
@@ -305,7 +306,7 @@ private fun InstalledList(state: MarketUiState, viewModel: MarketViewModel) {
 
 @Composable
 private fun InstallationRow(installation: Installation, viewModel: MarketViewModel) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(installation.label, style = MaterialTheme.typography.bodyMedium)
@@ -322,14 +323,14 @@ private fun InstallationRow(installation: Installation, viewModel: MarketViewMod
                 Text(stringResource(R.string.market_open))
             }
         }
-        HorizontalDivider(Modifier.padding(top = 8.dp))
+        HorizontalDivider(Modifier.padding(top = NovaSpacing.sm))
     }
 }
 
 @Composable
 private fun InstalledDetail(state: MarketUiState, viewModel: MarketViewModel) {
     val installation = state.selectedInstallation ?: return
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(NovaSpacing.lg)) {
         Text(installation.label, style = MaterialTheme.typography.titleMedium)
         Text(
             listOf(installation.`package`.id, installation.installationId.take(8))
@@ -343,7 +344,7 @@ private fun InstalledDetail(state: MarketUiState, viewModel: MarketViewModel) {
                     .filter { it.isNotBlank() }
                     .joinToString(" · "),
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(top = 6.dp),
+            modifier = Modifier.padding(top = NovaSpacing.chip),
         )
         Text(
             stringResource(
@@ -364,9 +365,9 @@ private fun InstalledDetail(state: MarketUiState, viewModel: MarketViewModel) {
         Text(
             stringResource(R.string.market_update_mode),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = NovaSpacing.md),
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             items(MarketLogic.UPDATE_MODES) { mode ->
                 FilterChip(
                     selected = installation.updateMode == mode,
@@ -380,7 +381,7 @@ private fun InstalledDetail(state: MarketUiState, viewModel: MarketViewModel) {
         Text(
             stringResource(R.string.market_backups, state.backups.size),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = NovaSpacing.md),
         )
         if (state.backups.isEmpty()) {
             Text(stringResource(R.string.market_backups_empty), style = MaterialTheme.typography.labelSmall)
@@ -393,7 +394,7 @@ private fun InstalledDetail(state: MarketUiState, viewModel: MarketViewModel) {
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 12.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip), modifier = Modifier.padding(top = NovaSpacing.md)) {
             TextButton(
                 onClick = { viewModel.checkInstallation(installation.installationId) },
                 enabled = !state.busy,
@@ -408,7 +409,7 @@ private fun InstalledDetail(state: MarketUiState, viewModel: MarketViewModel) {
 
 @Composable
 private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(NovaSpacing.lg)) {
         Text(stringResource(R.string.market_program_update), style = MaterialTheme.typography.titleSmall)
         val status = state.updateStatus
         val check = state.updateCheck
@@ -438,7 +439,7 @@ private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
         Text(
             stringResource(R.string.market_plugin_pages, state.pluginPages.size),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = NovaSpacing.md),
         )
         if (state.pluginPages.isEmpty()) {
             Text(stringResource(R.string.market_plugin_pages_empty), style = MaterialTheme.typography.labelSmall)
@@ -454,7 +455,7 @@ private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
         Text(
             stringResource(R.string.market_runtimes, state.runtimes.size),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = NovaSpacing.md),
         )
         if (state.runtimes.isEmpty()) {
             Text(stringResource(R.string.market_runtimes_empty), style = MaterialTheme.typography.labelSmall)
@@ -466,14 +467,14 @@ private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
         Text(
             stringResource(R.string.market_plugin_page_note),
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(top = 12.dp),
+            modifier = Modifier.padding(top = NovaSpacing.md),
         )
 
         // 项目级扩展配置：基线里少数**远程可写**的扩展设置（禁用插件 + 模型映射）。
         Text(
             stringResource(R.string.market_project_extensions, state.projectId.takeLast(8).ifBlank { "-" }),
             style = MaterialTheme.typography.titleSmall,
-            modifier = Modifier.padding(top = 16.dp),
+            modifier = Modifier.padding(top = NovaSpacing.lg),
         )
         val config = state.extensionConfig
         if (config == null) {
@@ -483,7 +484,7 @@ private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
                     value = state.projectInput,
                     onValueChange = viewModel::setProjectInput,
                     label = stringResource(R.string.market_project_id),
-                    modifier = Modifier.weight(1f).padding(vertical = 4.dp),
+                    modifier = Modifier.weight(1f).padding(vertical = NovaSpacing.xs),
                     singleLine = true,
                 )
                 TextButton(onClick = { viewModel.useProjectInput() }) {
@@ -499,7 +500,7 @@ private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
             if (state.disabledDraft.isEmpty()) {
                 Text(stringResource(R.string.market_none), style = MaterialTheme.typography.labelSmall)
             } else {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                     items(state.disabledDraft) { id ->
                         FilterChip(
                             selected = true,
@@ -514,7 +515,7 @@ private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
                     value = state.newDisabled,
                     onValueChange = viewModel::setNewDisabled,
                     label = stringResource(R.string.market_add_disabled),
-                    modifier = Modifier.weight(1f).padding(vertical = 4.dp),
+                    modifier = Modifier.weight(1f).padding(vertical = NovaSpacing.xs),
                     singleLine = true,
                 )
                 TextButton(onClick = { viewModel.addDisabled() }) { Text(stringResource(R.string.market_add)) }
@@ -523,7 +524,7 @@ private fun RuntimePanel(state: MarketUiState, viewModel: MarketViewModel) {
                 value = state.modelsText,
                 onValueChange = viewModel::setModelsText,
                 label = stringResource(R.string.market_models_json),
-                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs),
                 textStyle = MaterialTheme.typography.bodySmall,
                 minLines = 2,
                 maxLines = 6,

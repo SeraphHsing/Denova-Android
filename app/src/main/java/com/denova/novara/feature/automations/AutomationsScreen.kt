@@ -35,6 +35,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaStroke
 import com.denova.novara.core.automations.AutomationDraft
 import com.denova.novara.core.automations.AutomationEditor
 import com.denova.novara.core.i18n.resolve
@@ -88,15 +90,15 @@ private fun AutomationsContent(
                 if (state.loading || state.busy) {
                     CircularProgressIndicator(
                         Modifier.size(NovaSize.iconAction),
-                        strokeWidth = 2.dp,
+                        strokeWidth = NovaStroke.thick,
                     )
                 }
             },
         )
         // 动作行单独一行并横向可滚：窄屏（320）下按钮不重叠。
         LazyRow(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs),
         ) {
             item {
                 TextButton(onClick = { viewModel.startCreate() }) {
@@ -131,8 +133,8 @@ private fun AutomationsContent(
         // 项目作用域（目录按项目分组；切项目即切任务与收件箱）。
         if (state.groups.size > 1) {
             LazyRow(
-                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
             ) {
                 items(state.groups.filter { it.projectId.isNotBlank() }) { group ->
                     FilterChip(
@@ -148,24 +150,24 @@ private fun AutomationsContent(
                 it.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xxs),
             )
         }
         state.notice?.let {
             Text(
                 it.resolve(),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xxs),
             )
         }
         if (state.conflict) {
             Text(
                 stringResource(R.string.automation_conflict_hint),
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(horizontal = 16.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg),
             )
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm), horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             FilterChip(
                 selected = state.tab == AutomationTab.TASKS,
                 onClick = { viewModel.selectTab(AutomationTab.TASKS) },
@@ -220,7 +222,7 @@ private fun TaskList(state: AutomationsUiState, viewModel: AutomationsViewModel)
     if (state.tasks.isEmpty()) {
         Text(
             stringResource(R.string.automation_empty),
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(NovaSpacing.lg),
             style = MaterialTheme.typography.bodySmall,
         )
         return
@@ -235,7 +237,7 @@ private fun TaskList(state: AutomationsUiState, viewModel: AutomationsViewModel)
 @Composable
 private fun TaskRow(task: AutomationTask, onOpen: () -> Unit) {
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.tab),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -251,7 +253,7 @@ private fun TaskRow(task: AutomationTask, onOpen: () -> Unit) {
         task.lastRun?.takeIf { it.summary.isNotBlank() }?.let {
             Text(it.summary, style = MaterialTheme.typography.labelSmall)
         }
-        HorizontalDivider(Modifier.padding(top = 8.dp))
+        HorizontalDivider(Modifier.padding(top = NovaSpacing.sm))
     }
 }
 
@@ -260,7 +262,7 @@ private fun InboxList(state: AutomationsUiState, viewModel: AutomationsViewModel
     if (state.inbox.isEmpty()) {
         Text(
             stringResource(R.string.automation_inbox_empty),
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(NovaSpacing.lg),
             style = MaterialTheme.typography.bodySmall,
         )
         return
@@ -273,7 +275,7 @@ private fun InboxList(state: AutomationsUiState, viewModel: AutomationsViewModel
 @Composable
 private fun InboxRow(item: AutomationInboxItem, viewModel: AutomationsViewModel) {
     val unreadLabel = stringResource(R.string.automation_inbox_unread)
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.sm)) {
         Text(
             item.title.ifBlank { item.id },
             style = MaterialTheme.typography.bodyMedium,
@@ -288,7 +290,7 @@ private fun InboxRow(item: AutomationInboxItem, viewModel: AutomationsViewModel)
         if (item.actionError.isNotBlank()) {
             Text(item.actionError, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
             TextButton(
                 onClick = { viewModel.inboxAction(item, InboxAction.READ) },
                 enabled = item.readAt.isBlank(),
@@ -318,7 +320,7 @@ private fun EditorPanel(state: AutomationsUiState, viewModel: AutomationsViewMod
             item("project") {
                 SectionTitle(stringResource(R.string.automation_field_project))
                 val options = state.groups.map { it.projectId }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(horizontal = 16.dp)) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip), modifier = Modifier.padding(horizontal = NovaSpacing.lg)) {
                     items(options) { id ->
                         FilterChip(
                             selected = draft.projectId == id,
@@ -340,8 +342,8 @@ private fun EditorPanel(state: AutomationsUiState, viewModel: AutomationsViewMod
         item("enabled") {
             SectionTitle(stringResource(R.string.automation_field_enabled))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg),
             ) {
                 FilterChip(
                     selected = draft.enabled,
@@ -359,8 +361,8 @@ private fun EditorPanel(state: AutomationsUiState, viewModel: AutomationsViewMod
             item("template") {
                 SectionTitle(stringResource(R.string.automation_field_template))
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
+                    modifier = Modifier.padding(horizontal = NovaSpacing.lg),
                 ) {
                     items(state.templates) { template ->
                         FilterChip(
@@ -375,8 +377,8 @@ private fun EditorPanel(state: AutomationsUiState, viewModel: AutomationsViewMod
         item("session") {
             SectionTitle(stringResource(R.string.automation_field_session))
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
+                modifier = Modifier.padding(horizontal = NovaSpacing.lg),
             ) {
                 AutomationEditor.SESSION_STRATEGIES.forEach { strategy ->
                     FilterChip(
@@ -409,7 +411,7 @@ private fun EditorPanel(state: AutomationsUiState, viewModel: AutomationsViewMod
                 value = draft.prompt,
                 onValueChange = viewModel::setPrompt,
                 label = stringResource(R.string.automation_field_prompt),
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
                 minLines = 3,
                 maxLines = 8,
             )
@@ -417,7 +419,7 @@ private fun EditorPanel(state: AutomationsUiState, viewModel: AutomationsViewMod
         item("schedule") { ScheduleEditor(draft, state, viewModel) }
         item("triggers") { TriggersEditor(draft, state, viewModel) }
         item("runs") { RecentRuns(state.selected) }
-        item("footer") { Text("", Modifier.padding(16.dp)) }
+        item("footer") { Text("", Modifier.padding(NovaSpacing.lg)) }
     }
 }
 
@@ -430,8 +432,8 @@ private fun ScheduleEditor(
     val schedule = draft.schedule
     SectionTitle(stringResource(R.string.automation_field_schedule))
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
+        modifier = Modifier.padding(horizontal = NovaSpacing.lg),
     ) {
         items(AutomationEditor.SCHEDULE_KINDS) { kind ->
             FilterChip(
@@ -443,8 +445,8 @@ private fun ScheduleEditor(
     }
     if (schedule.kind != "manual") {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm),
+            modifier = Modifier.padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
         ) {
             NumberField(stringResource(R.string.automation_field_hour), schedule.hour, 0, 23) {
                 viewModel.setSchedule(schedule.copy(hour = it))
@@ -476,7 +478,7 @@ private fun ScheduleEditor(
             AutomationEditor.cronOf(schedule).ifBlank { "-" },
         ),
         style = MaterialTheme.typography.labelSmall,
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(horizontal = NovaSpacing.lg),
     )
     state.fieldErrors["schedule"]?.let { ErrorText(it.resolve()) }
 }
@@ -489,8 +491,8 @@ private fun TriggersEditor(
 ) {
     SectionTitle(stringResource(R.string.automation_field_triggers))
     LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier.padding(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
+        modifier = Modifier.padding(horizontal = NovaSpacing.lg),
     ) {
         items(AutomationEditor.TRIGGER_TYPES) { type ->
             FilterChip(
@@ -501,7 +503,7 @@ private fun TriggersEditor(
         }
     }
     draft.triggers.forEachIndexed { index, trigger ->
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.chip)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     stringResource(R.string.automation_trigger_index, index + 1),
@@ -512,7 +514,7 @@ private fun TriggersEditor(
                     Text(stringResource(R.string.delete))
                 }
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                 items(AutomationEditor.TRIGGER_TYPES) { type ->
                     FilterChip(
                         selected = trigger.type == type,
@@ -521,7 +523,7 @@ private fun TriggersEditor(
                     )
                 }
             }
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                 items(AutomationEditor.NOTIFY_POLICIES) { policy ->
                     FilterChip(
                         selected = trigger.notifyPolicy == policy,
@@ -571,7 +573,7 @@ private fun TriggersEditor(
         Text(
             stringResource(R.string.automation_trigger_empty),
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = NovaSpacing.lg),
         )
     }
 }
@@ -584,12 +586,12 @@ private fun RecentRuns(task: AutomationTask?) {
         Text(
             stringResource(R.string.automation_runs_empty),
             style = MaterialTheme.typography.labelSmall,
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(horizontal = NovaSpacing.lg),
         )
         return
     }
     runs.forEach { run ->
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs)) {
             Text(
                 AutomationEditor.runStatusText(run.status).resolve() + " · " + run.startedAt,
                 style = MaterialTheme.typography.labelSmall,
@@ -609,7 +611,7 @@ private fun SectionTitle(text: String) {
     Text(
         text,
         style = MaterialTheme.typography.titleSmall,
-        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+        modifier = Modifier.padding(start = NovaSpacing.lg, end = NovaSpacing.lg, top = NovaSpacing.md, bottom = NovaSpacing.xs),
     )
 }
 
@@ -619,7 +621,7 @@ private fun ErrorText(text: String) {
         text,
         color = MaterialTheme.colorScheme.error,
         style = MaterialTheme.typography.labelSmall,
-        modifier = Modifier.padding(horizontal = 16.dp),
+        modifier = Modifier.padding(horizontal = NovaSpacing.lg),
     )
 }
 
@@ -629,7 +631,7 @@ private fun LabeledField(label: String, value: String, onChange: (String) -> Uni
         value = value,
         onValueChange = onChange,
         label = label,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
         singleLine = true,
     )
 }
@@ -649,7 +651,7 @@ private fun NumberField(
             onChange(parsed.coerceIn(minimum, maximum))
         },
         label = label,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.lg, vertical = NovaSpacing.xs),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
     )
