@@ -61,6 +61,10 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaRadius
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaStroke
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.image.imageLoaderFor
 import com.denova.novara.core.network.DenovaClient
@@ -197,7 +201,7 @@ private fun LoreContent(
         val error = state.error?.resolve()
         if (notice != null || error != null) {
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -321,7 +325,7 @@ private fun LoreContent(
             onDismissRequest = { moveTarget = null },
             title = { Text(stringResource(R.string.lore_item_move)) },
             text = {
-                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                Column(Modifier.heightIn(max = NovaSize.panelMaxHeight).verticalScroll(rememberScrollState())) {
                     if (targets.isEmpty()) {
                         Text(stringResource(R.string.lore_no_project))
                     }
@@ -330,7 +334,7 @@ private fun LoreContent(
                             Modifier.fillMaxWidth().clickableRow {
                                 moveTarget = null
                                 viewModel.moveItem(item, category.id)
-                            }.padding(vertical = 10.dp),
+                            }.padding(vertical = NovaSpacing.tab),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
@@ -388,7 +392,7 @@ private fun LoreContent(
             onDismissRequest = viewModel::dismissClassification,
             title = { Text(stringResource(R.string.lore_classify)) },
             text = {
-                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                Column(Modifier.heightIn(max = NovaSize.panelMaxHeight).verticalScroll(rememberScrollState())) {
                     if (preview.warning.isNotBlank()) {
                         Text(preview.warning, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
@@ -447,8 +451,8 @@ private fun LoreList(
 ) {
     Column(Modifier.fillMaxSize()) {
         LazyRow(
-            Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
         ) {
             items(state.categories, key = { it.id }) { category ->
                 var menu by remember(category.id) { mutableStateOf(false) }
@@ -461,7 +465,7 @@ private fun LoreList(
                             } else {
                                 MaterialTheme.colorScheme.surface
                             },
-                            RoundedCornerShape(8.dp),
+                            RoundedCornerShape(NovaRadius.sm),
                         ),
                     ) {
                         Text("${categoryLabel(state, category.id)} ${state.categoryCount(category.id)}")
@@ -496,14 +500,14 @@ private fun LoreList(
             onValueChange = viewModel::setQuery,
             label = stringResource(R.string.lore_search_hint),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs),
         )
         HorizontalDivider()
         if (state.loading && state.items.isEmpty()) {
             Text(
                 stringResource(R.string.loading),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.padding(NovaSpacing.md),
             )
             return@Column
         }
@@ -535,7 +539,7 @@ private fun LoreRow(
         Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onOpen, onLongClick = onLongPress)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
@@ -586,7 +590,7 @@ private fun LoreEditor(
     val item = state.selectedItem()
     val coverUrl = remember(item, client) { client?.let { loreImageUrl(it, state.projectId, item) } }
 
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(NovaSpacing.md)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 if (draft.isNew) stringResource(R.string.lore_new_item) else draft.name,
@@ -602,7 +606,7 @@ private fun LoreEditor(
         // 进度与取消：上传 / 配图 / 语音在手机上可能持续数十秒，必须有可见状态与退出方式。
         if (state.uploading || state.generating != null) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(Modifier.size(NovaSize.spinner), strokeWidth = NovaStroke.thick)
                 Text(
                     text = when {
                         state.uploading -> stringResource(R.string.lore_upload_running)
@@ -610,7 +614,7 @@ private fun LoreEditor(
                         else -> stringResource(R.string.lore_generate_running_image)
                     },
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                    modifier = Modifier.weight(1f).padding(start = NovaSpacing.sm),
                 )
                 if (state.generating != null) {
                     TextButton(onClick = viewModel::cancelGeneration) {
@@ -627,7 +631,7 @@ private fun LoreEditor(
                 imageLoader = imageLoader,
                 contentDescription = stringResource(R.string.lore_image_label),
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(140.dp).padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().height(NovaSize.imagePreviewHeight).padding(vertical = NovaSpacing.xs),
             )
         }
 
@@ -636,7 +640,7 @@ private fun LoreEditor(
             onValueChange = { value -> viewModel.updateDraft { it.copy(name = value) } },
             label = stringResource(R.string.lore_field_name),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs),
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.lore_enabled), style = MaterialTheme.typography.bodySmall)
@@ -666,29 +670,29 @@ private fun LoreEditor(
             onValueChange = { value -> viewModel.updateDraft { it.copy(tagsText = value) } },
             label = stringResource(R.string.lore_field_tags),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs),
         )
         NovaTextField(
             value = draft.keywordsText,
             onValueChange = { value -> viewModel.updateDraft { it.copy(keywordsText = value) } },
             label = stringResource(R.string.lore_field_keywords),
             singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs),
         )
         NovaTextField(
             value = draft.briefDescription,
             onValueChange = { value -> viewModel.updateDraft { it.copy(briefDescription = value) } },
             label = stringResource(R.string.lore_field_brief),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs),
         )
         NovaTextField(
             value = draft.content,
             onValueChange = { value -> viewModel.updateDraft { it.copy(content = value) } },
             label = stringResource(R.string.lore_field_content),
             minLines = 6,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs),
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm)) {
             TextButton(
                 enabled = draft.canSave() && !state.busy,
                 onClick = viewModel::saveDraft,
@@ -739,7 +743,7 @@ private fun LoreEditor(
             Text(
                 stringResource(R.string.lore_materials, item.resolvedMaterials.size),
                 style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(vertical = 4.dp),
+                modifier = Modifier.padding(vertical = NovaSpacing.xs),
             )
             item.resolvedMaterials.forEach { material ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -752,7 +756,7 @@ private fun LoreEditor(
                             imageLoader = imageLoader,
                             contentDescription = material.name.ifBlank { material.originalName },
                             contentScale = ContentScale.Crop,
-                            modifier = Modifier.size(48.dp).padding(end = 8.dp),
+                            modifier = Modifier.size(NovaSize.coverWidth).padding(end = NovaSpacing.sm),
                         )
                     }
                     Column(Modifier.weight(1f)) {
@@ -814,7 +818,7 @@ private fun LoreEditor(
 
 @Composable
 private fun LoreIndexPanel(state: LoreUiState, viewModel: LoreViewModel, onClose: () -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(NovaSpacing.md)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.lore_index), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
             TextButton(enabled = !state.busy, onClick = viewModel::previewIndex) {
@@ -833,14 +837,14 @@ private fun LoreIndexPanel(state: LoreUiState, viewModel: LoreViewModel, onClose
             )
         }
         if (state.busy) {
-            LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 4.dp))
+            LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs))
         }
         NovaTextField(
             value = state.indexIntro,
             onValueChange = viewModel::setIndexIntro,
             label = stringResource(R.string.lore_index_intro),
             minLines = 4,
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xs),
         )
         state.index?.guide?.groups?.forEach { group ->
             HorizontalDivider()
@@ -886,7 +890,7 @@ private fun CategoryManagerDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.lore_category_manage)) },
         text = {
-            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+            LazyColumn(Modifier.heightIn(max = NovaSize.panelMaxHeight)) {
                 items(state.categories, key = { it.id }) { category ->
                     val index = state.categories.indexOfFirst { it.id == category.id }
                     val locked = category.id == LoreOptions.CHARACTER
@@ -943,7 +947,7 @@ private fun CategoryDeleteDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.lore_field_type)) },
         text = {
-            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            Column(Modifier.heightIn(max = NovaSize.panelMaxHeight).verticalScroll(rememberScrollState())) {
                 Text(
                     stringResource(
                         R.string.lore_category_delete_confirm,
@@ -955,7 +959,7 @@ private fun CategoryDeleteDialog(
                     stringResource(R.string.lore_category_destination),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(vertical = 4.dp),
+                    modifier = Modifier.padding(vertical = NovaSpacing.xs),
                 )
                 destinations.forEach { category ->
                     Row(
@@ -993,7 +997,7 @@ private fun OptionRow(
     var open by remember { mutableStateOf(false) }
     val selectedLabel = options.firstOrNull { it.first == selected }?.second ?: selected
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = 8.dp))
+        Text(label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(end = NovaSpacing.sm))
         Box {
             TextButton(onClick = { open = true }) { Text(selectedLabel.ifBlank { "-" }) }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
@@ -1150,7 +1154,7 @@ private fun RemoteMaterialDialog(
                     Text(
                         stringResource(R.string.lore_material_save_locally),
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 8.dp),
+                        modifier = Modifier.padding(start = NovaSpacing.sm),
                     )
                 }
             }
@@ -1180,7 +1184,7 @@ private fun ImageGenerateDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.lore_generate_image)) },
         text = {
-            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            Column(Modifier.heightIn(max = NovaSize.panelMaxHeight).verticalScroll(rememberScrollState())) {
                 Text(item.name, style = MaterialTheme.typography.bodyMedium)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = !custom, onClick = { mode = "agent" })
@@ -1230,13 +1234,13 @@ private fun AssetPickerDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.lore_materials_library)) },
         text = {
-            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+            LazyColumn(Modifier.heightIn(max = NovaSize.panelMaxHeight)) {
                 if (assets.isEmpty()) {
                     item { Text(stringResource(R.string.lore_material_empty)) }
                 }
                 items(assets, key = { it.id.ifBlank { it.path } }) { asset ->
                     Row(
-                        Modifier.fillMaxWidth().clickableRow { onPick(asset) }.padding(vertical = 10.dp),
+                        Modifier.fillMaxWidth().clickableRow { onPick(asset) }.padding(vertical = NovaSpacing.tab),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {

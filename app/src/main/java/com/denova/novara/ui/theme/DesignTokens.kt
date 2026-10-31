@@ -163,12 +163,15 @@ object NovaSize {
     /** 多行文本输入的最小高度（设置页长文本字段 120dp）。 */
     val textAreaMinHeight: Dp = 120.dp
 
+    /** 面板 / 弹窗内可滚动区的统一上限（终端输出、资料库面板、预设与 Skills 列表共用 420dp）。 */
+    val panelMaxHeight: Dp = 420.dp
+
     /** 游戏控制台日志区最大高度（避免长日志把整屏撑满）。 */
-    val consoleLogMaxHeight: Dp = 420.dp
+    val consoleLogMaxHeight: Dp = panelMaxHeight
 
     /** 预设编辑区高度区间（长表单不挤走底部按钮，也不无限拉长）。 */
     val presetEditorMinHeight: Dp = 200.dp
-    val presetEditorMaxHeight: Dp = 420.dp
+    val presetEditorMaxHeight: Dp = panelMaxHeight
 
     /** 调试面板的日志框高度与输入框宽度。 */
     val debugLogHeight: Dp = 160.dp
@@ -188,7 +191,11 @@ object NovaSize {
     /** Skills 编辑区高度区间与列表上限。 */
     val skillEditorMinHeight: Dp = 160.dp
     val skillEditorMaxHeight: Dp = 360.dp
-    val skillListMaxHeight: Dp = 420.dp
+    val skillListMaxHeight: Dp = panelMaxHeight
+
+    /** 小尺寸加载指示器（资料库行内）与图片预览高度。 */
+    val spinner: Dp = 18.dp
+    val imagePreviewHeight: Dp = 140.dp
 
     /** 工作台历史抽屉的列表上限。 */
     val historyListMaxHeight: Dp = 460.dp

@@ -67,6 +67,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.core.terminal.DEFAULT_BG
 import com.denova.novara.core.terminal.TerminalAttr
 import com.denova.novara.core.terminal.buildRowRuns
@@ -144,14 +146,14 @@ fun TerminalScreen(
         if (inline) {
             // 内嵌：只留一行状态（连接状态 / 网格尺寸 / 关闭会话），其余交给工作台页签条。
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(state.status.resolve(), style = MaterialTheme.typography.bodySmall)
                 Text(
                     text = "${state.cols}×${state.rows}",
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 8.dp),
+                    modifier = Modifier.padding(horizontal = NovaSpacing.sm),
                 )
                 Box(Modifier.weight(1f))
                 if (state.connected) {
@@ -162,7 +164,7 @@ fun TerminalScreen(
             }
         } else {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 NovaTopBar(
@@ -178,7 +180,7 @@ fun TerminalScreen(
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 NovaTextField(
@@ -187,7 +189,7 @@ fun TerminalScreen(
                     label = stringResource(R.string.term_project_id),
                     singleLine = true,
                     enabled = !state.connected,
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    modifier = Modifier.weight(1f).padding(end = NovaSpacing.sm),
                 )
                 NovaButton(
                     onClick = { viewModel.connect(projectId.trim()) },
@@ -198,7 +200,7 @@ fun TerminalScreen(
 
         state.error?.let {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -224,7 +226,7 @@ fun TerminalScreen(
                 text = {
                     Column(
                         modifier = Modifier
-                            .heightIn(max = 420.dp)
+                            .heightIn(max = NovaSize.panelMaxHeight)
                             .verticalScroll(rememberScrollState()),
                     ) {
                         Text(history, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
@@ -278,9 +280,9 @@ fun TerminalScreen(
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(8.dp)
+                        .padding(NovaSpacing.sm)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                        .padding(horizontal = NovaSpacing.sm, vertical = NovaSpacing.xxs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -293,7 +295,7 @@ fun TerminalScreen(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             NovaTextField(
@@ -310,7 +312,7 @@ fun TerminalScreen(
                         input = ""
                     },
                 ),
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                modifier = Modifier.weight(1f).padding(end = NovaSpacing.sm),
             )
             NovaButton(
                 onClick = {
@@ -324,8 +326,8 @@ fun TerminalScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm),
         ) {
             NovaButton(onClick = { viewModel.sendKey(3) }, enabled = state.connected, text = "Ctrl-C", primary = false,)
             NovaButton(onClick = { viewModel.sendKey(4) }, enabled = state.connected, text = "Ctrl-D", primary = false,)
