@@ -19,6 +19,27 @@
 - `AgentScreen` 的消息列表状态改为 `rememberSaveable(saver = LazyListState.Saver)`：切页返回不再回到顶部（原先每次重建 `rememberLazyListState`）。
 - 编辑器正文：`textFieldValue` 仍由 UI 状态（含 caret）驱动，返回时按 `uiState.content + caret` 重建，`BasicTextField` 会把光标滚入可见区。
 
+## 2026-10-31 长文档滚动/编辑位置对照（仍差一步）
+
+夹具：服务端 API 写入 `project-efb2ed8ad64c839df4b72c3a69772350/nav002-long.md`，1200 小节、59KB。
+设备 480dp，搜狗与百度输入法均 `ime disable`（否则点击正文会弹键盘把内容顶出视口）。
+
+| 步骤 | 结果 |
+|---|---|
+| 滚动到中部后点击正文，光标落在 `marker-46` 附近 | 切页前截图 `editor-before-switch.png`：可见 `marker-43…55`，光标在 46（屏幕中部） |
+| 点「写作」进入 Agent → 点「返回」 | 切页后截图 `editor-after-return.png`：可见 `marker-34…46`，光标仍在 46（屏幕下沿） |
+
+判读：
+
+- **编辑位置（caret）保留**：切页前后光标都在 `marker-46`，没有回到文档开头。
+- **滚动偏移有偏差**：重建 `TextFieldValue(content, caret)` 后 Compose 把光标滚到可见区下沿，视图相对切页前上移约 12 行。
+  也就是说当前实现保留的是「编辑位置」，不是「像素级滚动位置」。
+- **Agent 消息列表未验证**：本轮没有足够长的写作会话（消息撑不满一屏，`LazyListState` 的恢复看不出差别）。
+
+因此 NAV-002 仍保持 `未开始`：缺 Agent 侧长列表对照，且编辑器侧是「caret 保留 + 滚动偏移」而非严格意义的滚动位置保留。
+补齐方式：①在 Agent 页先用 API 灌 5~8 条长消息，再滚到中部做同样的前后截图；②若要求像素级滚动保留，
+需要在重建时恢复 `TextFieldValue` 的滚动偏移（Compose `BasicTextField` 无直接 API，需改为 `TextFieldState` 或自定义滚动同步）。
+
 ## 未覆盖（本条未回写为已完成的原因）
 
 - **滚动位置的逐屏真机对照**：需要一个足够长的会话（多条历史消息）或长文档才能观察「返回后停在原位置」。当前测试会话没有长历史，编辑器 `ideas.md` 内容也不足以滚动，因此只做到实现层保证，缺少真机对照证据。
