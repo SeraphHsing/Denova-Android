@@ -58,6 +58,8 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.core.export.DownloadsSaver
 import com.denova.novara.core.i18n.resolve
 import com.denova.novara.core.image.imageLoaderFor
@@ -170,8 +172,8 @@ fun BooksScreen(
             },
         )
         Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md),
+            horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs),
         ) {
             TextButton(onClick = { createOpen = true }) { Text(stringResource(R.string.home_createBook)) }
             TextButton(onClick = { novelPicker.launch(arrayOf("text/plain", "text/markdown", "application/octet-stream")) }) {
@@ -186,7 +188,7 @@ fun BooksScreen(
                 it.resolve(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
             )
         }
         state.notice?.let {
@@ -194,7 +196,7 @@ fun BooksScreen(
                 it.resolve(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
             )
         }
         state.error?.let {
@@ -202,19 +204,19 @@ fun BooksScreen(
                 it.resolve(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
             )
         }
         HorizontalDivider()
 
         if (state.books.isEmpty() && !state.loading) {
-            Column(Modifier.fillMaxSize().padding(24.dp)) {
+            Column(Modifier.fillMaxSize().padding(NovaSpacing.xl)) {
                 Text(stringResource(R.string.home_empty), style = MaterialTheme.typography.titleSmall)
                 Text(
                     stringResource(R.string.home_emptyDescription),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.sm),
                 )
             }
             return@Column
@@ -223,20 +225,20 @@ fun BooksScreen(
         LazyColumn(Modifier.fillMaxSize()) {
             val current = state.currentBook()
             item("current") {
-                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                Column(Modifier.padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm)) {
                     Text(
                         stringResource(R.string.home_currentBook).uppercase(),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline,
                     )
-                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(top = NovaSpacing.chip), verticalAlignment = Alignment.CenterVertically) {
                         Cover(
                             client = client,
                             book = current,
                             imageLoader = imageLoader,
-                            modifier = Modifier.width(48.dp).aspectRatio(3f / 4f),
+                            modifier = Modifier.width(NovaSize.coverWidth).aspectRatio(3f / 4f),
                         )
-                        Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                        Column(Modifier.weight(1f).padding(start = NovaSpacing.tab)) {
                             Text(
                                 current?.name?.ifBlank { stringResource(R.string.home_unnamedBook) }
                                     ?: stringResource(R.string.home_currentWorkspaceUnset),
@@ -254,7 +256,7 @@ fun BooksScreen(
                         }
                     }
                     if (current != null) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
                             TextButton(
                                 enabled = state.progress == null,
                                 onClick = {
@@ -286,22 +288,22 @@ fun BooksScreen(
                     stringResource(R.string.home_bookshelf),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(start = 12.dp, top = 8.dp, bottom = 4.dp),
+                    modifier = Modifier.padding(start = NovaSpacing.md, top = NovaSpacing.sm, bottom = NovaSpacing.xs),
                 )
             }
             items(state.books, key = { it.path }) { book ->
                 val currentBook = book.projectId == state.currentProjectId
                 Row(
-                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                    Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.chip),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Cover(
                         client = client,
                         book = book,
                         imageLoader = imageLoader,
-                        modifier = Modifier.width(48.dp).aspectRatio(3f / 4f),
+                        modifier = Modifier.width(NovaSize.coverWidth).aspectRatio(3f / 4f),
                     )
-                    Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                    Column(Modifier.weight(1f).padding(start = NovaSpacing.tab)) {
                         Text(
                             book.name.ifBlank { stringResource(R.string.home_unnamedBook) },
                             style = MaterialTheme.typography.bodyMedium,
@@ -326,7 +328,7 @@ fun BooksScreen(
                             stringResource(R.string.books_current_badge),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(end = 4.dp),
+                            modifier = Modifier.padding(end = NovaSpacing.xs),
                         )
                     }
                     TextButton(onClick = { viewModel.switchTo(book) }, enabled = !currentBook) {
@@ -334,8 +336,8 @@ fun BooksScreen(
                     }
                 }
                 Row(
-                    Modifier.fillMaxWidth().padding(start = 70.dp, end = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    Modifier.fillMaxWidth().padding(start = NovaSize.bookSummaryIndent, end = NovaSpacing.md),
+                    horizontalArrangement = Arrangement.spacedBy(NovaSpacing.xs),
                 ) {
                     TextButton(onClick = { editTarget = book }) { Text(stringResource(R.string.home_editInfo)) }
                     if (state.sortMode == "manual") {
@@ -495,7 +497,7 @@ private fun BookFormDialog(
                     onValueChange = { description = it },
                     label = stringResource(R.string.home_descriptionPlaceholder),
                     minLines = 2,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 140.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = NovaSize.descriptionMaxHeight),
                 )
             }
         },
@@ -546,7 +548,7 @@ private fun NovelImportDialog(
                     onValueChange = { title = it },
                     label = stringResource(R.string.home_bookTitlePlaceholder),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = NovaSpacing.sm),
                 )
                 NovaTextField(
                     value = author,
@@ -560,7 +562,7 @@ private fun NovelImportDialog(
                     onValueChange = { description = it },
                     label = stringResource(R.string.home_descriptionPlaceholder),
                     minLines = 2,
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 120.dp),
+                    modifier = Modifier.fillMaxWidth().heightIn(max = NovaSize.descriptionCollapsedHeight),
                 )
             }
         },
@@ -605,7 +607,7 @@ private fun CardImportDialog(
                     onValueChange = { title = it },
                     label = stringResource(R.string.home_bookTitlePlaceholder),
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = NovaSpacing.sm),
                 )
             }
         },

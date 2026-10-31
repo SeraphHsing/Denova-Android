@@ -174,6 +174,22 @@ object NovaSize {
     val debugLogHeight: Dp = 160.dp
     val debugBoxWidth: Dp = 240.dp
 
+    /** 书籍封面宽度（列表与详情共用，3:4 竖版）与摘要相对封面的左缩进。 */
+    val coverWidth: Dp = 48.dp
+    val bookSummaryIndent: Dp = 70.dp
+
+    /** 书籍简介的展开上限与折叠高度。 */
+    val descriptionMaxHeight: Dp = 140.dp
+    val descriptionCollapsedHeight: Dp = 120.dp
+
+    /** Agent 指令编辑区上限（下限复用 [textAreaMinHeight]）。 */
+    val agentEditorMaxHeight: Dp = 300.dp
+
+    /** Skills 编辑区高度区间与列表上限。 */
+    val skillEditorMinHeight: Dp = 160.dp
+    val skillEditorMaxHeight: Dp = 360.dp
+    val skillListMaxHeight: Dp = 420.dp
+
     /** 文件标签最大宽度与关闭按钮盒，避免长路径把标签条撑爆（编辑器标签条）。 */
     val tabMaxWidth: Dp = 120.dp
     val tabCloseBox: Dp = 18.dp

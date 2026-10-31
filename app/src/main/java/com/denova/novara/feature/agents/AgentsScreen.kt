@@ -46,6 +46,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.core.agents.AgentDefinitions
 import com.denova.novara.core.agents.BuiltinAgent
 import com.denova.novara.core.i18n.resolve
@@ -118,11 +120,11 @@ fun AgentsScreen(
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
             state = listState,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(NovaSpacing.sm),
         ) {
             item(key = "engines") {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
                     Text(stringResource(R.string.agents_engine), style = MaterialTheme.typography.labelLarge)
                     if (state.engines.isEmpty() && !state.enginesLoading) {
                         Text(
@@ -360,7 +362,7 @@ private fun BuiltinDetailCard(
     onEnter: () -> Unit,
     onCreateCustom: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
         HorizontalDivider()
         Text(titleOf(builtin), style = MaterialTheme.typography.titleSmall)
         Text(
@@ -376,7 +378,7 @@ private fun BuiltinDetailCard(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.outline,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             TextButton(onClick = onEnter, enabled = !busy) { Text(stringResource(R.string.agents_enter)) }
             if (builtin.customizable) {
                 TextButton(onClick = onCreateCustom, enabled = !busy) {
@@ -395,7 +397,7 @@ private fun CustomDetailCard(
     onEdit: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.xs)) {
         HorizontalDivider()
         Text(agent.name.ifBlank { agent.id }, style = MaterialTheme.typography.titleSmall)
         Text(
@@ -424,7 +426,7 @@ private fun CustomDetailCard(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             TextButton(onClick = onEnter, enabled = !busy) { Text(stringResource(R.string.agents_enter)) }
             TextButton(onClick = onEdit, enabled = !busy) { Text(stringResource(R.string.agents_edit)) }
             TextButton(onClick = onDelete, enabled = !busy) { Text(stringResource(R.string.agents_delete)) }
@@ -443,7 +445,7 @@ private fun AgentEditorCard(
     onSave: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
         HorizontalDivider()
         Text(
             if (state.creating) stringResource(R.string.agents_create_title)
@@ -454,7 +456,7 @@ private fun AgentEditorCard(
             Text(stringResource(R.string.agents_contract), style = MaterialTheme.typography.labelMedium)
             Row(
                 Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
             ) {
                 AgentDefinitions.customizableKinds.forEach { kind ->
                     FilterChip(
@@ -488,14 +490,15 @@ private fun AgentEditorCard(
             value = state.editInstructions,
             onValueChange = onInstructions,
             label = stringResource(R.string.agents_instructions),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 300.dp),
+            modifier = Modifier.fillMaxWidth()
+                .heightIn(min = NovaSize.textAreaMinHeight, max = NovaSize.agentEditorMaxHeight),
             textStyle = MaterialTheme.typography.bodySmall,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
             Switch(checked = state.editEnabled, onCheckedChange = onEnabled, enabled = !state.creating)
             Text(stringResource(R.string.agents_enabled), style = MaterialTheme.typography.bodySmall)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
             TextButton(onClick = onSave, enabled = !state.busy) { Text(stringResource(R.string.presets_save)) }
             TextButton(onClick = onCancel, enabled = !state.busy) {
                 Text(stringResource(R.string.common_cancel))

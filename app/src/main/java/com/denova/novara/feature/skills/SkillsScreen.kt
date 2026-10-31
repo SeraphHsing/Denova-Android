@@ -59,6 +59,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import com.denova.novara.ui.components.NovaIconButton
 import com.denova.novara.ui.components.NovaTopBar
+import com.denova.novara.ui.theme.NovaSize
+import com.denova.novara.ui.theme.NovaSpacing
 import com.denova.novara.ui.theme.NovaText
 import com.denova.novara.ui.theme.NovaTheme
 import androidx.compose.material.icons.filled.Menu
@@ -130,13 +132,13 @@ fun SkillsScreen(
         LazyColumn(
             Modifier.fillMaxWidth().weight(1f),
             state = listState,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(horizontal = NovaSpacing.md, vertical = NovaSpacing.sm),
+            verticalArrangement = Arrangement.spacedBy(NovaSpacing.sm),
         ) {
             item(key = "targets") {
                 Row(
                     Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     FilterChip(
@@ -185,7 +187,7 @@ fun SkillsScreen(
             }
 
             item(key = "filters") {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                     NovaTextField(
                         value = state.query,
                         onValueChange = viewModel::setQuery,
@@ -195,7 +197,7 @@ fun SkillsScreen(
                     )
                     Row(
                         Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         FilterChip(
@@ -220,7 +222,7 @@ fun SkillsScreen(
                     }
                     Row(
                         Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         FilterChip(
@@ -402,11 +404,11 @@ private fun SkillRow(
     onToggle: (Boolean) -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xxs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(
-            Modifier.weight(1f).padding(end = 8.dp),
+            Modifier.weight(1f).padding(end = NovaSpacing.sm),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -466,7 +468,7 @@ private fun DocumentCard(
     onEditFile: (String) -> Unit,
     onSaveFile: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
         HorizontalDivider()
         Text(
             "${document.name} · ${scopeLabel(document.scope)}",
@@ -495,12 +497,13 @@ private fun DocumentCard(
         NovaTextField(
             value = content,
             onValueChange = onEdit,
-            modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 360.dp),
+            modifier = Modifier.fillMaxWidth()
+                .heightIn(min = NovaSize.skillEditorMinHeight, max = NovaSize.skillEditorMaxHeight),
             label = stringResource(R.string.skills_document_content),
             textStyle = MaterialTheme.typography.bodySmall,
         )
 
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip), verticalAlignment = Alignment.CenterVertically) {
             if (document.editable) {
                 TextButton(onClick = onSave, enabled = !busy) {
                     Text(
@@ -529,7 +532,7 @@ private fun DocumentCard(
 
         if (files.isNotEmpty() || activeFile.isNotBlank()) {
             Text(stringResource(R.string.skills_files), style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip), verticalAlignment = Alignment.CenterVertically) {
                 AssistChip(
                     onClick = onCloseFile,
                     label = { Text("SKILL.md") },
@@ -556,11 +559,12 @@ private fun DocumentCard(
             NovaTextField(
                 value = fileContent,
                 onValueChange = onEditFile,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 160.dp, max = 360.dp),
+                modifier = Modifier.fillMaxWidth()
+                .heightIn(min = NovaSize.skillEditorMinHeight, max = NovaSize.skillEditorMaxHeight),
                 label = activeFile,
                 textStyle = MaterialTheme.typography.bodySmall,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                 TextButton(onClick = onSaveFile, enabled = !busy && !fileLoading) {
                     Text(
                         if (fileDirty) stringResource(R.string.skills_save_dirty)
@@ -592,11 +596,11 @@ private fun CreateSkillDialog(
         title = { Text(stringResource(R.string.skills_create_title)) },
         text = {
             Column(
-                Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                Modifier.heightIn(max = NovaSize.skillListMaxHeight).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
             ) {
                 Text(stringResource(R.string.skills_create_scope), style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                     scopes.forEach { candidate ->
                         FilterChip(
                             selected = scope == candidate,
@@ -619,7 +623,7 @@ private fun CreateSkillDialog(
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(stringResource(R.string.skills_create_category), style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(NovaSpacing.chip)) {
                     SkillLibrary.standardCategories.forEach { candidate ->
                         FilterChip(
                             selected = category == candidate,
