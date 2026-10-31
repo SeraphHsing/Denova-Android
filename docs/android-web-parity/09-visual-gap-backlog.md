@@ -96,5 +96,5 @@
 ## 3. 完成标准（P5 退出条件）
 
 1. `DesignTokens` 存在且被抽屉/顶栏/按钮/输入四类共用件引用；`grep -r "\.dp\b" feature/` 里不再有散落的尺寸字面量（允许 token 定义处除外）。**已达成（2026-11-01）**：`feature/` 下 22 个文件共 457 处字面量分批清零（7 批提交），只剩 6 处语义为「归零」的 `0.dp`（`tonalElevation`、`padding(0.dp)`、`padding(start = if (indent) … else 0.dp)`）。
-2. 每屏都有「Web 390×844 截图 / 真机 390dp 截图」成对证据，尺寸差 ≤ 1dp（字号 ≤ 1sp）。
+2. 每屏都有「Web 390×844 截图 / 真机 390dp 截图」成对证据，尺寸差 ≤ 1dp（字号 ≤ 1sp）。**真机侧 2026-11-01 已采 17 屏**（editor / drawer / settings / library + workbench / game / agent / debug / lore / presets / versions / books / skills / agents / automations / market，脚本 `tools/p5_android_capture.py`，[证据](../evidence/p5-screens/README.md)）；**Web 侧 390×844 尚未采**（需登录测试服务器后跑 `tools/web_parity_capture.py`），未采屏：终端、连接页、占位页（占位页应删除）。
 3. 本文第 1 节表格逐行变为 `已对齐` + 证据链接。
