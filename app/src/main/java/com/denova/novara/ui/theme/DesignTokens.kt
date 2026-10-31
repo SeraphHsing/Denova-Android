@@ -59,6 +59,9 @@ object NovaSpacing {
  * - 抽屉内容侧 `24px`；`1rem` 圆角（sheet）与胶囊按钮另计。
  */
 object NovaRadius {
+    /** 行内标记（如审批徽标）的 4dp 小圆角。 */
+    val micro: Dp = 4.dp
+
     /** `--radius-sm: calc(--radius × 0.6)`。 */
     val xs: Dp = 6.dp
 

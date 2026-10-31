@@ -49,6 +49,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.denova.novara.R
+import com.denova.novara.ui.theme.NovaRadius
+import com.denova.novara.ui.theme.NovaSpacing
+import com.denova.novara.ui.theme.NovaStroke
 import com.denova.novara.core.stream.AgentContextAnalysis
 import com.denova.novara.core.stream.AgentContextLogic
 import com.denova.novara.core.stream.AgentTodoItem
@@ -169,9 +172,9 @@ private fun AgentApprovalCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-            .padding(10.dp),
+            .padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(NovaRadius.sm))
+            .padding(NovaSpacing.tab),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
@@ -185,7 +188,7 @@ private fun AgentApprovalCard(
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        Row(modifier = Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.padding(top = NovaSpacing.xs), horizontalArrangement = Arrangement.spacedBy(NovaSpacing.sm)) {
             Text(
                 stringResource(R.string.approval_label_tool) + "：" + approval.toolName,
                 style = MaterialTheme.typography.bodySmall,
@@ -213,36 +216,36 @@ private fun AgentApprovalCard(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(4.dp))
-                    .padding(6.dp),
+                    .padding(top = NovaSpacing.xs)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(NovaRadius.micro))
+                    .padding(NovaSpacing.chip),
             )
         }
         Text(
             stringResource(R.string.approval_reason_label) + "：" + approvalReasonText(AgentApprovalLogic.reason(approval.ruleId)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = NovaSpacing.xs),
         )
         if (AgentApprovalLogic.canAlwaysAllow(approval)) {
             Text(
                 stringResource(R.string.approval_scope, approval.ruleDisplayPattern),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 4.dp),
+                modifier = Modifier.padding(top = NovaSpacing.xs),
             )
         }
-        Row(modifier = Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(top = NovaSpacing.chip), verticalAlignment = Alignment.CenterVertically) {
             NovaButton(onClick = { onDecide(ApprovalOption.DENY) }, enabled = !submitting, text = stringResource(R.string.approval_deny), primary = false,)
             if (AgentApprovalLogic.canAlwaysAllow(approval)) {
                 NovaButton(
                     onClick = { onDecide(ApprovalOption.ALLOW_WORKSPACE) },
                     enabled = !submitting,
-                    modifier = Modifier.padding(start = 8.dp), text = stringResource(R.string.approval_allow_workspace), primary = false,)
+                    modifier = Modifier.padding(start = NovaSpacing.sm), text = stringResource(R.string.approval_allow_workspace), primary = false,)
             }
             NovaButton(
                 onClick = { onDecide(ApprovalOption.ALLOW_ONCE) },
                 enabled = !submitting,
-                modifier = Modifier.padding(start = 8.dp), text = stringResource(R.string.approval_allow_once), primary = false,)
+                modifier = Modifier.padding(start = NovaSpacing.sm), text = stringResource(R.string.approval_allow_once), primary = false,)
             TextButton(onClick = onCancel, enabled = !submitting) {
                 Text(stringResource(R.string.ask_cancel))
             }
@@ -271,9 +274,9 @@ private fun AgentAskCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
-            .padding(10.dp),
+            .padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs)
+            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(NovaRadius.sm))
+            .padding(NovaSpacing.tab),
     ) {
         if (verification != null) {
             Text(stringResource(R.string.verify_title), style = MaterialTheme.typography.titleSmall)
@@ -281,13 +284,13 @@ private fun AgentAskCard(
                 stringResource(R.string.verify_description),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(top = 2.dp),
+                modifier = Modifier.padding(top = NovaSpacing.xxs),
             )
             if (verification.tool.isNotBlank()) {
                 Text(
                     verification.tool,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.xs),
                 )
             }
             AgentVerificationLogic.argumentsText(verification)?.let { arguments ->
@@ -297,7 +300,7 @@ private fun AgentAskCard(
                     color = MaterialTheme.colorScheme.outline,
                     maxLines = 8,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 2.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.xxs),
                 )
             }
         }
@@ -305,7 +308,7 @@ private fun AgentAskCard(
             Text(
                 if (verification != null) stringResource(R.string.verify_question) else question.question,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = if (verification != null) 8.dp else 0.dp),
+                modifier = Modifier.padding(top = if (verification != null) NovaSpacing.sm else 0.dp),
             )
             val picked = selected[question.id].orEmpty()
             question.options.forEach { option ->
@@ -313,10 +316,10 @@ private fun AgentAskCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable(enabled = !submitting) { onToggle(question, option.id) }
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = NovaSpacing.xs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(if (option.id in picked) "●" else "○", modifier = Modifier.padding(end = 8.dp))
+                    Text(if (option.id in picked) "●" else "○", modifier = Modifier.padding(end = NovaSpacing.sm))
                     Column {
                         val localized = AgentVerificationLogic.optionLabelRes(option.id)
                             ?.takeIf { verification != null }
@@ -339,12 +342,12 @@ private fun AgentAskCard(
                 }
             }
         }
-        Row(modifier = Modifier.padding(top = 6.dp)) {
+        Row(modifier = Modifier.padding(top = NovaSpacing.chip)) {
             NovaButton(onClick = onSubmit, enabled = !submitting, text = stringResource(if (submitting) R.string.ask_submitting else R.string.ask_submit), primary = false,)
             NovaButton(
                 onClick = onCancel,
                 enabled = !submitting,
-                modifier = Modifier.padding(start = 8.dp), text = stringResource(
+                modifier = Modifier.padding(start = NovaSpacing.sm), text = stringResource(
                         if (verification != null) R.string.verify_cancel_task else R.string.ask_cancel,
                     ), primary = false,)
         }
@@ -358,7 +361,7 @@ private fun AgentMessageRow(
     message: AgentMessageView,
     loadImage: suspend (AgentImagePart) -> ByteArray?,
 ) {
-    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = NovaSpacing.chip)) {
         Text(
             stringResource(if (message.isUser) R.string.agent_role_user else R.string.agent_role_assistant),
             style = MaterialTheme.typography.labelSmall,
@@ -388,7 +391,7 @@ private fun AgentMessageRow(
 @Composable
 private fun AgentCollapsibleBlock(title: String, body: String) {
     var expanded by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xxs)) {
         Row(
             Modifier.fillMaxWidth().clickable { expanded = !expanded },
             verticalAlignment = Alignment.CenterVertically,
@@ -435,9 +438,9 @@ private fun AgentToolCard(part: AgentToolPart, loadImage: suspend (AgentImagePar
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp)
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
-            .padding(8.dp),
+            .padding(vertical = NovaSpacing.xxs)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f), RoundedCornerShape(NovaRadius.xs))
+            .padding(NovaSpacing.sm),
     ) {
         Row(
             Modifier.fillMaxWidth().clickable { expanded = !expanded },
@@ -469,7 +472,7 @@ private fun AgentToolCard(part: AgentToolPart, loadImage: suspend (AgentImagePar
                     stringResource(R.string.agent_tool_input),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.xs),
                 )
                 Text(
                     AgentPartLogic.prettyText(part.inputJson),
@@ -481,7 +484,7 @@ private fun AgentToolCard(part: AgentToolPart, loadImage: suspend (AgentImagePar
                     stringResource(R.string.agent_tool_output),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.outline,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.xs),
                 )
                 Text(
                     AgentPartLogic.prettyText(part.outputText),
@@ -493,7 +496,7 @@ private fun AgentToolCard(part: AgentToolPart, loadImage: suspend (AgentImagePar
                     stringResource(R.string.agent_tool_error),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 4.dp),
+                    modifier = Modifier.padding(top = NovaSpacing.xs),
                 )
                 Text(part.errorText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
             }
@@ -511,7 +514,7 @@ private fun AgentImageCard(part: AgentImagePart, loadImage: suspend (AgentImageP
         val decoded = bytes?.let { runCatching { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }.getOrNull() }
         if (decoded == null) failed = true else bitmap = decoded
     }
-    Column(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = NovaSpacing.xxs)) {
         Text(
             stringResource(R.string.agent_part_image) + " · " + part.label,
             style = MaterialTheme.typography.labelMedium,
@@ -521,7 +524,7 @@ private fun AgentImageCard(part: AgentImagePart, loadImage: suspend (AgentImageP
             image != null -> Image(
                 bitmap = image.asImageBitmap(),
                 contentDescription = part.label,
-                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = NovaSpacing.xs),
                 contentScale = ContentScale.FillWidth,
             )
 
@@ -544,7 +547,7 @@ private fun AgentImageCard(part: AgentImagePart, loadImage: suspend (AgentImageP
 @Composable
 private fun AgentDataRow(part: AgentDataPart) {
     var expanded by remember(part.id) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(vertical = 1.dp)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = NovaStroke.hairline)) {
         Row(
             Modifier.fillMaxWidth().clickable { expanded = !expanded },
             verticalAlignment = Alignment.CenterVertically,
@@ -640,13 +643,13 @@ fun AgentScreen(
                 },
             )
 
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md)) {
                 NovaTextField(
                     value = sessionId,
                     onValueChange = { sessionId = it },
                     label = "session ID",
                     singleLine = true,
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    modifier = Modifier.weight(1f).padding(end = NovaSpacing.sm),
                 )
                 NovaButton(onClick = { viewModel.start(sessionId.trim(), projectId) }, text = stringResource(R.string.common_attach), primary = false,)
             }
@@ -662,7 +665,7 @@ fun AgentScreen(
             if (state.pendingAsks.isNotEmpty()) stringResource(R.string.agent_waiting_ask) else base
         }
         val activityText = if (state.ui.activity.isNotBlank()) " · ${state.ui.activity}" else ""
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md)) {
             Text(
                 stringResource(R.string.agent_status, phaseText + activityText + (if (state.connected) " · " + stringResource(R.string.common_connected) else "")),
                 style = MaterialTheme.typography.bodySmall,
@@ -673,13 +676,13 @@ fun AgentScreen(
         // 命令提交中禁用避免重复下发，停止请求后显示「正在停止…」等待最终状态。
         val canControl = state.activeOperationId.isNotBlank()
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
         ) {
             NovaButton(
                 onClick = { viewModel.pause() },
                 enabled = canControl && !state.commandSubmitting,
-                modifier = Modifier.padding(end = 8.dp), text = stringResource(R.string.agent_pause), primary = false,)
+                modifier = Modifier.padding(end = NovaSpacing.sm), text = stringResource(R.string.agent_pause), primary = false,)
             NovaButton(
                 onClick = { viewModel.abort() },
                 enabled = canControl && !state.commandSubmitting, text = stringResource(if (state.abortPending) R.string.agent_stopping else R.string.agent_stop), primary = false,)
@@ -690,7 +693,7 @@ fun AgentScreen(
                     viewModel.loadContextAnalysis()
                 },
                 enabled = sessionId.isNotBlank() && !state.contextLoading,
-                modifier = Modifier.padding(start = 8.dp), text = stringResource(R.string.agent_context_open), primary = false,)
+                modifier = Modifier.padding(start = NovaSpacing.sm), text = stringResource(R.string.agent_context_open), primary = false,)
             val phaseLabel = when (state.runtimePhase) {
                 "suspended" -> stringResource(R.string.agent_suspended)
                 "" -> ""
@@ -700,7 +703,7 @@ fun AgentScreen(
                 Text(
                     phaseLabel,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 8.dp),
+                    modifier = Modifier.padding(start = NovaSpacing.sm),
                 )
             }
         }
@@ -709,7 +712,7 @@ fun AgentScreen(
         // 推进（AGT-009），客户端原样回传身份，不另发新命令；`start_turn` 由挂接路径自动消费。
         if (state.recoveryActions.isNotEmpty()) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -721,7 +724,7 @@ fun AgentScreen(
                     NovaButton(
                         onClick = { viewModel.runRecoveryAction(action) },
                         enabled = !state.recoveryActionPending,
-                        modifier = Modifier.padding(start = 8.dp), text = stringResource(
+                        modifier = Modifier.padding(start = NovaSpacing.sm), text = stringResource(
                                 when (action.kind) {
                                     AgentRecoveryKind.RESUME -> R.string.agent_recovery_resume
                                     else -> R.string.agent_recovery_abort
@@ -731,7 +734,7 @@ fun AgentScreen(
             }
         }
         state.error?.let {
-            Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = 12.dp))
+            Text(it.resolve(), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(horizontal = NovaSpacing.md))
         }
         // 流级错误原因（AGT-009）：服务端 error 帧的 errorText；没有具体原因时说明「为什么是错误」，
         // 否则用户只看到「状态：错误」而不知道这一轮为什么没跑完。
@@ -747,14 +750,14 @@ fun AgentScreen(
                     reason,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(horizontal = 12.dp),
+                    modifier = Modifier.padding(horizontal = NovaSpacing.md),
                 )
             }
         }
         // 发送结果不明（AGT-008）：明确标出 uncertain，并提供「重新核对」；不会自动重发新命令。
         if (state.uncertainCommandId.isNotBlank() || state.reconcileNotice != null) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -779,7 +782,7 @@ fun AgentScreen(
                 color = MaterialTheme.colorScheme.outline,
                 maxLines = 4,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 12.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md),
             )
         }
 
@@ -855,7 +858,7 @@ fun AgentScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = NovaSpacing.md),
         ) {
             if (state.historyHasMore || state.historyLoadingMore) {
                 item(key = "history-older") {
@@ -871,7 +874,7 @@ fun AgentScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { loadOlder() }
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = NovaSpacing.chip),
                     )
                 }
             }
@@ -901,7 +904,7 @@ fun AgentScreen(
             }
             if (state.ui.content.isNotBlank()) {
                 item(key = "live-tail") {
-                    Column(Modifier.padding(vertical = 4.dp)) {
+                    Column(Modifier.padding(vertical = NovaSpacing.xs)) {
                         Text(
                             stringResource(R.string.agent_live_tail),
                             style = MaterialTheme.typography.labelSmall,
@@ -949,7 +952,7 @@ fun AgentScreen(
                 it.resolve(),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 12.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md),
             )
         }
         state.resolvedAsks.forEach { ask ->
@@ -967,7 +970,7 @@ fun AgentScreen(
                 text,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
-                modifier = Modifier.padding(horizontal = 12.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md),
             )
         }
 
@@ -977,18 +980,18 @@ fun AgentScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 2.dp),
+                    .padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
             ) {
                 selections.forEachIndexed { index, selection ->
                     Row(
                         modifier = Modifier
-                            .padding(end = 6.dp)
+                            .padding(end = NovaSpacing.chip)
                             .background(
                                 MaterialTheme.colorScheme.secondaryContainer,
-                                androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
+                                androidx.compose.foundation.shape.RoundedCornerShape(NovaRadius.xs),
                             )
                             .clickable { viewModel.removeSelection(index) }
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(horizontal = NovaSpacing.sm, vertical = NovaSpacing.xs),
                     ) {
                         Text(
                             "${TextSelectionQuote.label(selection)} ${TextSelectionQuote.excerpt(selection)} ×",
@@ -1004,7 +1007,7 @@ fun AgentScreen(
             Text(
                 stringResource(R.string.agent_queue_hint),
                 style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+                modifier = Modifier.padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
             )
             state.queue.forEach { item ->
                 // 队列项控制（AGT-007）：转向只改该项执行方式，删除只移除该项，取回把正文放回输入框。
@@ -1015,7 +1018,7 @@ fun AgentScreen(
                     if (item.messageTruncated) append(stringResource(R.string.agent_queue_truncated))
                 }
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xxs),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -1054,7 +1057,7 @@ fun AgentScreen(
                 viewModel.setComposerDraft("")
             }
         }
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = NovaSpacing.md, vertical = NovaSpacing.xs)) {
             NovaTextField(
                 value = draft,
                 onValueChange = { viewModel.setComposerDraft(it) },
@@ -1063,7 +1066,7 @@ fun AgentScreen(
                 // 键盘「发送」键与右侧按钮等价（终端输入同样以 IME 动作提交）。
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { submitComposer() }),
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
+                modifier = Modifier.weight(1f).padding(end = NovaSpacing.sm),
             )
             NovaButton(
                 onClick = submitComposer,
@@ -1114,7 +1117,7 @@ private fun AgentContextDialog(
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(NovaSpacing.chip),
             ) {
                 when {
                     loading -> Text(
