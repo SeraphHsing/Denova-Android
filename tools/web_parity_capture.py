@@ -53,6 +53,10 @@ METRICS_JS = """
     for (const p of props) out[p] = c.getPropertyValue(p);
     return out;
   };
+  const visible = (el) => {
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
   const TYPO = ['font-size', 'font-weight', 'line-height', 'letter-spacing', 'color'];
   const BOX = ['background-color', 'border-radius', 'border-top-width', 'padding-left', 'padding-right', 'box-shadow'];
   const sheet = document.querySelector('.nova-mobile-sheet[data-slot="sheet-content"]');
@@ -71,18 +75,26 @@ METRICS_JS = """
     current: el.getAttribute('aria-current') === 'page',
     ...rect(el),
   }));
-  // 列表行（09 §2「列表」类）：设置 / 资料库 / 消息中心等页面的行高、内边距与分隔线。
   const ROW_PROPS = ['font-size', 'font-weight', 'line-height', 'padding-top', 'padding-bottom',
     'border-bottom-width', 'border-bottom-color', 'background-color'];
-  const listRows = [...document.querySelectorAll('[role="listitem"], li, .nova-list-row, [data-list-row]')]
-    .slice(0, 60)
+  // 列表行（09 §2「列表」类）：设置 / 资料库 / 消息中心等页面的行高、内边距与分隔线。
+  // 基线多数列表是 div + data-slot 结构（不是 li），所以同时收 [data-slot=field] / card 直接子块。
+  const listRows = [
+    ...document.querySelectorAll('[role="listitem"], li, .nova-list-row, [data-list-row]'),
+    ...document.querySelectorAll('[data-slot="field"], [data-slot="item"]'),
+    ...document.querySelectorAll('[data-slot="card"] > div'),
+  ]
+    .filter(visible)
+    .slice(0, 80)
     .map((el) => ({
       text: (el.textContent || '').trim().slice(0, 40),
+      slot: el.getAttribute('data-slot'),
       ...rect(el),
       ...style(el, ROW_PROPS),
     }));
   // 编辑器排版（09 §2「编辑器」类）：正文块的字号 / 行高 / 字距 / 段距，以及代码块与表格。
-  const doc = document.querySelector('[contenteditable="true"], .ProseMirror, [data-editor-content]');
+  const doc = [...document.querySelectorAll('[contenteditable="true"], .ProseMirror, [data-editor-content]')]
+    .find(visible) || null;
   const docBlock = (sel) => {
     const el = doc && doc.querySelector(sel);
     if (!el) return null;
@@ -90,6 +102,7 @@ METRICS_JS = """
   };
   // 通用控件读数（09 §2「输入 / 按钮 / 标签」类）：非登录页也能取到输入框与按钮的实际盒模型。
   const controls = [...document.querySelectorAll('input, textarea, select, button, [role="switch"]')]
+    .filter(visible)
     .slice(0, 60)
     .map((el) => ({
       tag: el.tagName.toLowerCase(),
@@ -208,19 +221,25 @@ def open_destination(page: Page, names: tuple[str, ...]) -> bool:
 
 
 def open_first_file(page: Page) -> bool:
-    """工作台 →「文件」页签 → 文件树第一项，进入编辑器后才有正文排版读数。"""
-    for sel in ('[role="tab"]:has-text("文件")', 'button:has-text("文件")'):
-        tab = page.locator(sel).first
-        if tab.count() > 0:
-            tab.click()
-            page.wait_for_timeout(1200)
+    """工作台 →「打开文件」→ 章节/文件树第一项，进入编辑器后才有正文排版读数。"""
+    for sel in ('button:has-text("打开文件")', '[role="tab"]:has-text("文件")'):
+        opener = page.locator(sel).first
+        if opener.count() > 0:
+            opener.click()
+            page.wait_for_timeout(2200)
             break
     for sel in ('[role="treeitem"]', '[data-file-path]', '[data-tree-node]'):
         items = page.locator(sel)
         if items.count() > 0:
             items.first.click()
-            page.wait_for_timeout(2500)
+            page.wait_for_timeout(3000)
             return True
+    # 基线手机端章节以文本行渲染（`chapters/` 下），没有 treeitem 角色。
+    chapter = page.get_by_text(re.compile(r"第\s*\d+\s*章")).first
+    if chapter.count() > 0:
+        chapter.click()
+        page.wait_for_timeout(3000)
+        return True
     print("  warn: no file node found, editor metrics skipped")
     return False
 
@@ -309,7 +328,17 @@ def run_scene(browser: Browser, base: str, width: int, out_dir: Path, records: d
     def scene_page() -> Page:
         fresh = context.new_page()
         fresh.goto(base, wait_until="domcontentloaded", timeout=30000)
-        fresh.wait_for_selector('[data-nova-mobile-shell="true"]', timeout=25000)
+        try:
+            fresh.wait_for_selector('[data-nova-mobile-shell="true"]', timeout=8000)
+        except Exception:  # noqa: BLE001 - 会话未带过来时退回登录页重登
+            if fresh.locator("#remote-username").count() > 0:
+                fresh.fill("#remote-username", os.environ.get("DENOVA_USER", ""))
+                fresh.fill("#remote-password", os.environ.get("DENOVA_PASS", ""))
+                fresh.click('button[form="remote-access-login"]')
+                fresh.wait_for_selector("#remote-username", state="detached", timeout=40000)
+                fresh.wait_for_selector('[data-nova-mobile-shell="true"]', timeout=25000)
+            else:
+                print("  warn: app shell missing and no login form")
         fresh.wait_for_timeout(1500)
         return fresh
 
@@ -343,7 +372,7 @@ def main() -> None:
     parser.add_argument(
         "--scene",
         default="all",
-        choices=["all", "login", "workspace", "editor", "library", "messages", "settings"],
+        help="all 或逗号分隔的子集：" + ",".join(ALL_SCENES),
     )
     parser.add_argument("--lang", default="", choices=["", "zh", "en"], help="空表示不干预（默认中文环境）")
     parser.add_argument("--scheme", default="", choices=["", "light"], help="空表示基线默认深色；light 走 data-theme=light")
@@ -356,7 +385,13 @@ def main() -> None:
     args = parser.parse_args()
 
     widths = [int(w) for w in args.widths.split(",") if w.strip()]
-    scenes = set(ALL_SCENES) if args.scene == "all" else {args.scene}
+    if args.scene == "all":
+        scenes = set(ALL_SCENES)
+    else:
+        scenes = {s.strip() for s in args.scene.split(",") if s.strip()}
+        unknown = scenes - set(ALL_SCENES)
+        if unknown:
+            fail(f"未知场景：{','.join(sorted(unknown))}")
     # 除登录页外都需要已认证外壳，凭证只在真实登录时才要求。
     base, _user, _password = collect_credentials(require_login=bool(scenes - {"login"}))
     lang = args.lang or None
